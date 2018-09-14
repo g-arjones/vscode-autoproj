@@ -7,14 +7,7 @@ import * as wrappers from './wrappers';
 import * as context from './context';
 import * as autoproj from './autoproj';
 import * as commands from './commands';
-import * as packages from './packages';
-import * as debug from './debug';
-import * as config from './config';
-import * as fs from 'fs';
-import { join as joinpath } from 'path';
-import * as snippets from './snippets';
 import * as watcher from './watcher';
-import * as path from 'path'
 
 function watchManifest(ws: autoproj.Workspace, fileWatcher: watcher.FileWatcher)
 {
@@ -27,15 +20,13 @@ function watchManifest(ws: autoproj.Workspace, fileWatcher: watcher.FileWatcher)
                 }
             );
         });
-    }
-    catch (err) {
+    } catch (err) {
         vscode.window.showErrorMessage(err.message);
     }
 }
 
 function unwatchManifest(ws: autoproj.Workspace, fileWatcher: watcher.FileWatcher)
 {
-    let manifestPath = autoproj.installationManifestPath(ws.root);
     try {
         fileWatcher.stopWatching(autoproj.installationManifestPath(ws.root));
     }
@@ -46,50 +37,35 @@ function unwatchManifest(ws: autoproj.Workspace, fileWatcher: watcher.FileWatche
 
 function handleNewWorkspaceFolder(
         path: string,
-        rockContext : context.Context,
         workspaces: autoproj.Workspaces,
-        configManager: config.ConfigManager,
-        fileWatcher: watcher.FileWatcher) : void
-{
+        fileWatcher: watcher.FileWatcher) : void {
     let { added, workspace } = workspaces.addFolder(path);
     if (added && workspace) {
         workspace.info().catch(err => {
                 let errMsg = `Could not load installation manifest: ${err.message}`
                 vscode.window.showErrorMessage(errMsg);
         })
-        workspace.ensureSyskitContextAvailable().catch(() => {})
         vscode.commands.executeCommand('workbench.action.tasks.runTask', `autoproj: ${workspace.name}: Watch`)
         watchManifest(workspace, fileWatcher);
-    } else if (workspace) {
-        configManager.setupPackage(path).catch((reason) => {
-            vscode.window.showErrorMessage(reason.message);
-        });
     }
 }
 
-function initializeWorkspacesFromVSCodeFolders(
-    rockContext: context.Context,
-    workspaces: autoproj.Workspaces,
-    configManager: config.ConfigManager,
-    fileWatcher: watcher.FileWatcher)
-{
+function initializeWorkspacesFromVSCodeFolders(workspaces: autoproj.Workspaces,
+                                               fileWatcher: watcher.FileWatcher) {
     if (vscode.workspace.workspaceFolders != undefined) {
         vscode.workspace.workspaceFolders.forEach((folder) => {
-            handleNewWorkspaceFolder(folder.uri.fsPath, rockContext,
-                workspaces, configManager, fileWatcher);
+            handleNewWorkspaceFolder(folder.uri.fsPath, workspaces, fileWatcher);
         });
     }
 }
 
-function setupEvents(rockContext: context.Context, extensionContext: vscode.ExtensionContext,
-    workspaces: autoproj.Workspaces, taskProvider: tasks.AutoprojProvider,
-    configManager: config.ConfigManager, fileWatcher: watcher.FileWatcher)
-{
+function setupEvents(extensionContext: vscode.ExtensionContext,
+                     workspaces: autoproj.Workspaces, taskProvider: tasks.AutoprojProvider,
+                     fileWatcher: watcher.FileWatcher) {
     extensionContext.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders((event) => {
             event.added.forEach((folder) => {
-                handleNewWorkspaceFolder(folder.uri.fsPath, rockContext,
-                    workspaces, configManager, fileWatcher);
+                handleNewWorkspaceFolder(folder.uri.fsPath, workspaces, fileWatcher);
             });
             event.removed.forEach((folder) => {
                 let deletedWs = workspaces.deleteFolder(folder.uri.fsPath);
@@ -110,45 +86,22 @@ function setupEvents(rockContext: context.Context, extensionContext: vscode.Exte
 export function activate(extensionContext: vscode.ExtensionContext) {
     let fileWatcher = new watcher.FileWatcher();
     let vscodeWrapper = new wrappers.VSCode(extensionContext);
-
-    let outputChannel = vscode.window.createOutputChannel('Rock');
+    let outputChannel = vscode.window.createOutputChannel('Autoproj');
     let workspaces = new autoproj.Workspaces(null, outputChannel);
     let autoprojTaskProvider = new tasks.AutoprojProvider(workspaces);
-    let rockContext = new context.Context(vscodeWrapper, workspaces,
-        new packages.PackageFactory(vscodeWrapper),
-        outputChannel);
+    let autoprojContext = new context.Context(vscodeWrapper, workspaces, outputChannel);
+    let autoprojCommands = new commands.Commands(autoprojContext, vscodeWrapper);
 
-    let configManager = new config.ConfigManager(workspaces, vscodeWrapper);
-    let rockCommands = new commands.Commands(rockContext, vscodeWrapper, configManager);
-
-    extensionContext.subscriptions.push(
-        vscode.workspace.registerTaskProvider('autoproj', autoprojTaskProvider));
-
-    initializeWorkspacesFromVSCodeFolders(rockContext, workspaces,
-        configManager, fileWatcher);
+    extensionContext.subscriptions.push(vscode.workspace.registerTaskProvider('autoproj', autoprojTaskProvider));
+    initializeWorkspacesFromVSCodeFolders(workspaces, fileWatcher);
     autoprojTaskProvider.reloadTasks();
-    setupEvents(rockContext, extensionContext, workspaces,
-        autoprojTaskProvider, configManager, fileWatcher);
-    rockCommands.register();
+    setupEvents(extensionContext, workspaces, autoprojTaskProvider, fileWatcher);
+    autoprojCommands.register();
 
     extensionContext.subscriptions.push(workspaces);
     extensionContext.subscriptions.push(outputChannel);
-
-    let cppDebugProvider = new debug.CXXConfigurationProvider(rockContext);
-    extensionContext.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('cppdbg', cppDebugProvider));
-    let rubyDebugProvider = new debug.RubyConfigurationProvider(rockContext);
-    extensionContext.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('Ruby', rubyDebugProvider));
-    let orogenDebugProvider = new debug.OrogenConfigurationProvider(rockContext, vscodeWrapper);
-    extensionContext.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('orogen', orogenDebugProvider));
-
-    extensionContext.subscriptions.push(rockContext);
+    extensionContext.subscriptions.push(autoprojContext);
     extensionContext.subscriptions.push(fileWatcher);
-    const launchJsonDocumentSelector: vscode.DocumentSelector = [{
-        language: 'jsonc',
-        pattern: '**/launch.json'
-    }];
-    extensionContext.subscriptions.push(vscode.languages.registerCompletionItemProvider(
-        launchJsonDocumentSelector, new snippets.LaunchSnippetProvider(rockContext, vscodeWrapper)));
 }
 
 // this method is called when your extension is deactivated

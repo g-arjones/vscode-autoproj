@@ -1,5 +1,4 @@
 import * as vscode from 'vscode'
-import * as Path from 'path'
 
 /** Shim that provides us an API to the VSCode state we need within the extension
  *
@@ -12,21 +11,6 @@ export class VSCode {
     public constructor(extensionContext : vscode.ExtensionContext)
     {
         this._extensionContext = extensionContext;
-    }
-
-    public get activeDocumentURI() : vscode.Uri | undefined
-    {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            return;
-        }
-
-        return editor.document.uri;
-    }
-
-    public get activeTextEditor() : vscode.TextEditor | undefined
-    {
-        return vscode.window.activeTextEditor;
     }
 
     public get workspaceFolders(): vscode.WorkspaceFolder[] | undefined
@@ -42,12 +26,6 @@ export class VSCode {
         return vscode.workspace.getWorkspaceFolder(uri);
     }
 
-    public getConfiguration(section?: string, resource?: vscode.Uri):
-        vscode.WorkspaceConfiguration
-    {
-        return vscode.workspace.getConfiguration(section, resource);
-    }
-
     public showQuickPick<T extends vscode.QuickPickItem>(items: T[] | Thenable<T[]>,
         options?: vscode.QuickPickOptions, token?: vscode.CancellationToken): Thenable<T | undefined>
     {
@@ -60,29 +38,9 @@ export class VSCode {
         this._extensionContext.subscriptions.push(cmd);
     }
 
-    public showOpenDialog(options: vscode.OpenDialogOptions): Thenable<vscode.Uri[] | undefined>
-    {
-        return vscode.window.showOpenDialog(options);
-    }
-
     public showErrorMessage<T extends vscode.MessageItem>(message: string, ...items: T[]): Thenable<T | undefined>
     {
         return vscode.window.showErrorMessage(message, ...items);
-    }
-
-    public showWarningMessage<T extends vscode.MessageItem>(message: string, ...items: T[]): Thenable<T | undefined>
-    {
-        return vscode.window.showWarningMessage(message, ...items);
-    }
-
-    public getWorkspaceState(key : string) : string | undefined
-    {
-        return this._extensionContext.workspaceState.get(key);
-    }
-
-    public updateWorkspaceState(key : string, value : string | undefined)
-    {
-        this._extensionContext.workspaceState.update(key, value);
     }
 
     public createOutputChannel(name: string) {

@@ -1,21 +1,15 @@
 'use strict';
 
-import * as vscode from 'vscode'
 import * as Autoproj from '../src/autoproj'
 import * as FS from 'fs';
 import * as Temp from 'fs-temp';
 import * as Path from 'path';
 import * as YAML from 'js-yaml';
-import * as assert from 'assert'
 import * as TypeMoq from 'typemoq'
 import * as Wrappers from '../src/wrappers'
 import * as Context from '../src/context'
-import * as Packages from '../src/packages'
 import * as Tasks from '../src/tasks'
-import * as Syskit from '../src/syskit'
-import * as Config from '../src/config'
 import { EventEmitter } from 'events';
-import { writeFileSync } from 'fs';
 
 export class OutputChannel implements Autoproj.OutputChannel
 {
@@ -140,14 +134,6 @@ export function addPackageToManifest(ws, path : string[], partialInfo: { [key: s
     return result;
 }
 
-export function mockSyskitConnection(mockWorkspace : TypeMoq.IMock<Autoproj.Workspace>) {
-    let mock = TypeMoq.Mock.ofType<Syskit.Connection>()
-    mock.setup((x: any) => x.then).returns(() => undefined)
-    mockWorkspace.setup(x => x.syskitDefaultConnection()).
-        returns(() => Promise.resolve(mock.object));
-    return mock;
-}
-
 class ProcessMock extends EventEmitter implements Autoproj.Process
 {
     stdout = new EventEmitter();
@@ -184,12 +170,6 @@ export class TestSetup
         return this.mockTaskProvider.target;
     }
 
-    mockPackageFactory : TypeMoq.IMock<Packages.PackageFactory>;
-    get packageFactory() : Packages.PackageFactory
-    {
-        return this.mockPackageFactory.target;
-    }
-
     mockContext : TypeMoq.IMock<Context.Context>;
     get context() : Context.Context
     {
@@ -202,12 +182,6 @@ export class TestSetup
         return this.mockOutputChannel.target;
     }
 
-    mockConfigManager : TypeMoq.IMock<Config.ConfigManager>;
-    get configManager() : Config.ConfigManager
-    {
-        return this.mockConfigManager.target;
-    }
-
     constructor()
     {
         this.mockWrapper = TypeMoq.Mock.ofType<Wrappers.VSCode>();
@@ -215,9 +189,7 @@ export class TestSetup
         this.mockOutputChannel = TypeMoq.Mock.ofType2(OutputChannel, []);
         this.mockWorkspaces = TypeMoq.Mock.ofType2(Autoproj.Workspaces, [undefined, this.outputChannel]);
         this.mockTaskProvider = TypeMoq.Mock.ofType2(Tasks.AutoprojProvider, [this.workspaces]);
-        this.mockPackageFactory = TypeMoq.Mock.ofType2(Packages.PackageFactory, [this.wrapper, this.taskProvider]);
-        this.mockContext = TypeMoq.Mock.ofType2(Context.Context, [this.wrapper, this.workspaces, this.packageFactory, this.outputChannel]);
-        this.mockConfigManager = TypeMoq.Mock.ofType2(Config.ConfigManager, [this.workspaces, this.wrapper])
+        this.mockContext = TypeMoq.Mock.ofType2(Context.Context, [this.wrapper, this.workspaces, this.outputChannel]);
     }
 
     setupWrapper(fn) {
@@ -239,26 +211,5 @@ export class TestSetup
 
     addPackageToManifest(ws, path : string[], partialInfo: { [key: string]: any } = {}) : Autoproj.Package {
         return addPackageToManifest(ws, path, partialInfo);
-    }
-
-    async registerPackage(ws, path : string[], partialInfo: { [key: string]: any } = {}) : Promise<Packages.Package>
-    {
-        let full = fullPath(...path);
-        this.addPackageToManifest(ws, path, partialInfo)
-        this.workspaces.associateFolderToWorkspace(full, ws);
-        let folder: vscode.WorkspaceFolder = {
-            uri: vscode.Uri.file(full),
-            name: Path.basename(full),
-            index: 0
-        }
-        this.mockWrapper.setup(x => x.getWorkspaceFolder(full)).
-            returns(() => folder);
-        let pkg = await this.context.getPackageByPath(full);
-        if (pkg) {
-            return pkg;
-        }
-        else {
-            throw Error("failed to resolve package after registration");
-        }
     }
 };

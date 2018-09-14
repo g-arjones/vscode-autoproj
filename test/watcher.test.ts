@@ -3,7 +3,6 @@ import * as watcher from '../src/watcher';
 import * as helpers from './helpers';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as TypeMoq from 'typemoq';
 
 async function sleep(ms: number): Promise<void>
 {

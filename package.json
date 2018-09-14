@@ -40,101 +40,30 @@
     "keywords": [
         "rock",
         "robotics",
-        "autoproj",
-        "syskit",
-        "roby"
+        "autoproj"
     ],
     "contributes": {
-        "debuggers": [
-            {
-                "type": "orogen",
-                "label": "Orogen",
-                "enableBreakpointsFor": {
-                    "languageIds": [
-                        "c",
-                        "cpp"
-                    ]
-                },
-                "configurationAttributes": {
-                    "launch": {
-                        "required": [
-                            "deploy"
-                        ],
-                        "properties": {
-                            "deploy": {
-                                "type": "string",
-                                "description": "Name of the task model or deployment to debug."
-                            },
-                            "deployAs": {
-                                "type": "string",
-                                "description": "Name to be used as the deployment name for task models, and as prefix for deployments."
-                            },
-                            "cwd": {
-                                "type": "string",
-                                "description": "Working directory"
-                            },
-                            "stopAtEntry": {
-                                "type": "boolean",
-                                "description": "Whether GDB should break when entering the program"
-                            },
-                            "externalConsole": {
-                                "type": "boolean",
-                                "description": "Whether the program should get its own console or be redirected to the main debug console"
-                            },
-                            "environment": {
-                                "type": "array",
-                                "description": "Environment variables that should be set as { \"name\": \"name_of_var\", \"value\": \"value_of_var\" }"
-                            },
-                            "MIMode": {
-                                "type": "string",
-                                "description": "Debugger mode"
-                            },
-                            "start": {
-                                "type": "boolean",
-                                "description": "Start task on launch.",
-                                "default": false
-                            },
-                            "confDir": {
-                                "type": "string",
-                                "description": "Directory to launch task configuration from."
-                            }
-                        }
-                    }
-                }
-            }
-        ],
         "commands": [
             {
                 "title": "Update package info",
-                "category": "Rock",
-                "command": "rock.updatePackageInfo"
-            },
-            {
-                "title": "Add launch config",
-                "category": "Rock",
-                "command": "rock.addLaunchConfig"
+                "category": "Autoproj",
+                "command": "autoproj.updatePackageInfo"
             },
             {
                 "title": "Add package to workspace",
-                "category": "Rock",
-                "command": "rock.addPackageToWorkspace"
-            },
-            {
-                "title": "Update VS Code configuration",
-                "category": "Rock",
-                "command": "rock.updateCodeConfig"
+                "category": "Autoproj",
+                "command": "autoproj.addPackageToWorkspace"
             },
             {
                 "title": "Show Output",
-                "category": "Rock",
-                "command": "rock.showOutputChannel"
+                "category": "Autoproj",
+                "command": "autoproj.showOutputChannel"
             }
         ],
         "languages": [
             {
                 "id": "ruby",
                 "extensions": [
-                    ".orogen",
                     ".autobuild"
                 ]
             },
@@ -245,29 +174,23 @@
         "test": "npm run compile && node ./node_modules/vscode/bin/test"
     },
     "extensionDependencies": [
-        "ms-vscode.cpptools",
         "rebornix.ruby"
     ],
     "dependencies": {
-        "js-yaml": "*",
-        "fs-temp": "latest",
-        "jsonc-parser": "*",
-        "request-promise-native": "latest",
-        "request": "*"
+        "js-yaml": "*"
     },
     "devDependencies": {
         "@types/js-yaml": "latest",
         "@types/node": "^7.0.43",
-        "@types/should": "latest",
         "decache": "^4.1.0",
         "del": "^3.0.0",
+        "fs-temp": "latest",
         "gulp": "^3.9.1",
         "gulp-coveralls": "^0.1.4",
         "gulp-json-editor": "^2.2.2",
         "istanbul": "^0.4.5",
         "remap-istanbul": "^0.6.4",
         "run-sequence": "^2.2.1",
-        "should": "latest",
         "typemoq": "latest",
         "typescript": "^2.6.1",
         "vscode": "^1.1.21"

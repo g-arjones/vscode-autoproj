@@ -3,7 +3,6 @@ import * as assert from 'assert';
 import * as helpers from './helpers';
 import * as autoproj from '../src/autoproj';
 import * as tasks from '../src/tasks';
-import { basename, relative } from 'path';
 import * as vscode from 'vscode';
 
 

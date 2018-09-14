@@ -2,7 +2,6 @@
 import * as vscode from 'vscode';
 import * as autoproj from './autoproj';
 import * as path from 'path';
-import * as context from './context';
 
 function runAutoproj(ws, ...args) {
     return new vscode.ProcessExecution(ws.autoprojExePath(), args, { cwd: ws.root })
