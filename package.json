@@ -1,0 +1,275 @@
+{
+    "name": "rock",
+    "displayName": "rock",
+    "description": "Base support for Rock workspaces",
+    "version": "0.2.2",
+    "publisher": "rock-robotics",
+    "license": "SEE LICENSE IN LICENSE.txt",
+    "icon": "images/icon.png",
+    "author": {
+        "name": "Rock Robotics"
+    },
+    "contributors": [
+        {
+            "name": "Gabriel Arjones",
+            "email": "arjones@arjones.com"
+        },
+        {
+            "name": "Sylvain Joyeux",
+            "email": "sylvain.joyeux@m4x.org"
+        }
+    ],
+    "galleryBanner": {
+        "color": "#458ccc",
+        "theme": "dark"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/rock-core/vscode-rock.git"
+    },
+    "engines": {
+        "vscode": "^1.21.0"
+    },
+    "activationEvents": [
+        "*"
+    ],
+    "main": "./out/src/extension",
+    "categories": [
+        "Other"
+    ],
+    "keywords": [
+        "rock",
+        "robotics",
+        "autoproj",
+        "syskit",
+        "roby"
+    ],
+    "contributes": {
+        "debuggers": [
+            {
+                "type": "orogen",
+                "label": "Orogen",
+                "enableBreakpointsFor": {
+                    "languageIds": [
+                        "c",
+                        "cpp"
+                    ]
+                },
+                "configurationAttributes": {
+                    "launch": {
+                        "required": [
+                            "deploy"
+                        ],
+                        "properties": {
+                            "deploy": {
+                                "type": "string",
+                                "description": "Name of the task model or deployment to debug."
+                            },
+                            "deployAs": {
+                                "type": "string",
+                                "description": "Name to be used as the deployment name for task models, and as prefix for deployments."
+                            },
+                            "cwd": {
+                                "type": "string",
+                                "description": "Working directory"
+                            },
+                            "stopAtEntry": {
+                                "type": "boolean",
+                                "description": "Whether GDB should break when entering the program"
+                            },
+                            "externalConsole": {
+                                "type": "boolean",
+                                "description": "Whether the program should get its own console or be redirected to the main debug console"
+                            },
+                            "environment": {
+                                "type": "array",
+                                "description": "Environment variables that should be set as { \"name\": \"name_of_var\", \"value\": \"value_of_var\" }"
+                            },
+                            "MIMode": {
+                                "type": "string",
+                                "description": "Debugger mode"
+                            },
+                            "start": {
+                                "type": "boolean",
+                                "description": "Start task on launch.",
+                                "default": false
+                            },
+                            "confDir": {
+                                "type": "string",
+                                "description": "Directory to launch task configuration from."
+                            }
+                        }
+                    }
+                }
+            }
+        ],
+        "commands": [
+            {
+                "title": "Update package info",
+                "category": "Rock",
+                "command": "rock.updatePackageInfo"
+            },
+            {
+                "title": "Add launch config",
+                "category": "Rock",
+                "command": "rock.addLaunchConfig"
+            },
+            {
+                "title": "Add package to workspace",
+                "category": "Rock",
+                "command": "rock.addPackageToWorkspace"
+            },
+            {
+                "title": "Update VS Code configuration",
+                "category": "Rock",
+                "command": "rock.updateCodeConfig"
+            },
+            {
+                "title": "Show Output",
+                "category": "Rock",
+                "command": "rock.showOutputChannel"
+            }
+        ],
+        "languages": [
+            {
+                "id": "ruby",
+                "extensions": [
+                    ".orogen",
+                    ".autobuild"
+                ]
+            },
+            {
+                "id": "yaml",
+                "extensions": [
+                    ".osdeps"
+                ],
+                "filenames": [
+                    "manifest"
+                ]
+            }
+        ],
+        "problemMatchers": [
+            {
+                "name": "autoproj",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": {
+                    "regexp": "^\\(\\d+\\) .+\\(([^\\)]+)\\): (failed in .* phase)$",
+                    "file": 1,
+                    "message": 2
+                }
+            },
+            {
+                "name": "autoproj-cmake-configure-error",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": [
+                    {
+                        "regexp": "(?:Autobuild::CMake|Autobuild::Orogen):(?:[^:]+):configure: (?:.+\n)?CMake Error at ([/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "file": 1,
+                        "line": 2,
+                        "message": 0
+                    }
+                ]
+            },
+            {
+                "name": "autoproj-cmake-configure-warning",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": [
+                    {
+                        "regexp": "(?:Autobuild::CMake|Autobuild::Orogen):(?:[^:]+):configure: (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "file": 1,
+                        "line": 2,
+                        "message": 0
+                    }
+                ]
+            },
+            {
+                "name": "autoproj-orogen-error",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "severity": "error",
+                "pattern": {
+                    "regexp": "Autobuild::Orogen:(?:[^:]+):orogen: (.+):(\\d+):\\s+(.+)",
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
+                }
+            },
+            {
+                "name": "autoproj-gcc-compile-error",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": {
+                    "regexp": "(?:Autobuild::CMake|Autobuild::Orogen):(?:[^:]+):build: (.+):(\\d+):(\\d+):\\s+(?:fatal\\s+)?(error):\\s+(.+)",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
+            {
+                "name": "autoproj-gcc-compile-warning",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": {
+                    "regexp": "(?:Autobuild::CMake|Autobuild::Orogen):(?:[^:]+):build: (?:.+:\\d+:\\d+:\n)?(.+):(\\d+):(\\d+):\\s+(?:.*\\s+)?(warning):\\s+(.+)",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "test": "npm run compile && node ./node_modules/vscode/bin/test"
+    },
+    "extensionDependencies": [
+        "ms-vscode.cpptools",
+        "rebornix.ruby"
+    ],
+    "dependencies": {
+        "js-yaml": "*",
+        "fs-temp": "latest",
+        "jsonc-parser": "*",
+        "request-promise-native": "latest",
+        "request": "*"
+    },
+    "devDependencies": {
+        "@types/js-yaml": "latest",
+        "@types/node": "^7.0.43",
+        "@types/should": "latest",
+        "decache": "^4.1.0",
+        "del": "^3.0.0",
+        "gulp": "^3.9.1",
+        "gulp-coveralls": "^0.1.4",
+        "gulp-json-editor": "^2.2.2",
+        "istanbul": "^0.4.5",
+        "remap-istanbul": "^0.6.4",
+        "run-sequence": "^2.2.1",
+        "should": "latest",
+        "typemoq": "latest",
+        "typescript": "^2.6.1",
+        "vscode": "^1.1.21"
+    }
+}
