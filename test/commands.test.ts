@@ -295,4 +295,48 @@ describe("Commands", function () {
                 TypeMoq.Times.once());
         })
     })
+    describe("showOutputChannel()", function () {
+        let mockOutputChannel: TypeMoq.IMock<vscode.OutputChannel>;
+        beforeEach(function () {
+            mockOutputChannel = TypeMoq.Mock.ofType<vscode.OutputChannel>();
+            mockContext.setup(x => x.outputChannel).returns(() => mockOutputChannel.object);
+        });
+        it("shows the output channel", async function () {
+            subject.showOutputChannel();
+            mockOutputChannel.verify(x => x.show(), TypeMoq.Times.once());
+        })
+    });
+    describe("register()", function () {
+        function setupWrapper(command: string, callback: (command, cb) => void) {
+            mockWrapper.setup(x => x.registerAndSubscribeCommand(command, TypeMoq.It.isAny())).callback(callback);
+        }
+
+        it("registers all commands", async function () {
+            let updatePackageInfoCb: () => Promise<void>;
+            let showOutputChannelCb: () => void;
+            let addPackageToWorkspaceCb: () => Promise<void>;
+
+            let mockUpdatePackageInfo = TypeMoq.Mock.ofInstance(() => Promise.resolve());
+            subject.updatePackageInfo = mockUpdatePackageInfo.object;
+
+            let mockShowOutputChannel = TypeMoq.Mock.ofInstance(() => {});
+            subject.showOutputChannel = mockShowOutputChannel.object;
+
+            let mockAddPackageToWorkspace = TypeMoq.Mock.ofInstance(() => Promise.resolve());
+            subject.addPackageToWorkspace = mockAddPackageToWorkspace.object;
+
+            setupWrapper('autoproj.updatePackageInfo', (command, cb) => updatePackageInfoCb = cb);
+            setupWrapper('autoproj.showOutputChannel', (command, cb) => showOutputChannelCb = cb);
+            setupWrapper('autoproj.addPackageToWorkspace', (command, cb) => addPackageToWorkspaceCb = cb);
+
+            subject.register();
+            updatePackageInfoCb!();
+            showOutputChannelCb!();
+            addPackageToWorkspaceCb!();
+
+            mockUpdatePackageInfo.verify(x => x(), TypeMoq.Times.once());
+            mockShowOutputChannel.verify(x => x(), TypeMoq.Times.once());
+            mockAddPackageToWorkspace.verify(x => x(), TypeMoq.Times.once());
+        })
+    });
 });

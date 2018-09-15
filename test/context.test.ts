@@ -12,7 +12,7 @@ class TestContext
     root: string;
     mockWrapper: TypeMoq.IMock<wrappers.VSCode>;
     workspaces: autoproj.Workspaces;
-
+    outputChannel: vscode.OutputChannel;
     workspaceFolders: vscode.WorkspaceFolder[];
 
     subject: context.Context;
@@ -26,6 +26,7 @@ class TestContext
         let mockOutputChannel = TypeMoq.Mock.ofType<vscode.OutputChannel>();
         mockOutputChannel.setup(x => x.dispose()).returns(() => undefined)
 
+        this.outputChannel = mockOutputChannel.object;
         this.subject = new context.Context(
             this.mockWrapper.object,
             this.workspaces,
@@ -61,5 +62,8 @@ describe("Context tests", function () {
         await testContext.subject.updateWorkspaceInfo(mockWs.object);
         mockWs.verify(x => x.envsh(), TypeMoq.Times.once());
         verifyContextUpdated(TypeMoq.Times.once());
+    });
+    it("returns the given output channel", function () {
+        assert.strictEqual(testContext.outputChannel, testContext.subject.outputChannel);
     });
 });
