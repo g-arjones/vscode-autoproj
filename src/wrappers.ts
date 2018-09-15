@@ -52,4 +52,14 @@ export class VSCode {
     {
         return vscode.workspace.updateWorkspaceFolders(start, deleteCount, ...workspaceFoldersToAdd);
     }
+
+    public executeCommand<T>(command: string, ...rest: any[]): Thenable<T | undefined>
+    {
+        return vscode.commands.executeCommand(command, ...rest);
+    }
+
+    public killProcess(pid: number, signal: string): void
+    {
+        return process.kill(pid, signal);
+    }
 }

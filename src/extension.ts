@@ -9,99 +9,105 @@ import * as autoproj from './autoproj';
 import * as commands from './commands';
 import * as watcher from './watcher';
 
-function watchManifest(ws: autoproj.Workspace, fileWatcher: watcher.FileWatcher)
-{
-    let manifestPath = autoproj.installationManifestPath(ws.root);
-    try {
-        fileWatcher.startWatching(manifestPath, (filePath) => {
-            ws.reload().catch(err => {
-                    let errMsg = `Could not load installation manifest: ${err.message}`
-                    vscode.window.showErrorMessage(errMsg);
-                }
-            );
-        });
-    } catch (err) {
-        vscode.window.showErrorMessage(err.message);
-    }
-}
+export class EventHandler {
+    private _wrapper: wrappers.VSCode;
+    private _watcher: watcher.FileWatcher;
+    private _workspaces: autoproj.Workspaces;
 
-function unwatchManifest(ws: autoproj.Workspace, fileWatcher: watcher.FileWatcher)
-{
-    try {
-        fileWatcher.stopWatching(autoproj.installationManifestPath(ws.root));
+    constructor(wrapper: wrappers.VSCode, fileWatcher: watcher.FileWatcher,
+                workspaces: autoproj.Workspaces) {
+        this._wrapper = wrapper;
+        this._watcher = fileWatcher;
+        this._workspaces = workspaces;
     }
-    catch (err) {
-        vscode.window.showErrorMessage(err.message);
-    }
-}
 
-function handleNewWorkspaceFolder(
-        path: string,
-        workspaces: autoproj.Workspaces,
-        fileWatcher: watcher.FileWatcher) : void {
-    let { added, workspace } = workspaces.addFolder(path);
-    if (added && workspace) {
-        workspace.info().catch(err => {
+    async onManifestChanged(ws: autoproj.Workspace): Promise<void> {
+        try {
+            await ws.reload();
+        } catch (err) {
+            this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
+        }
+    }
+
+    async onWorkspaceFolderAdded(folder: vscode.WorkspaceFolder): Promise<void> {
+        const { added, workspace } = this._workspaces.addFolder(folder.uri.fsPath);
+        if (added && workspace) {
+            try {
+                await workspace.info();
+            } catch(err) {
                 let errMsg = `Could not load installation manifest: ${err.message}`
-                vscode.window.showErrorMessage(errMsg);
-        })
-        vscode.commands.executeCommand('workbench.action.tasks.runTask', `autoproj: ${workspace.name}: Watch`)
-        watchManifest(workspace, fileWatcher);
+                this._wrapper.showErrorMessage(errMsg);
+            }
+            this._wrapper.executeCommand('workbench.action.tasks.runTask', `autoproj: ${workspace.name}: Watch`)
+            this.watchManifest(workspace);
+        }
+    }
+
+    async onWorkspaceFolderRemoved(folder: vscode.WorkspaceFolder): Promise<void> {
+        const deletedWs = this._workspaces.deleteFolder(folder.uri.fsPath);
+        if (deletedWs) {
+            this.unwatchManifest(deletedWs);
+            try {
+                let pid: number = await deletedWs.readWatchPID();
+                this._wrapper.killProcess(pid, 'SIGINT');
+            } catch(err) {
+                this._wrapper.showErrorMessage(`Could not stop autoproj watch process: ${err.message}`);
+            }
+        }
+    }
+
+    watchManifest(ws: autoproj.Workspace): void {
+        let manifestPath = autoproj.installationManifestPath(ws.root);
+        try {
+            this._watcher.startWatching(manifestPath, () => this.onManifestChanged(ws));
+        } catch (err) {
+            this._wrapper.showErrorMessage(err.message);
+        }
+    }
+
+    unwatchManifest(ws: autoproj.Workspace): void {
+        try {
+            this._watcher.stopWatching(autoproj.installationManifestPath(ws.root));
+        }
+        catch (err) {
+            this._wrapper.showErrorMessage(err.message);
+        }
     }
 }
 
-function initializeWorkspacesFromVSCodeFolders(workspaces: autoproj.Workspaces,
-                                               fileWatcher: watcher.FileWatcher) {
-    if (vscode.workspace.workspaceFolders != undefined) {
-        vscode.workspace.workspaceFolders.forEach((folder) => {
-            handleNewWorkspaceFolder(folder.uri.fsPath, workspaces, fileWatcher);
-        });
-    }
-}
-
-function setupEvents(extensionContext: vscode.ExtensionContext,
-                     workspaces: autoproj.Workspaces, taskProvider: tasks.AutoprojProvider,
-                     fileWatcher: watcher.FileWatcher) {
-    extensionContext.subscriptions.push(
-        vscode.workspace.onDidChangeWorkspaceFolders((event) => {
-            event.added.forEach((folder) => {
-                handleNewWorkspaceFolder(folder.uri.fsPath, workspaces, fileWatcher);
-            });
-            event.removed.forEach((folder) => {
-                let deletedWs = workspaces.deleteFolder(folder.uri.fsPath);
-                if (deletedWs) {
-                    unwatchManifest(deletedWs, fileWatcher);
-                    deletedWs.readWatchPID().
-                        then((pid) => process.kill(pid, 'SIGINT')).
-                        catch(() => {})
-                }
-            });
-            taskProvider.reloadTasks();
-        })
-    );
-}
-
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
-export function activate(extensionContext: vscode.ExtensionContext) {
+export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSCode) {
     let fileWatcher = new watcher.FileWatcher();
-    let vscodeWrapper = new wrappers.VSCode(extensionContext);
     let outputChannel = vscode.window.createOutputChannel('Autoproj');
     let workspaces = new autoproj.Workspaces(null, outputChannel);
     let autoprojTaskProvider = new tasks.AutoprojProvider(workspaces);
     let autoprojContext = new context.Context(vscodeWrapper, workspaces, outputChannel);
     let autoprojCommands = new commands.Commands(autoprojContext, vscodeWrapper);
+    let eventHandler = new EventHandler(vscodeWrapper, fileWatcher, workspaces);
 
-    extensionContext.subscriptions.push(vscode.workspace.registerTaskProvider('autoproj', autoprojTaskProvider));
-    initializeWorkspacesFromVSCodeFolders(workspaces, fileWatcher);
+    subscriptions.push(vscode.workspace.registerTaskProvider('autoproj', autoprojTaskProvider));
+    if (vscode.workspace.workspaceFolders) {
+        vscode.workspace.workspaceFolders.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
+    }
+
     autoprojTaskProvider.reloadTasks();
-    setupEvents(extensionContext, workspaces, autoprojTaskProvider, fileWatcher);
     autoprojCommands.register();
 
-    extensionContext.subscriptions.push(workspaces);
-    extensionContext.subscriptions.push(outputChannel);
-    extensionContext.subscriptions.push(autoprojContext);
-    extensionContext.subscriptions.push(fileWatcher);
+    subscriptions.push(workspaces);
+    subscriptions.push(outputChannel);
+    subscriptions.push(autoprojContext);
+    subscriptions.push(fileWatcher);
+    subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
+        event.added.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
+        event.removed.forEach((folder) => eventHandler.onWorkspaceFolderRemoved(folder));
+        autoprojTaskProvider.reloadTasks();
+    }));
+}
+
+// this method is called when your extension is activated
+// your extension is activated the very first time the command is executed
+export function activate(extensionContext: vscode.ExtensionContext) {
+    let vscodeWrapper = new wrappers.VSCode(extensionContext);
+    setupExtension(extensionContext.subscriptions, vscodeWrapper);
 }
 
 // this method is called when your extension is deactivated
