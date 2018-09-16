@@ -3,7 +3,7 @@
     "relativeSourcePath": "../src/",
     "relativeCoverageDir": "../../coverage",
     "ignorePatterns": [
-        "**/test/**"
+        "**/wrappers.*"
     ],
     "verbose": false
 }
