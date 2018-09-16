@@ -23,6 +23,21 @@ async function assertProcessIsShown(shortname, cmd, promise, subprocess, channel
     assert.deepStrictEqual(channel.receivedLines, expected);
 }
 
+describe("ConsoleOutputChannel", () => {
+    it("prints to text to console", () => {
+        const mockLogFunc = TypeMoq.Mock.ofType<(text: string) => void>();
+        // tslint:disable-next-line:no-console
+        const originalLogFunc = console.log; console.log = mockLogFunc.object;
+
+        const channel = new autoproj.ConsoleOutputChannel();
+        channel.appendLine("test");
+        mockLogFunc.verify((x) => x("test"), TypeMoq.Times.once());
+
+        // tslint:disable-next-line:no-console
+        console.log = originalLogFunc;
+    });
+});
+
 describe("Autoproj helpers tests", () => {
     const originalSpawn = require("child_process").spawn;
     let root: string;
