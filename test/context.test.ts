@@ -42,12 +42,6 @@ describe("Context tests", () => {
         testContext.clear();
     });
 
-    function verifyContextUpdated(times) {
-        const mock = TypeMoq.Mock.ofInstance(() => undefined);
-        mock.object();
-        testContext.subject.onUpdate(mock);
-        mock.verify((x) => x(), times);
-    }
     it("returns the given workspaces", () => {
         assert.strictEqual(testContext.workspaces, testContext.subject.workspaces);
     });
@@ -55,9 +49,12 @@ describe("Context tests", () => {
         const mockWs = TypeMoq.Mock.ofType<autoproj.Workspace>();
         await testContext.subject.updateWorkspaceInfo(mockWs.object);
         mockWs.verify((x) => x.envsh(), TypeMoq.Times.once());
-        verifyContextUpdated(TypeMoq.Times.once());
     });
     it("returns the given output channel", () => {
         assert.strictEqual(testContext.outputChannel, testContext.subject.outputChannel);
+    });
+    it("disposes the context", () => {
+        // currently, this is a no-op
+        testContext.subject.dispose();
     });
 });

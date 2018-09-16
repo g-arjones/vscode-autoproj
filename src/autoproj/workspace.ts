@@ -26,14 +26,11 @@ export class Workspace {
     private infoUpdatedEvent: vscode.EventEmitter<WorkspaceInfo>;
     private outputChannel: IOutputChannel;
 
-    private pendingWorkspaceInit: Promise<void> | undefined;
-
     constructor(root: string, loadInfo: boolean = true, outputChannel: IOutputChannel = new ConsoleOutputChannel()) {
         this.root = root;
         this.name = path.basename(root);
         this.outputChannel = outputChannel;
         this.infoUpdatedEvent = new vscode.EventEmitter<WorkspaceInfo>();
-        this.pendingWorkspaceInit = undefined;
         if (loadInfo) {
             this.infoPromise = this.createInfoPromise();
         }
