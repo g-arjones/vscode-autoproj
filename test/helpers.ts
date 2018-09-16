@@ -1,91 +1,87 @@
-'use strict';
+"use strict";
 
-import * as Autoproj from '../src/autoproj'
-import * as FS from 'fs';
-import * as Temp from 'fs-temp';
-import * as Path from 'path';
-import * as YAML from 'js-yaml';
-import * as TypeMoq from 'typemoq'
-import * as Wrappers from '../src/wrappers'
-import * as Context from '../src/context'
-import * as Tasks from '../src/tasks'
-import { EventEmitter } from 'events';
+import { EventEmitter } from "events";
+import * as FS from "fs";
+import * as Temp from "fs-temp";
+import * as YAML from "js-yaml";
+import * as Path from "path";
+import * as TypeMoq from "typemoq";
+import * as Autoproj from "../src/autoproj";
+import * as Context from "../src/context";
+import * as Tasks from "../src/tasks";
+import * as Wrappers from "../src/wrappers";
 
-export class OutputChannel implements Autoproj.OutputChannel
-{
-    receivedLines : string[] = [];
+export class OutputChannel implements Autoproj.IOutputChannel {
+    public receivedLines: string[] = [];
 
-    appendLine(msg: string) : void {
+    public appendLine(msg: string): void {
         this.receivedLines.push(msg);
     }
 
-    clear() {
+    public clear() {
         this.receivedLines = [];
     }
 
-};
+}
 
-export async function assertThrowsAsync(p, msg: RegExp) : Promise<Error>
-{
+export async function assertThrowsAsync(p, msg: RegExp): Promise<Error> {
     try {
         await p;
-    }
-    catch(e) {
+    } catch (e) {
         if (!msg.test(e.message)) {
             throw new Error(`expected message "${e.message}" to match "${msg}"`);
         }
         return e;
     }
-    throw new Error("expected promise failure but it succeeded")
+    throw new Error("expected promise failure but it succeeded");
 }
 
 let root;
-let createdFS : Array<Array<string>> = []
+let createdFS: string[][] = [];
 
 export function init(): string {
     root = Temp.mkdirSync();
     return root;
 }
 
-export function fullPath(...path : string[]): string {
+export function fullPath(...path: string[]): string {
     return Path.join(root, ...path);
 }
 export function mkdir(...path): string {
     let joinedPath = root;
     path.forEach((element) => {
         joinedPath = Path.join(joinedPath, element);
-        if (!FS.existsSync(joinedPath))
-        {
+        if (!FS.existsSync(joinedPath)) {
             FS.mkdirSync(joinedPath);
-            createdFS.push([joinedPath, 'dir']);
+            createdFS.push([joinedPath, "dir"]);
         }
-    })
+    });
     return joinedPath;
 }
 export function rmdir(...path) {
-    let joinedPath = fullPath(...path);
+    const joinedPath = fullPath(...path);
     FS.rmdirSync(joinedPath);
 }
 export function mkfile(data: string, ...path): string {
-    let joinedPath = fullPath(...path);
-    FS.writeFileSync(joinedPath, data)
-    createdFS.push([joinedPath, 'file']);
+    const joinedPath = fullPath(...path);
+    FS.writeFileSync(joinedPath, data);
+    createdFS.push([joinedPath, "file"]);
     return joinedPath;
 }
 export function registerDir(...path) {
-    let joinedPath = fullPath(...path);
-    createdFS.push([joinedPath, 'dir']);
+    const joinedPath = fullPath(...path);
+    createdFS.push([joinedPath, "dir"]);
 }
 export function registerFile(...path) {
-    let joinedPath = fullPath(...path);
-    createdFS.push([joinedPath, 'file']);
+    const joinedPath = fullPath(...path);
+    createdFS.push([joinedPath, "file"]);
 }
 export function createInstallationManifest(data: any, ...workspacePath): string {
     let joinedPath = fullPath(...workspacePath);
     joinedPath = Autoproj.installationManifestPath(joinedPath);
-    mkdir(...workspacePath, '.autoproj')
+    mkdir(...workspacePath, ".autoproj");
     FS.writeFileSync(joinedPath, YAML.safeDump(data));
-    createdFS.push([joinedPath, 'file']);
+    createdFS.push([joinedPath, "file"]);
     return joinedPath;
 }
 export function clear() {
@@ -93,97 +89,89 @@ export function clear() {
         try {
             if (entry[1] === "file") {
                 FS.unlinkSync(entry[0]);
-            }
-            else if (entry[1] === "dir") {
+            } else if (entry[1] === "dir") {
                 FS.rmdirSync(entry[0]);
             }
-        }
-        catch(error) {
-            if (!(error.message =~ /ENOENT/)) {
+        } catch (error) {
+            if (!(error.code === "ENOENT")) {
                 throw error;
             }
         }
-    })
-    createdFS = []
-    FS.rmdirSync(root)
-    root = null
+    });
+    createdFS = [];
+    FS.rmdirSync(root);
+    root = null;
 }
 
-export function addPackageToManifest(ws, path : string[], partialInfo: { [key: string]: any } = {}) : Autoproj.Package {
-    let partialVCS: { [key: string]: any } = partialInfo.vcs || {};
-    let result: Autoproj.Package = {
-        name: partialInfo.name || 'Unknown',
-        srcdir: fullPath(...path),
+export function addPackageToManifest(ws, path: string[], partialInfo: { [key: string]: any } = {}): Autoproj.IPackage {
+    const partialVCS: { [key: string]: any } = partialInfo.vcs || {};
+    const result: Autoproj.IPackage = {
         builddir: partialInfo.builddir || "Unknown",
-        prefix: partialInfo.prefix || "Unknown",
-        vcs: {
-            url: partialVCS.url || "Unknown",
-            type: partialVCS.type || "Unknown",
-            repository_id: partialVCS.repository_id || "Unknown"
-        },
-        type: partialInfo.type || "Unknown",
+        dependencies: partialInfo.dependencies || "Unknown",
         logdir: partialInfo.logdir || "Unknown",
-        dependencies: partialInfo.dependencies || "Unknown"
+        name: partialInfo.name || "Unknown",
+        prefix: partialInfo.prefix || "Unknown",
+        srcdir: fullPath(...path),
+        type: partialInfo.type || "Unknown",
+        vcs: {
+            repository_id: partialVCS.repository_id || "Unknown",
+            type: partialVCS.type || "Unknown",
+            url: partialVCS.url || "Unknown",
+        },
+
     };
 
-    let manifestPath = Autoproj.installationManifestPath(ws.root)
-    let manifest = YAML.safeLoad(FS.readFileSync(manifestPath).toString()) as any[];
+    const manifestPath = Autoproj.installationManifestPath(ws.root);
+    const manifest = YAML.safeLoad(FS.readFileSync(manifestPath).toString()) as any[];
     manifest.push(result);
     FS.writeFileSync(manifestPath, YAML.safeDump(manifest));
     ws.reload();
     return result;
 }
 
-class ProcessMock extends EventEmitter implements Autoproj.Process
-{
-    stdout = new EventEmitter();
-    stderr = new EventEmitter();
-    killSignal: string | undefined;
-    kill(string) {
-        this.killSignal = string;
-        this.emit('exit', undefined, 2);
+// tslint:disable-next-line:max-classes-per-file
+class ProcessMock extends EventEmitter implements Autoproj.IProcess {
+    public stdout = new EventEmitter();
+    public stderr = new EventEmitter();
+    public killSignal: string | undefined;
+    public kill(signal: string) {
+        this.killSignal = signal;
+        this.emit("exit", undefined, 2);
     }
-};
+}
 
-export function createProcessMock() : ProcessMock
-{
+export function createProcessMock(): ProcessMock {
     return new ProcessMock();
 }
 
-export class TestSetup
-{
-    mockWrapper : TypeMoq.IMock<Wrappers.VSCode>;
-    get wrapper()
-    {
+// tslint:disable-next-line:max-classes-per-file
+export class TestSetup {
+    public mockWrapper: TypeMoq.IMock<Wrappers.VSCode>;
+    get wrapper() {
         return this.mockWrapper.object;
     }
 
-    mockWorkspaces: TypeMoq.IMock<Autoproj.Workspaces>;
-    get workspaces()
-    {
+    public mockWorkspaces: TypeMoq.IMock<Autoproj.Workspaces>;
+    get workspaces() {
         return this.mockWorkspaces.target;
     }
 
-    mockTaskProvider : TypeMoq.IMock<Tasks.AutoprojProvider>;
-    get taskProvider()
-    {
+    public mockTaskProvider: TypeMoq.IMock<Tasks.AutoprojProvider>;
+    get taskProvider() {
         return this.mockTaskProvider.target;
     }
 
-    mockContext : TypeMoq.IMock<Context.Context>;
-    get context() : Context.Context
-    {
+    public mockContext: TypeMoq.IMock<Context.Context>;
+    get context(): Context.Context {
         return this.mockContext.target;
     }
 
-    mockOutputChannel : TypeMoq.IMock<OutputChannel>;
-    get outputChannel() : OutputChannel
-    {
+    public mockOutputChannel: TypeMoq.IMock<OutputChannel>;
+    get outputChannel(): OutputChannel {
         return this.mockOutputChannel.target;
     }
 
-    constructor()
-    {
+    constructor() {
         this.mockWrapper = TypeMoq.Mock.ofType<Wrappers.VSCode>();
 
         this.mockOutputChannel = TypeMoq.Mock.ofType2(OutputChannel, []);
@@ -192,24 +180,24 @@ export class TestSetup
         this.mockContext = TypeMoq.Mock.ofType2(Context.Context, [this.wrapper, this.workspaces, this.outputChannel]);
     }
 
-    setupWrapper(fn) {
+    public setupWrapper(fn) {
         return this.mockWrapper.setup(fn);
     }
 
-    createWorkspace(...path : string[]) : string {
-        let wsPath = fullPath(...path);
+    public createWorkspace(...path: string[]): string {
+        const wsPath = fullPath(...path);
         createInstallationManifest([], ...path);
         return wsPath;
     }
 
-    createAndRegisterWorkspace(...path: string[]) {
-        let wsPath = this.createWorkspace(...path);
-        let mock = TypeMoq.Mock.ofType2(Autoproj.Workspace, [wsPath, false, this.outputChannel]);
+    public createAndRegisterWorkspace(...path: string[]) {
+        const wsPath = this.createWorkspace(...path);
+        const mock = TypeMoq.Mock.ofType2(Autoproj.Workspace, [wsPath, false, this.outputChannel]);
         this.workspaces.add(mock.target);
-        return { mock: mock, ws: mock.target };
+        return { mock, ws: mock.target };
     }
 
-    addPackageToManifest(ws, path : string[], partialInfo: { [key: string]: any } = {}) : Autoproj.Package {
+    public addPackageToManifest(ws, path: string[], partialInfo: { [key: string]: any } = {}): Autoproj.IPackage {
         return addPackageToManifest(ws, path, partialInfo);
     }
-};
+}

@@ -1,229 +1,214 @@
-'use strict';
-import * as vscode from 'vscode';
-import * as autoproj from './autoproj';
-import * as path from 'path';
+"use strict";
+import { relative as pathRelative } from "path";
+import * as vscode from "vscode";
+import * as autoproj from "./autoproj";
 
 function runAutoproj(ws, ...args) {
-    return new vscode.ProcessExecution(ws.autoprojExePath(), args, { cwd: ws.root })
+    return new vscode.ProcessExecution(ws.autoprojExePath(), args, { cwd: ws.root });
 }
 
-export class AutoprojProvider implements vscode.TaskProvider
-{
-    workspaces : autoproj.Workspaces;
+export class AutoprojProvider implements vscode.TaskProvider {
+    public workspaces: autoproj.Workspaces;
 
-    private _watchTasks: Map<string, vscode.Task>;
-    private _buildTasks: Map<string, vscode.Task>;
-    private _nodepsBuildTasks: Map<string, vscode.Task>;
-    private _forceBuildTasks: Map<string, vscode.Task>;
-    private _updateTasks: Map<string, vscode.Task>;
-    private _checkoutTasks: Map<string, vscode.Task>;
-    private _osdepsTasks: Map<string, vscode.Task>;
-    private _updateConfigTasks: Map<string, vscode.Task>;
-    private _allTasks: vscode.Task[];
+    private watchTasks: Map<string, vscode.Task>;
+    private buildTasks: Map<string, vscode.Task>;
+    private nodepsBuildTasks: Map<string, vscode.Task>;
+    private forceBuildTasks: Map<string, vscode.Task>;
+    private updateTasks: Map<string, vscode.Task>;
+    private checkoutTasks: Map<string, vscode.Task>;
+    private osdepsTasks: Map<string, vscode.Task>;
+    private updateConfigTasks: Map<string, vscode.Task>;
+    private allTasks: vscode.Task[];
 
-    constructor(workspaces: autoproj.Workspaces)
-    {
+    constructor(workspaces: autoproj.Workspaces) {
         this.workspaces = workspaces;
         this.reloadTasks();
     }
 
-    private createTask(name, ws, defs = {}, args : string[] = []) {
-        let definition = { type: 'autoproj', workspace: ws.root, ...defs }
-        let exec = runAutoproj(ws, ...args);
-        return new vscode.Task(definition, name, 'autoproj', exec, []);
+    public buildTask(path: string): vscode.Task {
+        return this.getCache(this.buildTasks, path);
     }
 
-    private createOsdepsTask(name, ws, defs = {}, args : string[] = []) {
+    public watchTask(path: string): vscode.Task {
+        return this.getCache(this.watchTasks, path);
+    }
+
+    public forceBuildTask(path: string): vscode.Task {
+        return this.getCache(this.forceBuildTasks, path);
+    }
+
+    public nodepsBuildTask(path: string): vscode.Task {
+        return this.getCache(this.nodepsBuildTasks, path);
+    }
+
+    public updateTask(path: string): vscode.Task {
+        return this.getCache(this.updateTasks, path);
+    }
+
+    public checkoutTask(path: string): vscode.Task {
+        return this.getCache(this.checkoutTasks, path);
+    }
+
+    public osdepsTask(path: string): vscode.Task {
+        return this.getCache(this.osdepsTasks, path);
+    }
+
+    public updateConfigTask(path: string): vscode.Task {
+        return this.getCache(this.updateConfigTasks, path);
+    }
+
+    public reloadTasks() {
+        this.allTasks = [];
+
+        this.watchTasks = new Map<string, vscode.Task>();
+        this.buildTasks = new Map<string, vscode.Task>();
+        this.nodepsBuildTasks = new Map<string, vscode.Task>();
+        this.forceBuildTasks = new Map<string, vscode.Task>();
+        this.updateTasks = new Map<string, vscode.Task>();
+        this.checkoutTasks = new Map<string, vscode.Task>();
+        this.osdepsTasks = new Map<string, vscode.Task>();
+        this.updateConfigTasks = new Map<string, vscode.Task>();
+
+        this.workspaces.forEachWorkspace((ws) => {
+            this.addTask(ws.root, this.createWatchTask(`${ws.name}: Watch`, ws),
+                this.watchTasks);
+            this.addTask(ws.root, this.createBuildTask(`${ws.name}: Build`, ws),
+                this.buildTasks);
+            this.addTask(ws.root, this.createCheckoutTask(`${ws.name}: Checkout`, ws),
+                this.checkoutTasks);
+            this.addTask(ws.root, this.createOsdepsTask(`${ws.name}: Install OS Dependencies`, ws),
+                this.osdepsTasks);
+            this.addTask(ws.root, this.createUpdateConfigTask(`${ws.name}: Update Configuration`, ws),
+                this.updateConfigTasks);
+            this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update`, ws),
+                this.updateTasks);
+        });
+        this.workspaces.forEachFolder((ws, folder) => {
+            if (folder === ws.root) { return; }
+            if (this.workspaces.isConfig(folder)) { return; }
+            const relative = pathRelative(ws.root, folder);
+            this.addTask(folder, this.createPackageBuildTask(`${ws.name}: Build ${relative}`, ws, folder),
+                this.buildTasks);
+            this.addTask(folder, this.createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
+                this.checkoutTasks);
+            this.addTask(folder, this.createPackageForceBuildTask(`${ws.name}: Force Build ${relative} (nodeps)`,
+                ws, folder), this.forceBuildTasks);
+            this.addTask(folder, this.createPackageNodepsBuildTask(`${ws.name}: Build ${relative} (nodeps)`, ws,
+                folder), this.nodepsBuildTasks);
+            this.addTask(folder, this.createPackageUpdateTask(`${ws.name}: Update ${relative}`, ws, folder),
+                this.updateTasks);
+        });
+    }
+
+    public provideTasks(token) {
+        return this.allTasks;
+    }
+
+    public resolveTask(task, token) {
+        return null;
+    }
+
+    private createTask(name, ws, defs = {}, args: string[] = []) {
+        const definition = { type: "autoproj", workspace: ws.root, ...defs };
+        const exec = runAutoproj(ws, ...args);
+        return new vscode.Task(definition, name, "autoproj", exec, []);
+    }
+
+    private createOsdepsTask(name, ws, defs = {}, args: string[] = []) {
         return this.createTask(name, ws,
-            { mode: 'osdeps', ...defs },
-            ['osdeps', '--color', ...args]);
+            { mode: "osdeps", ...defs },
+            ["osdeps", "--color", ...args]);
     }
 
-    private createWatchTask(name, ws, defs = {}, args : string[] = []) {
+    private createWatchTask(name, ws, defs = {}, args: string[] = []) {
         return this.createTask(name, ws,
-            { mode: 'watch', ...defs },
-            ['watch', '--show-events', ...args]);
+            { mode: "watch", ...defs },
+            ["watch", "--show-events", ...args]);
     }
 
-    private createBuildTask(name, ws, defs = {}, args : string[] = []) {
-        let task = this.createTask(name, ws,
-            { mode: 'build', ...defs },
-            ['build', '--tool', ...args]);
+    private createBuildTask(name, ws, defs = {}, args: string[] = []) {
+        const task = this.createTask(name, ws,
+            { mode: "build", ...defs },
+            ["build", "--tool", ...args]);
         task.group = vscode.TaskGroup.Build;
         task.problemMatchers = [
-            '$autoproj-cmake-configure-error',
-            '$autoproj-cmake-configure-warning',
-            '$autoproj-gcc-compile-error',
-            '$autoproj-gcc-compile-warning',
-            '$autoproj-orogen-error'
+            "$autoproj-cmake-configure-error",
+            "$autoproj-cmake-configure-warning",
+            "$autoproj-gcc-compile-error",
+            "$autoproj-gcc-compile-warning",
+            "$autoproj-orogen-error",
         ];
         return task;
     }
 
-    private createUpdateTask(name, ws, defs = {}, args : string[] = []) {
-        let task = this.createTask(name, ws,
-            { mode: 'update', ...defs },
-            ['update', '--progress=f', '-k', '--color', ...args]);
-        task.problemMatchers = ['$autoproj'];
+    private createUpdateTask(name, ws, defs = {}, args: string[] = []) {
+        const task = this.createTask(name, ws,
+            { mode: "update", ...defs },
+            ["update", "--progress=f", "-k", "--color", ...args]);
+        task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private createUpdateConfigTask(name, ws, defs = {}, args : string[] = []) {
-        let task= this.createUpdateTask(name, ws,
-            { mode: 'update-config', ...defs },
-            [ '--config', ...args]);
-        task.problemMatchers = ['$autoproj'];
+    private createUpdateConfigTask(name, ws, defs = {}, args: string[] = []) {
+        const task = this.createUpdateTask(name, ws,
+            { mode: "update-config", ...defs },
+            [ "--config", ...args]);
+        task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private createCheckoutTask(name, ws, defs = {}, args : string[] = []) {
-        let task = this.createUpdateTask(name, ws,
-            { mode: 'checkout', ...defs },
-            ['--checkout-only', ...args]);
-        task.problemMatchers = ['$autoproj'];
+    private createCheckoutTask(name, ws, defs = {}, args: string[] = []) {
+        const task = this.createUpdateTask(name, ws,
+            { mode: "checkout", ...defs },
+            ["--checkout-only", ...args]);
+        task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private createPackageBuildTask(name, ws, folder, defs = {}, args : string[] = []) {
+    private createPackageBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
         return this.createBuildTask(name, ws,
-            { folder: folder, ...defs },
-            [...args, folder])
-    }
-
-    private createPackageNodepsBuildTask(name, ws, folder, defs = {}, args : string[] = []) {
-        return this.createPackageBuildTask(name, ws, folder,
-            { mode: 'build-no-deps', ...defs },
-            ['--deps=f', ...args]);
-    }
-
-    private createPackageForceBuildTask(name, ws, folder, defs = {}, args : string[] = []) {
-        return this.createPackageBuildTask(name, ws, folder,
-            { mode: 'force-build', ...defs },
-            ['--force', '--deps=f', '--no-confirm', ...args]);
-    }
-
-    private createPackageUpdateTask(name, ws, folder, defs = {}, args : string[] = []) {
-        let task = this.createUpdateTask(name, ws,
-            { folder: folder, ...defs },
+            { folder, ...defs },
             [...args, folder]);
-        task.problemMatchers = ['$autoproj'];
+    }
+
+    private createPackageNodepsBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
+        return this.createPackageBuildTask(name, ws, folder,
+            { mode: "build-no-deps", ...defs },
+            ["--deps=f", ...args]);
+    }
+
+    private createPackageForceBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
+        return this.createPackageBuildTask(name, ws, folder,
+            { mode: "force-build", ...defs },
+            ["--force", "--deps=f", "--no-confirm", ...args]);
+    }
+
+    private createPackageUpdateTask(name, ws, folder, defs = {}, args: string[] = []) {
+        const task = this.createUpdateTask(name, ws,
+            { folder, ...defs },
+            [...args, folder]);
+        task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private createPackageCheckoutTask(name, ws, folder, defs = {}, args : string[] = []) {
-        let task = this.createPackageUpdateTask(name, ws, folder,
-            { mode: 'checkout', ...defs },
-            ['--checkout-only', ...args]);
-        task.problemMatchers = ['$autoproj'];
+    private createPackageCheckoutTask(name, ws, folder, defs = {}, args: string[] = []) {
+        const task = this.createPackageUpdateTask(name, ws, folder,
+            { mode: "checkout", ...defs },
+            ["--checkout-only", ...args]);
+        task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private getCache(cache, key)
-    {
-        let value = cache.get(key);
+    private getCache(cache, key) {
+        const value = cache.get(key);
         if (value) {
             return value;
         }
-        throw new Error("no entry for " + path);
-    }
-    public buildTask(path: string): vscode.Task
-    {
-        return this.getCache(this._buildTasks, path);
+        throw new Error("no entry for " + key);
     }
 
-    public watchTask(path: string): vscode.Task
-    {
-        return this.getCache(this._watchTasks, path);
-    }
-
-    public forceBuildTask(path: string): vscode.Task
-    {
-        return this.getCache(this._forceBuildTasks, path);
-    }
-
-    public nodepsBuildTask(path: string): vscode.Task
-    {
-        return this.getCache(this._nodepsBuildTasks, path);
-    }
-
-    public updateTask(path: string): vscode.Task
-    {
-        return this.getCache(this._updateTasks, path);
-    }
-
-    public checkoutTask(path: string): vscode.Task
-    {
-        return this.getCache(this._checkoutTasks, path);
-    }
-
-    public osdepsTask(path: string): vscode.Task
-    {
-        return this.getCache(this._osdepsTasks, path);
-    }
-
-    public updateConfigTask(path: string): vscode.Task
-    {
-        return this.getCache(this._updateConfigTasks, path);
-    }
-
-    private addTask(root: string, task: vscode.Task,
-        cache: Map<string, vscode.Task>)
-    {
-        this._allTasks.push(task);
+    private addTask(root: string, task: vscode.Task, cache: Map<string, vscode.Task>) {
+        this.allTasks.push(task);
         cache.set(root, task);
-    }
-
-    reloadTasks()
-    {
-        this._allTasks = [];
-
-        this._watchTasks = new Map<string, vscode.Task>();
-        this._buildTasks = new Map<string, vscode.Task>();
-        this._nodepsBuildTasks = new Map<string, vscode.Task>();
-        this._forceBuildTasks = new Map<string, vscode.Task>();
-        this._updateTasks = new Map<string, vscode.Task>();
-        this._checkoutTasks = new Map<string, vscode.Task>();
-        this._osdepsTasks = new Map<string, vscode.Task>();
-        this._updateConfigTasks = new Map<string, vscode.Task>();
-
-        this.workspaces.forEachWorkspace((ws) => {
-            this.addTask(ws.root, this.createWatchTask(`${ws.name}: Watch`, ws),
-                this._watchTasks);
-            this.addTask(ws.root, this.createBuildTask(`${ws.name}: Build`, ws),
-                this._buildTasks);
-            this.addTask(ws.root, this.createCheckoutTask(`${ws.name}: Checkout`, ws),
-                this._checkoutTasks);
-            this.addTask(ws.root, this.createOsdepsTask(`${ws.name}: Install OS Dependencies`, ws),
-                this._osdepsTasks);
-            this.addTask(ws.root, this.createUpdateConfigTask(`${ws.name}: Update Configuration`, ws),
-                this._updateConfigTasks);
-            this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update`, ws),
-                this._updateTasks);
-        })
-        this.workspaces.forEachFolder((ws, folder) => {
-            if (folder == ws.root) { return; }
-            if (this.workspaces.isConfig(folder)) { return; }
-            let relative = path.relative(ws.root, folder);
-            this.addTask(folder, this.createPackageBuildTask(`${ws.name}: Build ${relative}`, ws, folder),
-                this._buildTasks);
-            this.addTask(folder, this.createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
-                this._checkoutTasks);
-            this.addTask(folder, this.createPackageForceBuildTask(`${ws.name}: Force Build ${relative} (nodeps)`, ws, folder),
-                this._forceBuildTasks);
-            this.addTask(folder, this.createPackageNodepsBuildTask(`${ws.name}: Build ${relative} (nodeps)`, ws, folder),
-                this._nodepsBuildTasks);
-            this.addTask(folder, this.createPackageUpdateTask(`${ws.name}: Update ${relative}`, ws, folder),
-                this._updateTasks);
-        })
-    }
-
-    provideTasks(token)
-    {
-        return this._allTasks;
-    }
-
-    resolveTask(task, token)
-    {
-        return null;
     }
 }

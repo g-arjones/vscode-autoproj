@@ -1,4 +1,4 @@
-import * as vscode from 'vscode'
+import * as vscode from "vscode";
 
 /** Shim that provides us an API to the VSCode state we need within the extension
  *
@@ -6,40 +6,35 @@ import * as vscode from 'vscode'
  * harness is fairly bad at
  */
 export class VSCode {
-    private _extensionContext : vscode.ExtensionContext;
+    private extensionContext: vscode.ExtensionContext;
 
-    public constructor(extensionContext : vscode.ExtensionContext)
-    {
-        this._extensionContext = extensionContext;
+    public constructor(extensionContext: vscode.ExtensionContext) {
+        this.extensionContext = extensionContext;
     }
 
-    public get workspaceFolders(): vscode.WorkspaceFolder[] | undefined
-    {
+    public get workspaceFolders(): vscode.WorkspaceFolder[] | undefined {
         return vscode.workspace.workspaceFolders;
     }
 
-    public getWorkspaceFolder(uri: vscode.Uri | string): vscode.WorkspaceFolder | undefined
-    {
-        if (typeof uri == 'string') {
+    public getWorkspaceFolder(uri: vscode.Uri | string): vscode.WorkspaceFolder | undefined {
+        if (typeof uri === "string") {
             uri = vscode.Uri.file(uri);
         }
         return vscode.workspace.getWorkspaceFolder(uri);
     }
 
     public showQuickPick<T extends vscode.QuickPickItem>(items: T[] | Thenable<T[]>,
-        options?: vscode.QuickPickOptions, token?: vscode.CancellationToken): Thenable<T | undefined>
-    {
+                                                         options?: vscode.QuickPickOptions,
+                                                         token?: vscode.CancellationToken): Thenable<T | undefined> {
         return vscode.window.showQuickPick<T>(items, options, token);
     }
 
-    public registerAndSubscribeCommand(name : string, fn) : void
-    {
-        let cmd = vscode.commands.registerCommand(name, fn);
-        this._extensionContext.subscriptions.push(cmd);
+    public registerAndSubscribeCommand(name: string, fn): void {
+        const cmd = vscode.commands.registerCommand(name, fn);
+        this.extensionContext.subscriptions.push(cmd);
     }
 
-    public showErrorMessage<T extends vscode.MessageItem>(message: string, ...items: T[]): Thenable<T | undefined>
-    {
+    public showErrorMessage<T extends vscode.MessageItem>(message: string, ...items: T[]): Thenable<T | undefined> {
         return vscode.window.showErrorMessage(message, ...items);
     }
 
@@ -48,18 +43,15 @@ export class VSCode {
     }
 
     public updateWorkspaceFolders(start: number, deleteCount: number | undefined | null,
-        ...workspaceFoldersToAdd: { name?: string, uri: vscode.Uri }[]): boolean
-    {
+                                  ...workspaceFoldersToAdd: Array<{ name?: string, uri: vscode.Uri }>): boolean {
         return vscode.workspace.updateWorkspaceFolders(start, deleteCount, ...workspaceFoldersToAdd);
     }
 
-    public executeCommand<T>(command: string, ...rest: any[]): Thenable<T | undefined>
-    {
+    public executeCommand<T>(command: string, ...rest: any[]): Thenable<T | undefined> {
         return vscode.commands.executeCommand(command, ...rest);
     }
 
-    public killProcess(pid: number, signal: string): void
-    {
+    public killProcess(pid: number, signal: string): void {
         return process.kill(pid, signal);
     }
 }

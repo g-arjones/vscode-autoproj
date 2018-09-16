@@ -1,45 +1,29 @@
-import * as vscode from 'vscode';
-import * as wrappers from './wrappers';
-import * as autoproj from './autoproj';
+import * as vscode from "vscode";
+import * as autoproj from "./autoproj";
+import * as wrappers from "./wrappers";
 
-export class Context
-{
-    private readonly _vscode: wrappers.VSCode;
-    private readonly _workspaces: autoproj.Workspaces;
-    private readonly _contextUpdatedEvent: vscode.EventEmitter<void>;
-    private readonly _outputChannel: vscode.OutputChannel;
+export class Context {
+    public readonly workspaces: autoproj.Workspaces;
+    public readonly outputChannel: vscode.OutputChannel;
 
-    public constructor(vscodeWrapper: wrappers.VSCode,
-                       workspaces: autoproj.Workspaces,
-                       outputChannel : vscode.OutputChannel)
-    {
-        this._vscode = vscodeWrapper;
-        this._workspaces = workspaces;
-        this._contextUpdatedEvent = new vscode.EventEmitter<void>();
-        this._outputChannel = outputChannel;
-    }
+    private readonly contextUpdatedEvent: vscode.EventEmitter<void>;
 
-    get outputChannel(): vscode.OutputChannel
-    {
-        return this._outputChannel;
+    public constructor(workspaces: autoproj.Workspaces, outputChannel: vscode.OutputChannel) {
+        this.workspaces = workspaces;
+        this.contextUpdatedEvent = new vscode.EventEmitter<void>();
+        this.outputChannel = outputChannel;
     }
 
     public dispose() {
-        this._contextUpdatedEvent.dispose();
+        this.contextUpdatedEvent.dispose();
     }
 
-    public onUpdate(callback)
-    {
-        return this._contextUpdatedEvent.event(callback);
-    }
-
-    public get workspaces(): autoproj.Workspaces
-    {
-        return this._workspaces;
+    public onUpdate(callback) {
+        return this.contextUpdatedEvent.event(callback);
     }
 
     public async updateWorkspaceInfo(ws: autoproj.Workspace) {
         await ws.envsh();
-        this._contextUpdatedEvent.fire();
+        this.contextUpdatedEvent.fire();
     }
 }

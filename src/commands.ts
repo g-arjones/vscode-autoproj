@@ -1,87 +1,75 @@
-import { basename, relative, dirname, join as pathjoin } from 'path';
-import * as context from './context';
-import * as wrappers from './wrappers';
-import * as vscode from 'vscode'
-import * as autoproj from './autoproj';
+import { basename, dirname, join as pathjoin, relative } from "path";
+import { CancellationTokenSource, QuickPickOptions, Uri } from "vscode";
+import * as autoproj from "./autoproj";
+import { Context } from "./context";
+import * as wrappers from "./wrappers";
 
 function findInsertIndex(array, predicate) {
     for (let i = 0; i < array.length; ++i) {
-        let element = array[i];
+        const element = array[i];
         if (predicate(element)) {
             return i;
         }
     }
-    return 0
+    return 0;
 }
 
-export class Commands
-{
-    private readonly _context: context.Context;
-    private readonly _vscode : wrappers.VSCode;
-
-    constructor(context: context.Context, vscode : wrappers.VSCode)
-    {
-        this._context = context;
-        this._vscode  = vscode;
+export class Commands {
+    constructor(private readonly context: Context,
+                private readonly vscode: wrappers.VSCode) {
     }
 
-    async showWorkspacePicker(): Promise<autoproj.Workspace | undefined>
-    {
-        if (this._context.workspaces.workspaces.size == 0) {
-            throw new Error("No Autoproj workspace found")
+    public async showWorkspacePicker(): Promise<autoproj.Workspace | undefined> {
+        if (this.context.workspaces.workspaces.size === 0) {
+            throw new Error("No Autoproj workspace found");
         }
-        let choices: { label, description, ws }[] = [];
-        function addChoice(ws: autoproj.Workspace)
-        {
+        const choices: Array<{ label, description, ws }> = [];
+        function addChoice(workspace: autoproj.Workspace) {
             const choice = {
-                label: basename(ws.root),
-                description: basename(dirname(ws.root)),
-                ws: ws
-            }
+                description: basename(dirname(workspace.root)),
+                label: basename(workspace.root),
+                ws: workspace,
+            };
             choices.push(choice);
         }
-        if (this._context.workspaces.workspaces.size == 1) {
-            return this._context.workspaces.workspaces.values().next().value;
+        if (this.context.workspaces.workspaces.size === 1) {
+            return this.context.workspaces.workspaces.values().next().value;
         }
-        this._context.workspaces.forEachWorkspace((ws) => {
-            addChoice(ws);
-        })
-        const options: vscode.QuickPickOptions = {
-            placeHolder: 'Select a workspace'
-        }
-        const ws = await this._vscode.showQuickPick(choices, options);
+        this.context.workspaces.forEachWorkspace((workspace: autoproj.Workspace) => {
+            addChoice(workspace);
+        });
+        const options: QuickPickOptions = {
+            placeHolder: "Select a workspace",
+        };
+        const ws = await this.vscode.showQuickPick(choices, options);
         if (ws) {
             return ws.ws;
         }
     }
 
-    async updatePackageInfo()
-    {
+    public async updatePackageInfo() {
         try {
-            let ws = await this.showWorkspacePicker();
+            const ws = await this.showWorkspacePicker();
             if (ws) {
-                await this._context.updateWorkspaceInfo(ws);
+                await this.context.updateWorkspaceInfo(ws);
             }
-        }
-        catch (err) {
-            this._vscode.showErrorMessage(err.message);
+        } catch (err) {
+            this.vscode.showErrorMessage(err.message);
         }
     }
 
-    showOutputChannel()
-    {
-        this._context.outputChannel.show();
+    public showOutputChannel() {
+        this.context.outputChannel.show();
     }
 
-    async packagePickerChoices(): Promise<{ label, description, pkg }[]>
-    {
-        let choices: { label, description, pkg }[] = [];
-        let fsPathsObj = {};
-        const wsInfos: [autoproj.Workspace, Promise<autoproj.WorkspaceInfo>][] = [];
+    public async packagePickerChoices(): Promise<Array<{ label, description, pkg }>> {
+        const choices: Array<{ label, description, pkg }> = [];
+        const fsPathsObj = {};
+        const wsInfos: Array<[autoproj.Workspace, Promise<autoproj.WorkspaceInfo>]> = [];
 
-        this._context.workspaces.forEachWorkspace((ws) => wsInfos.push([ws, ws.info()]));
-        if (this._vscode.workspaceFolders) {
-            for (const folder of this._vscode.workspaceFolders) {
+        this.context.workspaces.forEachWorkspace((ws) => wsInfos.push([ws, ws.info()]));
+        if (this.vscode.workspaceFolders) {
+            for (const folder of this.vscode.workspaceFolders) {
                 fsPathsObj[folder.uri.fsPath] = true;
             }
         }
@@ -89,24 +77,23 @@ export class Commands
             try {
                 const wsInfo = await wsInfoP;
                 if (!fsPathsObj.hasOwnProperty(ws.root)) {
-                    let name = `autoproj`
+                    const name = `autoproj`;
                     choices.push({
-                        label: name,
                         description: `${ws.name} Build Configuration`,
-                        pkg: { name: 'autoproj', srcdir: pathjoin(ws.root, 'autoproj') }
+                        label: name,
+                        pkg: { name: "autoproj", srcdir: pathjoin(ws.root, "autoproj") },
                     });
                 }
                 for (const aPkg of wsInfo.packages) {
                     if (!fsPathsObj.hasOwnProperty(aPkg[1].srcdir)) {
                         choices.push({
-                            label: aPkg[1].name,
                             description: basename(wsInfo.path),
-                            pkg: aPkg[1]
+                            label: aPkg[1].name,
+                            pkg: aPkg[1],
                         });
                     }
                 }
-            }
-            catch (err) {
+            } catch (err) {
                 throw new Error(
                     `Could not load installation manifest: ${err.message}`);
             }
@@ -116,44 +103,44 @@ export class Commands
         return choices;
     }
 
-    async addPackageToWorkspace()
-    {
-        const tokenSource = new vscode.CancellationTokenSource();
-        const options: vscode.QuickPickOptions = {
-            placeHolder: 'Select a package to add to this workspace'
-        }
+    public async addPackageToWorkspace() {
+        const tokenSource = new CancellationTokenSource();
+        const options: QuickPickOptions = {
+            placeHolder: "Select a package to add to this workspace",
+        };
         const choices = this.packagePickerChoices();
         choices.catch((err) => {
-            this._vscode.showErrorMessage(err.message);
+            this.vscode.showErrorMessage(err.message);
             tokenSource.cancel();
-        })
+        });
 
-        const selectedOption = await this._vscode.showQuickPick(choices,
+        const selectedOption = await this.vscode.showQuickPick(choices,
             options, tokenSource.token);
 
         tokenSource.dispose();
         if (selectedOption) {
             const name = selectedOption.pkg.name;
-            const wsFolders = this._vscode.workspaceFolders;
+            const wsFolders = this.vscode.workspaceFolders;
             let start = 0;
             if (wsFolders) {
-                start = findInsertIndex(wsFolders, ((f) => name < f.name))
+                start = findInsertIndex(wsFolders, ((f) => name < f.name));
             }
 
             const folder = {
-                name: name,
-                uri: vscode.Uri.file(selectedOption.pkg.srcdir) };
-            if (!this._vscode.updateWorkspaceFolders(start, null, folder)) {
-                this._vscode.showErrorMessage(
+                name,
+                uri: Uri.file(selectedOption.pkg.srcdir) };
+            if (!this.vscode.updateWorkspaceFolders(start, null, folder)) {
+                this.vscode.showErrorMessage(
                     `Could not add folder: ${selectedOption.pkg.srcdir}`);
             }
         }
     }
 
-    register()
-    {
-        this._vscode.registerAndSubscribeCommand('autoproj.updatePackageInfo', () => { this.updatePackageInfo() });
-        this._vscode.registerAndSubscribeCommand('autoproj.showOutputChannel', () => { this.showOutputChannel() });
-        this._vscode.registerAndSubscribeCommand('autoproj.addPackageToWorkspace', () => { this.addPackageToWorkspace() });
+    public register() {
+        this.vscode.registerAndSubscribeCommand("autoproj.updatePackageInfo", () => { this.updatePackageInfo(); });
+        this.vscode.registerAndSubscribeCommand("autoproj.showOutputChannel", () => { this.showOutputChannel(); });
+        this.vscode.registerAndSubscribeCommand("autoproj.addPackageToWorkspace", () => {
+            this.addPackageToWorkspace();
+        });
     }
 }

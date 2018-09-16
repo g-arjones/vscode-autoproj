@@ -1,52 +1,49 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import * as vscode from 'vscode';
+import * as fs from "fs";
+import * as path from "path";
+import * as vscode from "vscode";
 
-export class FileWatcher implements vscode.Disposable
-{
-    private readonly _fileToWatcher: Map<string, fs.FSWatcher>;
-    private readonly _fileToFilter: Map<string, any>;
-    constructor()
-    {
-        this._fileToWatcher = new Map<string, fs.FSWatcher>();
-        this._fileToFilter = new Map<string, any>();
+export class FileWatcher implements vscode.Disposable {
+    private readonly fileToWatcher: Map<string, fs.FSWatcher>;
+    private readonly fileToFilter: Map<string, any>;
+    constructor() {
+        this.fileToWatcher = new Map<string, fs.FSWatcher>();
+        this.fileToFilter = new Map<string, any>();
     }
-    startWatching(filePath: string,
-        callback: (filePath: string) => void): boolean
-    {
-        if (this._fileToWatcher.has(filePath))
+    public startWatching(filePath: string, callback: (filePath: string) => void): boolean {
+        if (this.fileToWatcher.has(filePath)) {
             return false;
+        }
 
-        let fileName = path.basename(filePath);
-        let fileDir = path.dirname(filePath);
-        this._fileToWatcher.set(filePath, fs.watch(fileDir, (type, file) => {
-            if (file == fileName) {
-                if (!this._fileToFilter.has(filePath)) {
+        const fileName = path.basename(filePath);
+        const fileDir = path.dirname(filePath);
+        this.fileToWatcher.set(filePath, fs.watch(fileDir, (type, file) => {
+            if (file === fileName) {
+                if (!this.fileToFilter.has(filePath)) {
                     callback(filePath);
                     // sometimes the callback is called multiple times for a single event
-                    this._fileToFilter.set(filePath, setTimeout(() => {
-                        this._fileToFilter.delete(filePath);
-                    }, 1000))
+                    this.fileToFilter.set(filePath, setTimeout(() => {
+                        this.fileToFilter.delete(filePath);
+                    }, 1000));
                 }
             }
         }));
         return true;
     }
-    stopWatching(filePath: string): void
-    {
-        let watcher = this._fileToWatcher.get(filePath);
-        if (!watcher)
+    public stopWatching(filePath: string): void {
+        const watcher = this.fileToWatcher.get(filePath);
+        if (!watcher) {
             throw new Error(`${filePath}: Not being watched`);
+        }
 
         watcher.close();
-        this._fileToWatcher.delete(filePath);
-        this._fileToFilter.delete(filePath);
+        this.fileToWatcher.delete(filePath);
+        this.fileToFilter.delete(filePath);
     }
-    dispose(): void {
-        this._fileToWatcher.forEach((watcher) => {
+    public dispose(): void {
+        this.fileToWatcher.forEach((watcher) => {
             watcher.close();
-        })
-        this._fileToWatcher.clear();
-        this._fileToFilter.clear();
+        });
+        this.fileToWatcher.clear();
+        this.fileToFilter.clear();
     }
 }
