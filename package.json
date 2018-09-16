@@ -171,7 +171,8 @@
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "postinstall": "node ./node_modules/vscode/bin/install",
-        "test": "npm run compile && node ./node_modules/vscode/bin/test"
+        "test": "npm run compile && node ./node_modules/vscode/bin/test",
+        "lint": "node ./node_modules/tslint/bin/tslint --project ."
     },
     "extensionDependencies": [
         "rebornix.ruby"
@@ -191,6 +192,7 @@
         "istanbul": "^0.4.5",
         "remap-istanbul": "^0.12.0",
         "run-sequence": "^2.2.1",
+        "tslint": "^5.11.0",
         "typemoq": "latest",
         "typescript": "^2.6.1",
         "vscode": "^1.1.21"
