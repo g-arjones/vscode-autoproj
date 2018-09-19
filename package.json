@@ -98,7 +98,7 @@
                 ],
                 "pattern": [
                     {
-                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):configure: (?:.+\n)?CMake Error at ([/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Error at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
                         "message": 0
@@ -113,7 +113,7 @@
                 ],
                 "pattern": [
                     {
-                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):configure: (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
                         "message": 0
