@@ -98,7 +98,7 @@
                 ],
                 "pattern": [
                     {
-                        "regexp": "(?:Autobuild::CMake|Autobuild::Orogen):(?:[^:]+):configure: (?:.+\n)?CMake Error at ([/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):configure: (?:.+\n)?CMake Error at ([/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
                         "message": 0
@@ -113,7 +113,7 @@
                 ],
                 "pattern": [
                     {
-                        "regexp": "(?:Autobuild::CMake|Autobuild::Orogen):(?:[^:]+):configure: (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):configure: (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
                         "message": 0
@@ -141,7 +141,7 @@
                     "absolute"
                 ],
                 "pattern": {
-                    "regexp": "(?:Autobuild::CMake|Autobuild::Orogen):(?:[^:]+):build: (.+):(\\d+):(\\d+):\\s+(?:fatal\\s+)?(error):\\s+(.+)",
+                    "regexp": "(?:Autobuild::\\w+):(?:[^:]+):build: (.+):(\\d+):(\\d+):\\s+(?:fatal\\s+)?(error):\\s+(.+)",
                     "file": 1,
                     "line": 2,
                     "column": 3,
@@ -156,7 +156,7 @@
                     "absolute"
                 ],
                 "pattern": {
-                    "regexp": "(?:Autobuild::CMake|Autobuild::Orogen):(?:[^:]+):build: (?:.+:\\d+:\\d+:\n)?(.+):(\\d+):(\\d+):\\s+(?:.*\\s+)?(warning):\\s+(.+)",
+                    "regexp": "(?:Autobuild::\\w+):(?:[^:]+):build: (?:.+:\\d+:\\d+:\n)?(.+):(\\d+):(\\d+):\\s+(?:.*\\s+)?(warning):\\s+(.+)",
                     "file": 1,
                     "line": 2,
                     "column": 3,
