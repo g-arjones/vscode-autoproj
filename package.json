@@ -93,9 +93,7 @@
             {
                 "name": "autoproj-cmake-configure-error",
                 "owner": "autoproj",
-                "fileLocation": [
-                    "absolute"
-                ],
+                "fileLocation":  "relative",
                 "pattern": [
                     {
                         "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Error at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
@@ -108,9 +106,7 @@
             {
                 "name": "autoproj-cmake-configure-warning",
                 "owner": "autoproj",
-                "fileLocation": [
-                    "absolute"
-                ],
+                "fileLocation": "relative",
                 "pattern": [
                     {
                         "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
