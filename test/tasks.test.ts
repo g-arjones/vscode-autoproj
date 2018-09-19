@@ -1,27 +1,47 @@
 "use strict";
 import * as assert from "assert";
 import { basename as pathBasename, join as pathJoin, relative as pathRelative } from "path";
+import * as TypeMoq from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as tasks from "../src/tasks";
+import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
 
 describe("Task provider", () => {
     let root: string;
     let workspaces: autoproj.Workspaces;
     let subject: tasks.AutoprojProvider;
+    let wrapper: TypeMoq.IMock<wrappers.VSCode>;
+    let workspaceFolders: vscode.WorkspaceFolder[];
 
     beforeEach(() => {
         root = helpers.init();
         workspaces = new autoproj.Workspaces();
+        wrapper = TypeMoq.Mock.ofType<wrappers.VSCode>();
+        workspaceFolders = [];
+        wrapper.setup((x) => x.workspaceFolders).returns(() => workspaceFolders);
     });
     afterEach(() => {
         helpers.clear();
     });
 
-    function assertTask(task: vscode.Task, process: string, args: string[], name: string) {
+    function addFolder(folderPath: string) {
+        const folder: vscode.WorkspaceFolder = {
+            index: workspaceFolders.length,
+            name: pathBasename(folderPath),
+            uri: vscode.Uri.file(folderPath),
+        };
+
+        workspaces.addFolder(folderPath);
+        workspaceFolders.push(folder);
+        wrapper.setup((x) => x.getWorkspaceFolder(folderPath)).returns(() => folder);
+    }
+    function assertTask(task: vscode.Task, process: string, args: string[],
+                        name: string, scope: vscode.TaskScope | vscode.WorkspaceFolder) {
         const actualProcess = (task.execution as vscode.ProcessExecution).process;
         const actualArgs = (task.execution as vscode.ProcessExecution).args;
+        assert.deepEqual(scope, task.scope);
         assert.equal(name, task.name);
         assert.equal(actualProcess, process);
         assert.deepEqual(actualArgs, args);
@@ -34,69 +54,75 @@ describe("Task provider", () => {
         const process = autoprojExePath(wsRoot);
         const args = ["watch", "--show-events"];
         const name = `${pathBasename(wsRoot)}: Watch`;
-        assertTask(task, process, args, name);
+        assertTask(task, process, args, name, workspaceFolders[0]);
     }
     function assertBuildTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["build", "--tool"];
+        let scope = workspaceFolders[0];
         let name = `${pathBasename(wsRoot)}: Build`;
 
         if (pkgPath) {
             args.push(pkgPath);
             name += ` ${pkgName}`;
+            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
         }
 
-        assertTask(task, process, args, name);
+        assertTask(task, process, args, name, scope);
     }
     function assertForceBuildTask(task: vscode.Task, wsRoot: string, pkgPath: string, pkgName: string) {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--force", "--deps=f", "--no-confirm", pkgPath];
         const name = `${pathBasename(wsRoot)}: Force Build ${pkgName} (nodeps)`;
-
-        assertTask(task, process, args, name);
+        const scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+        assertTask(task, process, args, name, scope);
     }
     function assertNodepsBuildTask(task: vscode.Task, wsRoot: string, pkgPath: string, pkgName: string) {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--deps=f", pkgPath];
         const name = `${pathBasename(wsRoot)}: Build ${pkgName} (nodeps)`;
-
-        assertTask(task, process, args, name);
+        const scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+        assertTask(task, process, args, name, scope);
     }
     function assertUpdateTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "--progress=f", "-k", "--color"];
+        let scope = workspaceFolders[0];
         let name = `${pathBasename(wsRoot)}: Update`;
 
         if (pkgPath) {
             args.push(pkgPath);
             name += ` ${pkgName}`;
+            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
         }
-        assertTask(task, process, args, name);
+        assertTask(task, process, args, name, scope);
     }
     function assertCheckoutTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "--progress=f", "-k", "--color", "--checkout-only"];
         let name = `${pathBasename(wsRoot)}: Checkout`;
+        let scope = workspaceFolders[0];
 
         if (pkgPath) {
             args.push(pkgPath);
             name += ` ${pkgName}`;
+            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
         }
-        assertTask(task, process, args, name);
+        assertTask(task, process, args, name, scope);
     }
     function assertOsdepsTask(task: vscode.Task, wsRoot: string) {
         const process = autoprojExePath(wsRoot);
         const args = ["osdeps", "--color"];
         const name = `${pathBasename(wsRoot)}: Install OS Dependencies`;
-
-        assertTask(task, process, args, name);
+        const scope = workspaceFolders[0];
+        assertTask(task, process, args, name, scope);
     }
     function assertUpdateConfigTask(task: vscode.Task, wsRoot: string) {
         const process = autoprojExePath(wsRoot);
         const args = ["update", "--progress=f", "-k", "--color", "--config"];
         const name = `${pathBasename(wsRoot)}: Update Configuration`;
-
-        assertTask(task, process, args, name);
+        const scope = workspaceFolders[0];
+        assertTask(task, process, args, name, scope);
     }
     function packageName(pkgPath: string, wsRoot: string, installManifest: autoproj.IPackage[]): string {
         const pkgInfo = installManifest.find((pkg) => pkg.srcdir === pkgPath);
@@ -178,12 +204,12 @@ describe("Task provider", () => {
             b = helpers.mkdir("one", "drivers", "auv_messaging");
             c = helpers.mkdir("two", "firmware", "chibios");
 
-            workspaces.addFolder(a);
-            workspaces.addFolder(b);
-            workspaces.addFolder(c);
-            workspaces.addFolder(d);
-            workspaces.addFolder(e);
-            subject = new tasks.AutoprojProvider(workspaces);
+            addFolder(a);
+            addFolder(b);
+            addFolder(c);
+            addFolder(d);
+            addFolder(e);
+            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
         });
 
         it("is initalized with all tasks", async () => {
@@ -227,7 +253,7 @@ describe("Task provider", () => {
 
     describe("in an empty workspace", () => {
         beforeEach(() => {
-            subject = new tasks.AutoprojProvider(workspaces);
+            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
         });
         it("provides an empty array of tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
@@ -239,7 +265,7 @@ describe("Task provider", () => {
             helpers.mkdir("drivers");
 
             const a = helpers.mkdir("drivers", "iodrivers_base");
-            workspaces.addFolder(a);
+            addFolder(a);
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
