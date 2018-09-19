@@ -18,6 +18,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
     private checkoutTasks: Map<string, vscode.Task>;
     private osdepsTasks: Map<string, vscode.Task>;
     private updateConfigTasks: Map<string, vscode.Task>;
+    private tasksPromise: Promise<vscode.Task[]>;
     private allTasks: vscode.Task[];
 
     constructor(workspaces: autoproj.Workspaces) {
@@ -25,39 +26,39 @@ export class AutoprojProvider implements vscode.TaskProvider {
         this.reloadTasks();
     }
 
-    public buildTask(path: string): vscode.Task {
+    public async buildTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.buildTasks, path);
     }
 
-    public watchTask(path: string): vscode.Task {
+    public async watchTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.watchTasks, path);
     }
 
-    public forceBuildTask(path: string): vscode.Task {
+    public async forceBuildTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.forceBuildTasks, path);
     }
 
-    public nodepsBuildTask(path: string): vscode.Task {
+    public async nodepsBuildTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.nodepsBuildTasks, path);
     }
 
-    public updateTask(path: string): vscode.Task {
+    public async updateTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.updateTasks, path);
     }
 
-    public checkoutTask(path: string): vscode.Task {
+    public async checkoutTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.checkoutTasks, path);
     }
 
-    public osdepsTask(path: string): vscode.Task {
+    public async osdepsTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.osdepsTasks, path);
     }
 
-    public updateConfigTask(path: string): vscode.Task {
+    public async updateConfigTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.updateConfigTasks, path);
     }
 
-    public reloadTasks() {
+    public reloadTasks(): void {
         this.allTasks = [];
 
         this.watchTasks = new Map<string, vscode.Task>();
@@ -69,6 +70,19 @@ export class AutoprojProvider implements vscode.TaskProvider {
         this.osdepsTasks = new Map<string, vscode.Task>();
         this.updateConfigTasks = new Map<string, vscode.Task>();
 
+        this.tasksPromise = this.createTasksPromise();
+    }
+
+    public async provideTasks(token): Promise<vscode.Task[]> {
+        await this.tasksPromise;
+        return this.allTasks;
+    }
+
+    public resolveTask(task, token) {
+        return null;
+    }
+
+    private async createTasksPromise(): Promise<vscode.Task[]> {
         this.workspaces.forEachWorkspace((ws) => {
             this.addTask(ws.root, this.createWatchTask(`${ws.name}: Watch`, ws),
                 this.watchTasks);
@@ -83,10 +97,20 @@ export class AutoprojProvider implements vscode.TaskProvider {
             this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update`, ws, "workspace"),
                 this.updateTasks);
         });
-        this.workspaces.forEachFolder((ws, folder) => {
-            if (folder === ws.root) { return; }
-            if (this.workspaces.isConfig(folder)) { return; }
-            const relative = pathRelative(ws.root, folder);
+
+        for (const folder of this.workspaces.folderToWorkspace.keys()) {
+            const ws: autoproj.Workspace = this.workspaces.folderToWorkspace.get(folder)!;
+
+            if (folder === ws.root) { continue; }
+            if (this.workspaces.isConfig(folder)) { continue; }
+
+            let relative: string;
+            try {
+                relative = (await ws.info()).findPackage(folder)!.name;
+            } catch (error) {
+                relative = pathRelative(ws.root, folder);
+            }
+
             this.addTask(folder, this.createPackageBuildTask(`${ws.name}: Build ${relative}`, ws, folder),
                 this.buildTasks);
             this.addTask(folder, this.createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
@@ -97,15 +121,9 @@ export class AutoprojProvider implements vscode.TaskProvider {
                 folder), this.nodepsBuildTasks);
             this.addTask(folder, this.createPackageUpdateTask(`${ws.name}: Update ${relative}`, ws, folder),
                 this.updateTasks);
-        });
-    }
+        }
 
-    public provideTasks(token) {
         return this.allTasks;
-    }
-
-    public resolveTask(task, token) {
-        return null;
     }
 
     private createTask(name, ws, type, defs = {}, args: string[] = []) {
@@ -201,7 +219,8 @@ export class AutoprojProvider implements vscode.TaskProvider {
         return task;
     }
 
-    private getCache(cache, key) {
+    private async getCache(cache, key): Promise<vscode.Task> {
+        await this.tasksPromise;
         const value = cache.get(key);
         if (value) {
             return value;
