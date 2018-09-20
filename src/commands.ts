@@ -76,12 +76,13 @@ export class Commands {
         for (const [ws, wsInfoP] of wsInfos) {
             try {
                 const wsInfo = await wsInfoP;
-                if (!fsPathsObj.hasOwnProperty(ws.root)) {
+                const buildconfPath = pathjoin(ws.root, "autoproj");
+                if (!fsPathsObj.hasOwnProperty(buildconfPath)) {
                     const name = `autoproj`;
                     choices.push({
                         description: `${ws.name} (buildconf)`,
                         label: name,
-                        pkg: { name: "autoproj (buildconf)", srcdir: pathjoin(ws.root, "autoproj") },
+                        pkg: { name: "autoproj (buildconf)", srcdir: buildconfPath },
                     });
                 }
                 for (const pkgSet of wsInfo.packageSets) {
