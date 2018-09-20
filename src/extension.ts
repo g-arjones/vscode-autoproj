@@ -78,7 +78,7 @@ export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSC
     const fileWatcher = new watcher.FileWatcher();
     const outputChannel = vscode.window.createOutputChannel("Autoproj");
     const workspaces = new autoproj.Workspaces(null, outputChannel);
-    const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces);
+    const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces, vscodeWrapper);
     const autoprojContext = new context.Context(workspaces, outputChannel);
     const autoprojCommands = new commands.Commands(autoprojContext, vscodeWrapper);
     const eventHandler = new EventHandler(vscodeWrapper, fileWatcher, workspaces);

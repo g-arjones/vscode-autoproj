@@ -84,39 +84,53 @@
                 "fileLocation": [
                     "absolute"
                 ],
-                "pattern": {
-                    "regexp": "^\\(\\d+\\) .+\\(([^\\)]+)\\): (failed in .* phase)$",
-                    "file": 1,
-                    "message": 2
-                }
+                "pattern": [
+                    {
+                        "regexp": "^\\(\\d+\\) .+\\(([^\\)]+)\\): (failed in .* phase)$",
+                        "kind": "file",
+                        "file": 1,
+                        "message": 2
+                    },
+                    {
+                        "regexp": "^    (.*)",
+                        "message": 1,
+                        "loop": true
+                    }
+                ]
             },
             {
                 "name": "autoproj-cmake-configure-error",
                 "owner": "autoproj",
-                "fileLocation": [
-                    "absolute"
-                ],
+                "fileLocation":  "relative",
                 "pattern": [
                     {
                         "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Error at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
-                        "message": 0
+                        "message": -1
+                    },
+                    {
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?!Call Stack)(.*)",
+                        "message": 1,
+                        "loop": true
                     }
                 ]
             },
             {
                 "name": "autoproj-cmake-configure-warning",
                 "owner": "autoproj",
-                "fileLocation": [
-                    "absolute"
-                ],
+                "fileLocation": "relative",
                 "pattern": [
                     {
                         "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
-                        "message": 0
+                        "message": -1
+                    },
+                    {
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?!Call Stack)(.*)",
+                        "message": 1,
+                        "loop": true
                     }
                 ]
             },
@@ -147,6 +161,36 @@
                     "column": 3,
                     "severity": 4,
                     "message": 5
+                }
+            },
+            {
+                "name": "autoproj-gcc-compile-template-expansion",
+                "severity": "error",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": {
+                    "regexp": "(?:Autobuild::\\w+):(?:[^:]+):build: (.+):(\\d+):(\\d+):\\s+(required from .+)",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "message": 4
+                }
+            },
+            {
+                "name": "autoproj-gcc-compile-file-inclusion",
+                "severity": "error",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": {
+                    "regexp": "(?:Autobuild::\\w+):(?:[^:]+):build: (In file included from (.+):(\\d+):(\\d+))",
+                    "file": 2,
+                    "line": 3,
+                    "column": 4,
+                    "message": 1
                 }
             },
             {
