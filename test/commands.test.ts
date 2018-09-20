@@ -214,10 +214,10 @@ describe("Commands", () => {
         beforeEach(() => {
             mockPackageOne = TypeMoq.Mock.ofType<autoproj.IPackage>();
             mockPackageTwo = TypeMoq.Mock.ofType<autoproj.IPackage>();
-            mockPackageOne.setup((x) => x.srcdir).returns(() => "/path/to/one");
-            mockPackageTwo.setup((x) => x.srcdir).returns(() => "/path/to/two");
-            mockPackageOne.setup((x) => x.name).returns(() => "one");
-            mockPackageTwo.setup((x) => x.name).returns(() => "two");
+            mockPackageOne.setup((x) => x.srcdir).returns(() => "/path/to/drivers/one");
+            mockPackageTwo.setup((x) => x.srcdir).returns(() => "/path/to/tools/two");
+            mockPackageOne.setup((x) => x.name).returns(() => "drivers/one");
+            mockPackageTwo.setup((x) => x.name).returns(() => "tools/two");
             choices = [{
                 description: "to",
                 label: "one",
@@ -259,14 +259,14 @@ describe("Commands", () => {
             await subject.addPackageToWorkspace();
 
             mockWrapper.verify((x) => x.updateWorkspaceFolders(0, null,
-                { name: "two", uri: vscode.Uri.file("/path/to/two") }),
+                { name: "tools/two", uri: vscode.Uri.file("/path/to/tools/two") }),
                 TypeMoq.Times.once());
         });
         it("keeps the folder list sorted", async () => {
             const folder: vscode.WorkspaceFolder = {
                 index: 0,
-                name: "two",
-                uri: vscode.Uri.file("/path/to/two"),
+                name: "tools/two",
+                uri: vscode.Uri.file("/path/to/tools/two"),
             };
             const promise = Promise.resolve(choices);
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => [folder]);
@@ -276,7 +276,7 @@ describe("Commands", () => {
             await subject.addPackageToWorkspace();
 
             mockWrapper.verify((x) => x.updateWorkspaceFolders(0, null,
-                { name: "one", uri: vscode.Uri.file("/path/to/one") }), TypeMoq.Times.once());
+                { name: "drivers/one", uri: vscode.Uri.file("/path/to/drivers/one") }), TypeMoq.Times.once());
         });
         it("shows an error if folder could not be added", async () => {
             const promise = Promise.resolve(choices);
@@ -285,10 +285,10 @@ describe("Commands", () => {
             mockWrapper.setup((x) => x.showQuickPick(promise,
                 options, TypeMoq.It.isAny())).returns(() => Promise.resolve(choices[1]));
             mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null,
-                    { uri: vscode.Uri.file("/path/to/two") })).returns(() => false);
+                    { uri: vscode.Uri.file("/path/to/tools/two") })).returns(() => false);
 
             await subject.addPackageToWorkspace();
-            mockWrapper.verify((x) => x.showErrorMessage("Could not add folder: /path/to/two"),
+            mockWrapper.verify((x) => x.showErrorMessage("Could not add folder: /path/to/tools/two"),
                 TypeMoq.Times.once());
         });
     });

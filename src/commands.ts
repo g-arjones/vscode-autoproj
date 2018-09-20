@@ -114,8 +114,7 @@ export class Commands {
             tokenSource.cancel();
         });
 
-        const selectedOption = await this.vscode.showQuickPick(choices,
-            options, tokenSource.token);
+        const selectedOption = await this.vscode.showQuickPick(choices, options, tokenSource.token);
 
         tokenSource.dispose();
         if (selectedOption) {
@@ -126,12 +125,10 @@ export class Commands {
                 start = findInsertIndex(wsFolders, ((f) => name < f.name));
             }
 
-            const folder = {
-                name,
-                uri: Uri.file(selectedOption.pkg.srcdir) };
+            const folder = { name: selectedOption.pkg.name,
+                             uri: Uri.file(selectedOption.pkg.srcdir) };
             if (!this.vscode.updateWorkspaceFolders(start, null, folder)) {
-                this.vscode.showErrorMessage(
-                    `Could not add folder: ${selectedOption.pkg.srcdir}`);
+                this.vscode.showErrorMessage(`Could not add folder: ${selectedOption.pkg.srcdir}`);
             }
         }
     }
