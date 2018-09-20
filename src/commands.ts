@@ -1,4 +1,4 @@
-import { basename, dirname, join as pathjoin, relative } from "path";
+import { basename, dirname, join as pathjoin } from "path";
 import { CancellationTokenSource, QuickPickOptions, Uri } from "vscode";
 import * as autoproj from "./autoproj";
 import { Context } from "./context";
@@ -79,23 +79,31 @@ export class Commands {
                 if (!fsPathsObj.hasOwnProperty(ws.root)) {
                     const name = `autoproj`;
                     choices.push({
-                        description: `${ws.name} Build Configuration`,
+                        description: `${ws.name} (buildconf)`,
                         label: name,
-                        pkg: { name: "autoproj", srcdir: pathjoin(ws.root, "autoproj") },
+                        pkg: { name: "autoproj (buildconf)", srcdir: pathjoin(ws.root, "autoproj") },
                     });
+                }
+                for (const pkgSet of wsInfo.packageSets) {
+                    if (!fsPathsObj.hasOwnProperty(pkgSet[1].user_local_dir)) {
+                        choices.push({
+                            description: `${ws.name} (package set)`,
+                            label: pkgSet[1].name,
+                            pkg: { name: `${pkgSet[1].name} (package set)`, srcdir: pkgSet[1].user_local_dir },
+                        });
+                    }
                 }
                 for (const aPkg of wsInfo.packages) {
                     if (!fsPathsObj.hasOwnProperty(aPkg[1].srcdir)) {
                         choices.push({
-                            description: basename(wsInfo.path),
+                            description: ws.name,
                             label: aPkg[1].name,
                             pkg: aPkg[1],
                         });
                     }
                 }
             } catch (err) {
-                throw new Error(
-                    `Could not load installation manifest: ${err.message}`);
+                throw new Error(`Could not load installation manifest: ${err.message}`);
             }
         }
         choices.sort((a, b) =>
@@ -106,6 +114,7 @@ export class Commands {
     public async addPackageToWorkspace() {
         const tokenSource = new CancellationTokenSource();
         const options: QuickPickOptions = {
+            matchOnDescription: true,
             placeHolder: "Select a package to add to this workspace",
         };
         const choices = this.packagePickerChoices();

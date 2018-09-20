@@ -138,23 +138,30 @@ describe("Commands", () => {
         let mockWsInfo: TypeMoq.IMock<autoproj.WorkspaceInfo>;
         let mockPackageOne: TypeMoq.IMock<autoproj.IPackage>;
         let mockPackageTwo: TypeMoq.IMock<autoproj.IPackage>;
+        let mockPackageSetOne: TypeMoq.IMock<autoproj.IPackageSet>;
         let pathToPackage: Map<string, autoproj.IPackage>;
+        let pathToPackageSet: Map<string, autoproj.IPackageSet>;
         beforeEach(() => {
             mockWs = TypeMoq.Mock.ofType<autoproj.Workspace>();
             mockWsInfo = TypeMoq.Mock.ofType<autoproj.WorkspaceInfo>();
             mockPackageOne = TypeMoq.Mock.ofType<autoproj.IPackage>();
             mockPackageTwo = TypeMoq.Mock.ofType<autoproj.IPackage>();
+            mockPackageSetOne = TypeMoq.Mock.ofType<autoproj.IPackageSet>();
             pathToPackage = new Map();
+            pathToPackageSet = new Map();
             mockWs.setup((x) => x.name).returns(() => "to");
             mockWs.setup((x) => x.root).returns(() => "/path/to");
             mockWsInfo.setup((x: any) => x.then).returns(() => undefined);
             mockWsInfo.setup((x) => x.path).returns(() => "/path/to");
             mockPackageOne.setup((x) => x.srcdir).returns(() => "/path/to/one");
+            mockPackageSetOne.setup((x) => x.user_local_dir).returns(() => "/path/to/autoproj/remotes/set.one");
             mockPackageTwo.setup((x) => x.srcdir).returns(() => "/path/to/two");
             mockPackageOne.setup((x) => x.name).returns(() => "one");
             mockPackageTwo.setup((x) => x.name).returns(() => "two");
+            mockPackageSetOne.setup((x) => x.name).returns(() => "set.one");
             pathToPackage.set("/path/to/two", mockPackageTwo.object);
             pathToPackage.set("/path/to/one", mockPackageOne.object);
+            pathToPackageSet.set("/path/to/autoproj/remotes/set.one", mockPackageSetOne.object);
             mockWorkspaces.setup((x) => x.forEachWorkspace(TypeMoq.It.isAny())).
                 callback((cb) => cb(mockWs.object));
         });
@@ -168,19 +175,24 @@ describe("Commands", () => {
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
             mockWs.setup((x) => x.info()).returns(() => Promise.resolve(mockWsInfo.object));
             mockWsInfo.setup((x) => x.packages).returns(() => pathToPackage);
+            mockWsInfo.setup((x) => x.packageSets).returns(() => pathToPackageSet);
 
             const choices = await subject.packagePickerChoices();
-            assert.equal(choices.length, 3);
+            assert.equal(choices.length, 4);
             assert.deepStrictEqual(choices[0].pkg,
-                { name: "autoproj", srcdir: "/path/to/autoproj" });
+                { name: "autoproj (buildconf)", srcdir: "/path/to/autoproj" });
             assert.strictEqual(choices[0].label, "autoproj");
-            assert.strictEqual(choices[0].description, "to Build Configuration");
+            assert.strictEqual(choices[0].description, "to (buildconf)");
             assert.strictEqual(choices[1].pkg, mockPackageOne.object);
             assert.strictEqual(choices[1].label, "one");
             assert.strictEqual(choices[1].description, "to");
-            assert.strictEqual(choices[2].pkg, mockPackageTwo.object);
-            assert.strictEqual(choices[2].label, "two");
-            assert.strictEqual(choices[2].description, "to");
+            assert.deepStrictEqual(choices[2].pkg,
+                { name: "set.one (package set)", srcdir: "/path/to/autoproj/remotes/set.one" });
+            assert.strictEqual(choices[2].label, "set.one");
+            assert.strictEqual(choices[2].description, "to (package set)");
+            assert.strictEqual(choices[3].pkg, mockPackageTwo.object);
+            assert.strictEqual(choices[3].label, "two");
+            assert.strictEqual(choices[3].description, "to");
         });
         it("returns packages that are not in the current workspace", async () => {
             const folder: vscode.WorkspaceFolder = {
@@ -191,16 +203,21 @@ describe("Commands", () => {
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => [folder]);
             mockWs.setup((x) => x.info()).returns(() => Promise.resolve(mockWsInfo.object));
             mockWsInfo.setup((x) => x.packages).returns(() => pathToPackage);
+            mockWsInfo.setup((x) => x.packageSets).returns(() => pathToPackageSet);
 
             const choices = await subject.packagePickerChoices();
-            assert.equal(choices.length, 2);
+            assert.equal(choices.length, 3);
             assert.deepStrictEqual(choices[0].pkg,
-                { name: "autoproj", srcdir: "/path/to/autoproj" });
+                { name: "autoproj (buildconf)", srcdir: "/path/to/autoproj" });
             assert.strictEqual(choices[0].label, "autoproj");
-            assert.strictEqual(choices[0].description, "to Build Configuration");
-            assert.strictEqual(choices[1].pkg, mockPackageTwo.object);
-            assert.strictEqual(choices[1].label, "two");
-            assert.strictEqual(choices[1].description, "to");
+            assert.strictEqual(choices[0].description, "to (buildconf)");
+            assert.deepStrictEqual(choices[1].pkg,
+                { name: "set.one (package set)", srcdir: "/path/to/autoproj/remotes/set.one" });
+            assert.strictEqual(choices[1].label, "set.one");
+            assert.strictEqual(choices[1].description, "to (package set)");
+            assert.strictEqual(choices[2].pkg, mockPackageTwo.object);
+            assert.strictEqual(choices[2].label, "two");
+            assert.strictEqual(choices[2].description, "to");
         });
     });
     describe("addPackageToWorkspace()", () => {
@@ -209,6 +226,7 @@ describe("Commands", () => {
         let mockPackageTwo: TypeMoq.IMock<autoproj.IPackage>;
         let choices: Array<{ label, description, pkg }> = [];
         const options: vscode.QuickPickOptions = {
+            matchOnDescription: true,
             placeHolder: "Select a package to add to this workspace",
         };
         beforeEach(() => {
