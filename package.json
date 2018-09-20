@@ -84,11 +84,19 @@
                 "fileLocation": [
                     "absolute"
                 ],
-                "pattern": {
+                "pattern": [
+                    {
                     "regexp": "^\\(\\d+\\) .+\\(([^\\)]+)\\): (failed in .* phase)$",
+                        "kind": "file",
                     "file": 1,
                     "message": 2
+                    },
+                    {
+                        "regexp": "^    (.*)",
+                        "message": 1,
+                        "loop": true
                 }
+                ]
             },
             {
                 "name": "autoproj-cmake-configure-error",
@@ -99,7 +107,12 @@
                         "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Error at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
-                        "message": 0
+                        "message": -1
+                    },
+                    {
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?!Call Stack)(.*)",
+                        "message": 1,
+                        "loop": true
                     }
                 ]
             },
@@ -112,7 +125,12 @@
                         "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
-                        "message": 0
+                        "message": -1
+                    },
+                    {
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?!Call Stack)(.*)",
+                        "message": 1,
+                        "loop": true
                     }
                 ]
             },
