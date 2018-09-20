@@ -86,16 +86,16 @@
                 ],
                 "pattern": [
                     {
-                    "regexp": "^\\(\\d+\\) .+\\(([^\\)]+)\\): (failed in .* phase)$",
+                        "regexp": "^\\(\\d+\\) .+\\(([^\\)]+)\\): (failed in .* phase)$",
                         "kind": "file",
-                    "file": 1,
-                    "message": 2
+                        "file": 1,
+                        "message": 2
                     },
                     {
                         "regexp": "^    (.*)",
                         "message": 1,
                         "loop": true
-                }
+                    }
                 ]
             },
             {
@@ -161,6 +161,36 @@
                     "column": 3,
                     "severity": 4,
                     "message": 5
+                }
+            },
+            {
+                "name": "autoproj-gcc-compile-template-expansion",
+                "severity": "error",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": {
+                    "regexp": "(?:Autobuild::\\w+):(?:[^:]+):build: (.+):(\\d+):(\\d+):\\s+(required from .+)",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "message": 4
+                }
+            },
+            {
+                "name": "autoproj-gcc-compile-file-inclusion",
+                "severity": "error",
+                "owner": "autoproj",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": {
+                    "regexp": "(?:Autobuild::\\w+):(?:[^:]+):build: (In file included from (.+):(\\d+):(\\d+))",
+                    "file": 2,
+                    "line": 3,
+                    "column": 4,
+                    "message": 1
                 }
             },
             {
