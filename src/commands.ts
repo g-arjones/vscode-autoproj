@@ -4,16 +4,6 @@ import * as autoproj from "./autoproj";
 import { Context } from "./context";
 import * as wrappers from "./wrappers";
 
-function findInsertIndex(array, predicate) {
-    for (let i = 0; i < array.length; ++i) {
-        const element = array[i];
-        if (predicate(element)) {
-            return i;
-        }
-    }
-    return 0;
-}
-
 export class Commands {
     constructor(private readonly context: Context,
                 private readonly vscode: wrappers.VSCode) {
@@ -131,8 +121,13 @@ export class Commands {
             const name = selectedOption.pkg.name;
             const wsFolders = this.vscode.workspaceFolders;
             let start = 0;
+
             if (wsFolders) {
-                start = findInsertIndex(wsFolders, ((f) => name < f.name));
+                for (start = 0; start < wsFolders.length; start++) {
+                    if (name < wsFolders[start].name) {
+                        break;
+                    }
+                }
             }
 
             const folder = { name: selectedOption.pkg.name,
