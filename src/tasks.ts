@@ -143,7 +143,12 @@ export class AutoprojProvider implements vscode.TaskProvider {
     }
 
     private createWatchTask(name, ws, defs = {}, args: string[] = []) {
-        return this.createWorkspaceTask(name, ws, "watch", defs, ["watch", "--show-events", ...args]);
+        const task = this.createWorkspaceTask(name, ws, "watch", defs, ["watch", "--show-events", ...args]);
+        task.isBackground = true;
+        task.presentationOptions = {
+            reveal: vscode.TaskRevealKind.Never,
+        };
+        return task;
     }
 
     // vscode currently does not support workspace and global tasks

@@ -55,6 +55,8 @@ describe("Task provider", () => {
         const args = ["watch", "--show-events"];
         const name = `${pathBasename(wsRoot)}: Watch`;
         assertTask(task, process, args, name, workspaceFolders[0]);
+        assert.equal(task.isBackground, true);
+        assert.deepEqual(task.presentationOptions, { reveal: vscode.TaskRevealKind.Never });
     }
     function assertBuildTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
