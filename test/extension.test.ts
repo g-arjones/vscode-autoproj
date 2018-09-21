@@ -18,6 +18,46 @@ describe("EventHandler", () => {
         mockWatcher = TypeMoq.Mock.ofType<watcher.FileWatcher>();
         subject = new extension.EventHandler(mockWrapper.object, mockWatcher.object, mockWorkspaces.object);
     });
+    describe("onDidStartTaskProcess()", () => {
+        let mockTaskExecution: TypeMoq.IMock<vscode.TaskExecution>;
+        let mockWorkspace: TypeMoq.IMock<autoproj.Workspace>;
+        let mockTask: TypeMoq.IMock<vscode.Task>;
+        const taskDefinition: vscode.TaskDefinition = {
+            mode: "watch",
+            type: "autoproj-workspace",
+            workspace: "/path/to/workspace",
+        };
+
+        beforeEach(() => {
+            mockTask = TypeMoq.Mock.ofType<vscode.Task>();
+            mockTaskExecution = TypeMoq.Mock.ofType<vscode.TaskExecution>();
+            mockWorkspace = TypeMoq.Mock.ofType<autoproj.Workspace>();
+            mockTaskExecution.setup((x) => x.task).returns(() => mockTask.object);
+            mockTask.setup((x) => x.definition).returns(() => taskDefinition);
+            mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
+        });
+        it("associate 'autoproj watch' task's pid with a workspace root", async () => {
+            subject.onDidStartTaskProcess({ execution: mockTaskExecution.object, processId: 1234 });
+            subject.dispose();
+            mockWrapper.verify((x) => x.killProcess(1234, "SIGINT"), TypeMoq.Times.once());
+        });
+        it("ignore tasks that are not 'autoproj watch' tasks", async () => {
+            taskDefinition.mode = "build";
+            subject.onDidStartTaskProcess({ execution: mockTaskExecution.object, processId: 1234 });
+            subject.dispose();
+            mockWrapper.verify((x) => x.killProcess(TypeMoq.It.isAny(), TypeMoq.It.isAny()), TypeMoq.Times.never());
+        });
+        describe("dispose()", () => {
+            it("ignores if killing a 'autoproj watch' task fails", () => {
+                subject.onDidStartTaskProcess({ execution: mockTaskExecution.object, processId: 1234 });
+                mockWrapper.setup((x) => x.killProcess(TypeMoq.It.isAny(),
+                    TypeMoq.It.isAny())).throws(new Error("test"));
+
+                subject.dispose();
+                mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.never());
+            });
+        });
+    });
     describe("onManifestChanged()", () => {
         let mockWorkspace: TypeMoq.IMock<autoproj.Workspace>;
         let mockInfo: TypeMoq.IMock<autoproj.WorkspaceInfo>;
@@ -42,17 +82,27 @@ describe("EventHandler", () => {
     describe("onWorkspaceFolderAdded()", () => {
         let mockWorkspace: TypeMoq.IMock<autoproj.Workspace>;
         let mockWatchFunc: TypeMoq.IMock<(ws: autoproj.Workspace) => void>;
+        let mockTask: TypeMoq.IMock<vscode.Task>;
         let mockInfo: TypeMoq.IMock<autoproj.WorkspaceInfo>;
         const folder: vscode.WorkspaceFolder = {
             index: 0,
             name: "two",
             uri: vscode.Uri.file("/path/to/two"),
         };
+        const taskDefinition: vscode.TaskDefinition = {
+            mode: "watch",
+            type: "autoproj-workspace",
+            workspace: "/path/to/workspace",
+        };
         beforeEach(() => {
             mockInfo = TypeMoq.Mock.ofType<autoproj.WorkspaceInfo>();
+            mockTask = TypeMoq.Mock.ofType<vscode.Task>();
+            mockTask.setup((x: any) => x.then).returns(() => undefined);
             mockInfo.setup((x: any) => x.then).returns(() => undefined);
             mockWorkspace = TypeMoq.Mock.ofType<autoproj.Workspace>();
-            mockWorkspace.setup((x) => x.name).returns(() => "dev");
+            mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
+            mockTask.setup((x) => x.definition).returns(() => taskDefinition);
+            mockWrapper.setup((x) => x.fetchTasks()).returns(() => Promise.resolve([mockTask.object]));
             mockWatchFunc = TypeMoq.Mock.ofInstance(() => {
                 // no-op
             });
@@ -67,8 +117,7 @@ describe("EventHandler", () => {
             mockWorkspace.verify((x) => x.info(), TypeMoq.Times.once());
             mockWatchFunc.verify((x) => x(mockWorkspace.object), TypeMoq.Times.once());
             mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.never());
-            mockWrapper.verify((x) => x.executeCommand("workbench.action.tasks.runTask", `autoproj: dev: Watch`),
-                TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.executeTask(mockTask.object), TypeMoq.Times.once());
         });
         it("loads manifest and shows error if failure", async () => {
             mockWorkspace.setup((x) => x.info()).returns(() => Promise.reject(new Error("test")));
@@ -79,8 +128,16 @@ describe("EventHandler", () => {
             mockWorkspace.verify((x) => x.info(), TypeMoq.Times.once());
             mockWatchFunc.verify((x) => x(mockWorkspace.object), TypeMoq.Times.once());
             mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.once());
-            mockWrapper.verify((x) => x.executeCommand("workbench.action.tasks.runTask", `autoproj: dev: Watch`),
-                TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.executeTask(mockTask.object), TypeMoq.Times.once());
+        });
+        it("shows error message if watch task cannot be started", async () => {
+            mockWrapper.reset();
+            mockWorkspace.setup((x) => x.info()).returns(() => Promise.resolve(mockInfo.object));
+            mockWorkspaces.setup((x) => x.addFolder(folder.uri.fsPath)).
+                returns(() => ({ added: true, workspace: mockWorkspace.object }));
+
+            await subject.onWorkspaceFolderAdded(folder);
+            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.once());
         });
         it("does nothing if folder already in workspace", async () => {
             mockWorkspaces.setup((x) => x.addFolder(folder.uri.fsPath)).
@@ -90,7 +147,8 @@ describe("EventHandler", () => {
             mockWorkspace.verify((x) => x.info(), TypeMoq.Times.never());
             mockWatchFunc.verify((x) => x(TypeMoq.It.isAny()), TypeMoq.Times.never());
             mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.never());
-            mockWrapper.verify((x) => x.executeCommand(TypeMoq.It.isAny(), TypeMoq.It.isAny()), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.fetchTasks(TypeMoq.It.isAny()), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.executeTask(TypeMoq.It.isAny()), TypeMoq.Times.never());
         });
         it("does nothing if folder not added", async () => {
             mockWorkspaces.setup((x) => x.addFolder(folder.uri.fsPath)).
@@ -100,23 +158,37 @@ describe("EventHandler", () => {
             mockWorkspace.verify((x) => x.info(), TypeMoq.Times.never());
             mockWatchFunc.verify((x) => x(TypeMoq.It.isAny()), TypeMoq.Times.never());
             mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.never());
-            mockWrapper.verify((x) => x.executeCommand(TypeMoq.It.isAny(), TypeMoq.It.isAny()), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.fetchTasks(TypeMoq.It.isAny()), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.executeTask(TypeMoq.It.isAny()), TypeMoq.Times.never());
         });
     });
     describe("onWorkspaceFolderRemoved()", () => {
         let mockWorkspace: TypeMoq.IMock<autoproj.Workspace>;
+        let mockTaskExecution: TypeMoq.IMock<vscode.TaskExecution>;
         let mockUnwatchFunc: TypeMoq.IMock<(ws: autoproj.Workspace) => void>;
+        let mockTask: TypeMoq.IMock<vscode.Task>;
+        const taskDefinition: vscode.TaskDefinition = {
+            mode: "watch",
+            type: "autoproj-workspace",
+            workspace: "/path/to/workspace",
+        };
+
         const folder: vscode.WorkspaceFolder = {
             index: 0,
             name: "two",
             uri: vscode.Uri.file("/path/to/two"),
         };
         beforeEach(() => {
+            mockTask = TypeMoq.Mock.ofType<vscode.Task>();
+            mockTaskExecution = TypeMoq.Mock.ofType<vscode.TaskExecution>();
             mockWorkspace = TypeMoq.Mock.ofType<autoproj.Workspace>();
-            mockWorkspace.setup((x) => x.readWatchPID()).returns(() => Promise.resolve(1234));
             mockUnwatchFunc = TypeMoq.Mock.ofInstance(() => {
                 // no-op
             });
+            mockTaskExecution.setup((x) => x.task).returns(() => mockTask.object);
+            mockTask.setup((x) => x.definition).returns(() => taskDefinition);
+            mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
+            subject.onDidStartTaskProcess({ execution: mockTaskExecution.object, processId: 1234 });
             subject.unwatchManifest = mockUnwatchFunc.object;
         });
         it("de-registers the folder", async () => {
@@ -135,15 +207,20 @@ describe("EventHandler", () => {
             mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.never());
             mockWrapper.verify((x) => x.killProcess(1234, "SIGINT"), TypeMoq.Times.once());
         });
-        it("de-registers the folder, stops the watcher and shows an error message", async () => {
-            mockWorkspace.reset();
-            mockWorkspace.setup((x) => x.readWatchPID()).returns(() => Promise.reject(new Error("test")));
+        it("de-registers the folder, stops the watcher and ignores killProcess() failure", async () => {
             mockWorkspaces.setup((x) => x.deleteFolder(folder.uri.fsPath)).returns(() => mockWorkspace.object);
-
+            mockWrapper.setup((x) => x.killProcess(1234, "SIGINT")).throws(new Error("test"));
             await subject.onWorkspaceFolderRemoved(folder);
             mockUnwatchFunc.verify((x) => x(mockWorkspace.object), TypeMoq.Times.once());
-            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.once());
-            mockWrapper.verify((x) => x.killProcess(1234, "SIGINT"), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.never());
+        });
+        it("does nothing if there was to watch task pid for the folder", async () => {
+            mockWorkspace.reset();
+            mockWorkspace.setup((x) => x.root).returns(() => "/some/other/path");
+            mockWorkspaces.setup((x) => x.deleteFolder(folder.uri.fsPath)).returns(() => mockWorkspace.object);
+            await subject.onWorkspaceFolderRemoved(folder);
+            mockWrapper.verify((x) => x.killProcess(TypeMoq.It.isAny(), TypeMoq.It.isAny()), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.never());
         });
     });
     describe("watchManifest()", () => {

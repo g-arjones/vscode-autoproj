@@ -323,29 +323,6 @@ describe("Autoproj helpers tests", () => {
                 await assertProcessIsShown("which cmd", "autoproj which cmd", p, processMock, outputChannel);
             });
         });
-
-        describe("readWatchPID", () => {
-            let workspace: autoproj.Workspace;
-
-            beforeEach(async () => {
-                const setup = new helpers.TestSetup();
-                const { mock, ws } = setup.createAndRegisterWorkspace("ws");
-                workspace = ws;
-            });
-            it ("errors if the watch file does not exist", async () => {
-                await helpers.assertThrowsAsync(workspace.readWatchPID(),
-                    new RegExp("^ENOENT: no such file or directory"));
-            });
-            it ("errors if the watch file is empty", async () => {
-                helpers.mkfile("", "ws", ".autoproj", "watch");
-                await helpers.assertThrowsAsync(workspace.readWatchPID(),
-                    new RegExp(`^invalid watch PID file$`));
-            });
-            it ("returns the PID if the file contains a number", async () => {
-                helpers.mkfile("1234", "ws", ".autoproj", "watch");
-                assert.strictEqual(1234, await workspace.readWatchPID());
-            });
-        });
     });
     describe("Workspaces", () => {
         let workspaces: autoproj.Workspaces;
