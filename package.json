@@ -28,7 +28,7 @@
         "url": "https://github.com/g-arjones/vscode-autoproj.git"
     },
     "engines": {
-        "vscode": "^1.21.0"
+        "vscode": "^1.27.0"
     },
     "activationEvents": [
         "*"
@@ -101,7 +101,7 @@
             {
                 "name": "autoproj-cmake-configure-error",
                 "owner": "autoproj",
-                "fileLocation":  "relative",
+                "fileLocation": "relative",
                 "severity": "error",
                 "pattern": [
                     {
@@ -199,7 +199,11 @@
         "taskDefinitions": [
             {
                 "type": "autoproj-package",
-                "required": ["workspace", "mode", "path"],
+                "required": [
+                    "workspace",
+                    "mode",
+                    "path"
+                ],
                 "properties": {
                     "workspace": {
                         "type": "string",
@@ -224,7 +228,10 @@
             },
             {
                 "type": "autoproj-workspace",
-                "required": ["workspace", "mode"],
+                "required": [
+                    "workspace",
+                    "mode"
+                ],
                 "properties": {
                     "workspace": {
                         "type": "string",
