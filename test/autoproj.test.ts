@@ -1,42 +1,8 @@
 "use strict";
 import * as assert from "assert";
 import * as path from "path";
-import * as TypeMoq from "typemoq";
 import * as autoproj from "../src/autoproj";
 import * as helpers from "./helpers";
-
-async function assertProcessIsShown(shortname, cmd, promise, subprocess, channel) {
-    subprocess.stdout.emit("data", "STDOUT");
-    subprocess.stderr.emit("data", "STDERR");
-    subprocess.emit("exit", 0, undefined);
-    try {
-        await promise;
-    } catch (e) {
-        // no-op
-    }
-    const expected = [
-        `${shortname}: starting ${cmd}`,
-        `${shortname}: STDOUT`,
-        `${shortname}: STDERR`,
-        `${shortname}: ${cmd} quit`,
-    ];
-    assert.deepStrictEqual(channel.receivedLines, expected);
-}
-
-describe("ConsoleOutputChannel", () => {
-    it("prints to text to console", () => {
-        const mockLogFunc = TypeMoq.Mock.ofType<(text: string) => void>();
-        // tslint:disable-next-line:no-console
-        const originalLogFunc = console.log; console.log = mockLogFunc.object;
-
-        const channel = new autoproj.ConsoleOutputChannel();
-        channel.appendLine("test");
-        mockLogFunc.verify((x) => x("test"), TypeMoq.Times.once());
-
-        // tslint:disable-next-line:no-console
-        console.log = originalLogFunc;
-    });
-});
 
 describe("Autoproj helpers tests", () => {
     const originalSpawn = require("child_process").spawn;
@@ -232,48 +198,6 @@ describe("Autoproj helpers tests", () => {
                 workspace.onInfoUpdated((callback) => called = true);
                 await workspace.reload();
                 assert(called);
-            });
-        });
-        describe("which", () => {
-            const processMock = helpers.createProcessMock();
-            let outputChannel: helpers.OutputChannel;
-            let subject;
-
-            beforeEach(async () => {
-                const spawn = (...args) => processMock;
-                require("child_process").spawn = spawn;
-
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
-                outputChannel = new helpers.OutputChannel();
-                subject = autoproj.Workspace.fromDir(root, false, outputChannel) as autoproj.Workspace;
-            });
-
-            it("returns the path displayed by autoproj on success", async () => {
-                const p = subject.which("cmd");
-                processMock.stdout.emit("data", "/test/cmd\n");
-                processMock.emit("exit", 0, null);
-                assert.equal("/test/cmd", await p);
-            });
-
-            it("concatenates the data if received in chunks", async () => {
-                const p = subject.which("cmd");
-                processMock.stdout.emit("data", "/te");
-                processMock.stdout.emit("data", "st/cmd\n");
-                processMock.emit("exit", 0, null);
-                assert.equal("/test/cmd", await p);
-            });
-
-            it("rejects the promise on failure", async () => {
-                const p = subject.which("cmd");
-                processMock.emit("exit", 1, null);
-                await helpers.assertThrowsAsync(p,
-                    /cannot find cmd in the workspace/);
-            });
-
-            it("redirects its output to the rock channel", async () => {
-                const p = subject.which("cmd");
-                await assertProcessIsShown("which cmd", "autoproj which cmd", p, processMock, outputChannel);
             });
         });
     });

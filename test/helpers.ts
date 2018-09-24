@@ -7,22 +7,8 @@ import * as YAML from "js-yaml";
 import * as Path from "path";
 import * as TypeMoq from "typemoq";
 import * as Autoproj from "../src/autoproj";
-import * as Context from "../src/context";
 import * as Tasks from "../src/tasks";
 import * as Wrappers from "../src/wrappers";
-
-export class OutputChannel implements Autoproj.IOutputChannel {
-    public receivedLines: string[] = [];
-
-    public appendLine(msg: string): void {
-        this.receivedLines.push(msg);
-    }
-
-    public clear() {
-        this.receivedLines = [];
-    }
-
-}
 
 export async function assertThrowsAsync(p, msg: RegExp): Promise<Error> {
     try {
@@ -161,23 +147,11 @@ export class TestSetup {
         return this.mockTaskProvider.target;
     }
 
-    public mockContext: TypeMoq.IMock<Context.Context>;
-    get context(): Context.Context {
-        return this.mockContext.target;
-    }
-
-    public mockOutputChannel: TypeMoq.IMock<OutputChannel>;
-    get outputChannel(): OutputChannel {
-        return this.mockOutputChannel.target;
-    }
-
     constructor() {
         this.mockWrapper = TypeMoq.Mock.ofType<Wrappers.VSCode>();
 
-        this.mockOutputChannel = TypeMoq.Mock.ofType2(OutputChannel, []);
-        this.mockWorkspaces = TypeMoq.Mock.ofType2(Autoproj.Workspaces, [undefined, this.outputChannel]);
+        this.mockWorkspaces = TypeMoq.Mock.ofType2(Autoproj.Workspaces, [undefined]);
         this.mockTaskProvider = TypeMoq.Mock.ofType2(Tasks.AutoprojProvider, [this.workspaces]);
-        this.mockContext = TypeMoq.Mock.ofType2(Context.Context, [this.wrapper, this.workspaces, this.outputChannel]);
     }
 
     public setupWrapper(fn) {
@@ -192,7 +166,7 @@ export class TestSetup {
 
     public createAndRegisterWorkspace(...path: string[]) {
         const wsPath = this.createWorkspace(...path);
-        const mock = TypeMoq.Mock.ofType2(Autoproj.Workspace, [wsPath, false, this.outputChannel]);
+        const mock = TypeMoq.Mock.ofType2(Autoproj.Workspace, [wsPath, false]);
         this.workspaces.add(mock.target);
         return { mock, ws: mock.target };
     }

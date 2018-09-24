@@ -5,23 +5,19 @@ import * as TypeMoq from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as commands from "../src/commands";
-import * as context from "../src/context";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
 
 describe("Commands", () => {
     let mockWorkspaces: TypeMoq.IMock<autoproj.Workspaces>;
     let mockWrapper: TypeMoq.IMock<wrappers.VSCode>;
-    let mockContext: TypeMoq.IMock<context.Context>;
     let subject: commands.Commands;
 
     beforeEach(() => {
         mockWorkspaces = TypeMoq.Mock.ofType<autoproj.Workspaces>();
         mockWrapper = TypeMoq.Mock.ofType<wrappers.VSCode>();
-        mockContext = TypeMoq.Mock.ofType<context.Context>();
-        subject = new commands.Commands(mockContext.object,
+        subject = new commands.Commands(mockWorkspaces.object,
             mockWrapper.object);
-        mockContext.setup((x) => x.workspaces).returns(() => mockWorkspaces.object);
     });
     describe("updatePackageInfo()", () => {
         let mockWorkspace: TypeMoq.IMock<autoproj.Workspace>;
@@ -311,17 +307,6 @@ describe("Commands", () => {
                 TypeMoq.Times.once());
         });
     });
-    describe("showOutputChannel()", () => {
-        let mockOutputChannel: TypeMoq.IMock<vscode.OutputChannel>;
-        beforeEach(() => {
-            mockOutputChannel = TypeMoq.Mock.ofType<vscode.OutputChannel>();
-            mockContext.setup((x) => x.outputChannel).returns(() => mockOutputChannel.object);
-        });
-        it("shows the output channel", async () => {
-            subject.showOutputChannel();
-            mockOutputChannel.verify((x) => x.show(), TypeMoq.Times.once());
-        });
-    });
     describe("register()", () => {
         function setupWrapper(command: string, callback: (command, cb) => void) {
             mockWrapper.setup((x) => x.registerAndSubscribeCommand(command, TypeMoq.It.isAny())).callback(callback);
@@ -329,31 +314,22 @@ describe("Commands", () => {
 
         it("registers all commands", async () => {
             let updatePackageInfoCb: () => Promise<void>;
-            let showOutputChannelCb: () => void;
             let addPackageToWorkspaceCb: () => Promise<void>;
 
             const mockUpdatePackageInfo = TypeMoq.Mock.ofInstance(() => Promise.resolve());
             subject.updatePackageInfo = mockUpdatePackageInfo.object;
 
-            const mockShowOutputChannel = TypeMoq.Mock.ofInstance(() => {
-                // no-op
-            });
-            subject.showOutputChannel = mockShowOutputChannel.object;
-
             const mockAddPackageToWorkspace = TypeMoq.Mock.ofInstance(() => Promise.resolve());
             subject.addPackageToWorkspace = mockAddPackageToWorkspace.object;
 
             setupWrapper("autoproj.updatePackageInfo", (command, cb) => updatePackageInfoCb = cb);
-            setupWrapper("autoproj.showOutputChannel", (command, cb) => showOutputChannelCb = cb);
             setupWrapper("autoproj.addPackageToWorkspace", (command, cb) => addPackageToWorkspaceCb = cb);
 
             subject.register();
             updatePackageInfoCb!();
-            showOutputChannelCb!();
             addPackageToWorkspaceCb!();
 
             mockUpdatePackageInfo.verify((x) => x(), TypeMoq.Times.once());
-            mockShowOutputChannel.verify((x) => x(), TypeMoq.Times.once());
             mockAddPackageToWorkspace.verify((x) => x(), TypeMoq.Times.once());
         });
     });

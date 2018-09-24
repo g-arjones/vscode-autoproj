@@ -38,10 +38,6 @@ export class VSCode {
         return vscode.window.showErrorMessage(message, ...items);
     }
 
-    public createOutputChannel(name: string) {
-        return vscode.window.createOutputChannel(name);
-    }
-
     public updateWorkspaceFolders(start: number, deleteCount: number | undefined | null,
                                   ...workspaceFoldersToAdd: Array<{ name?: string, uri: vscode.Uri }>): boolean {
         return vscode.workspace.updateWorkspaceFolders(start, deleteCount, ...workspaceFoldersToAdd);

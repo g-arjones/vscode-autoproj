@@ -4,7 +4,6 @@
 import * as vscode from "vscode";
 import * as autoproj from "./autoproj";
 import * as commands from "./commands";
-import * as context from "./context";
 import * as tasks from "./tasks";
 import * as watcher from "./watcher";
 import * as wrappers from "./wrappers";
@@ -108,11 +107,9 @@ export class EventHandler implements vscode.Disposable {
 
 export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSCode) {
     const fileWatcher = new watcher.FileWatcher();
-    const outputChannel = vscode.window.createOutputChannel("Autoproj");
-    const workspaces = new autoproj.Workspaces(null, outputChannel);
+    const workspaces = new autoproj.Workspaces(null);
     const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces, vscodeWrapper);
-    const autoprojContext = new context.Context(workspaces, outputChannel);
-    const autoprojCommands = new commands.Commands(autoprojContext, vscodeWrapper);
+    const autoprojCommands = new commands.Commands(workspaces, vscodeWrapper);
     const eventHandler = new EventHandler(vscodeWrapper, fileWatcher, workspaces);
 
     subscriptions.push(vscode.workspace.registerTaskProvider("autoproj", autoprojTaskProvider));
@@ -125,8 +122,6 @@ export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSC
 
     subscriptions.push(eventHandler);
     subscriptions.push(workspaces);
-    subscriptions.push(outputChannel);
-    subscriptions.push(autoprojContext);
     subscriptions.push(fileWatcher);
     subscriptions.push(vscode.tasks.onDidStartTaskProcess((event) => eventHandler.onDidStartTaskProcess(event)));
     subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
