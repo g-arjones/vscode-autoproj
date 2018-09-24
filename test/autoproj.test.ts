@@ -1,6 +1,7 @@
 "use strict";
 import * as assert from "assert";
 import * as path from "path";
+import * as TypeMoq from "typemoq";
 import * as autoproj from "../src/autoproj";
 import * as helpers from "./helpers";
 
@@ -97,6 +98,10 @@ describe("Autoproj helpers tests", () => {
             assert.equal(manifest.path, root);
             assert.equal(0, manifest.packages.size);
             assert.equal(0, manifest.packages.size);
+        });
+        it("throws if manifest cannot be read", async () => {
+            helpers.mkdir(".autoproj");
+            await helpers.assertThrowsAsync(autoproj.loadWorkspaceInfo(root), /ENOENT/);
         });
     });
 
@@ -372,6 +377,44 @@ describe("Autoproj helpers tests", () => {
                 assert.equal(workspaces.isConfig(a), false);
                 assert.equal(workspaces.isConfig(b), false);
                 assert.equal(workspaces.isConfig(c), false);
+            });
+        });
+        describe("forEachFolder", () => {
+            it ("invokes the callback for each folder in the workspace", () => {
+                const mockCallback = TypeMoq.Mock.ofType<(ws: autoproj.Workspace, folder: string) => void>();
+                const s = new helpers.TestSetup();
+                const ws1 = s.createAndRegisterWorkspace("ws1");
+                const ws2 = s.createAndRegisterWorkspace("ws2");
+                s.workspaces.addFolder(path.join(ws1.ws.root, "pkg"));
+                s.workspaces.addFolder(path.join(ws2.ws.root, "pkg"));
+
+                s.workspaces.forEachFolder((ws, folder) => { mockCallback.object(ws, folder); });
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws1.ws.root),
+                    path.join(ws1.ws.root, "pkg")), TypeMoq.Times.once());
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws2.ws.root),
+                    path.join(ws2.ws.root, "pkg")), TypeMoq.Times.once());
+            });
+        });
+        describe("forEachWorkspace", () => {
+            it ("invokes the callback for each registered workspace", () => {
+                const mockCallback = TypeMoq.Mock.ofType<(ws: autoproj.Workspace) => void>();
+                const s = new helpers.TestSetup();
+                const ws1 = s.createAndRegisterWorkspace("ws1");
+                const ws2 = s.createAndRegisterWorkspace("ws2");
+
+                s.workspaces.forEachWorkspace((ws) => { mockCallback.object(ws); });
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws1.ws.root)), TypeMoq.Times.once());
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws2.ws.root) ), TypeMoq.Times.once());
+            });
+        });
+        describe("getWorkspaceFromFolder", () => {
+            it ("returns the workspace that owns the package", () => {
+                const s = new helpers.TestSetup();
+                const ws1 = s.createAndRegisterWorkspace("ws1");
+                s.workspaces.addFolder(path.join(ws1.ws.root, "pkg"));
+
+                const ws = s.workspaces.getWorkspaceFromFolder(path.join(ws1.ws.root, "pkg"));
+                assert.deepEqual(ws, ws1.ws);
             });
         });
     });

@@ -223,6 +223,8 @@ describe("Task provider", () => {
             addFolder(c);
             addFolder(d);
             addFolder(e);
+            addFolder(wsOneRoot);
+            addFolder(wsTwoRoot);
             subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
         });
 
@@ -286,6 +288,25 @@ describe("Task provider", () => {
             await assert.equal(providedTasks.length, 12);
             await assertAllWorkspaceTasks(helpers.fullPath());
             await assertAllPackageTasks(a, root);
+        });
+    });
+    describe("in any case", () => {
+        beforeEach(() => {
+            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
+        });
+        it("resolveTask() always returns null", async () => {
+            assert.equal(await subject.resolveTask(undefined, undefined), null);
+        });
+        it("task getters throws if there are no tasks", async () => {
+            await helpers.assertThrowsAsync(subject.buildTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.watchTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.forceBuildTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.nodepsBuildTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.updateConfigTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.updateEnvironmentTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.updateTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.checkoutTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.osdepsTask("/not/found"), /no entry/);
         });
     });
 });
