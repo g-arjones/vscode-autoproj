@@ -243,6 +243,7 @@
                             "osdeps",
                             "watch",
                             "update-config",
+                            "update-environment",
                             "update",
                             "checkout"
                         ],

@@ -19,6 +19,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
     private checkoutTasks: Map<string, vscode.Task>;
     private osdepsTasks: Map<string, vscode.Task>;
     private updateConfigTasks: Map<string, vscode.Task>;
+    private updateEnvironmentTasks: Map<string, vscode.Task>;
     private tasksPromise: Promise<vscode.Task[]>;
     private allTasks: vscode.Task[];
     private vscode: wrappers.VSCode;
@@ -61,6 +62,10 @@ export class AutoprojProvider implements vscode.TaskProvider {
         return this.getCache(this.updateConfigTasks, path);
     }
 
+    public async updateEnvironmentTask(path: string): Promise<vscode.Task> {
+        return this.getCache(this.updateEnvironmentTasks, path);
+    }
+
     public reloadTasks(): void {
         this.allTasks = [];
 
@@ -72,6 +77,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
         this.checkoutTasks = new Map<string, vscode.Task>();
         this.osdepsTasks = new Map<string, vscode.Task>();
         this.updateConfigTasks = new Map<string, vscode.Task>();
+        this.updateEnvironmentTasks = new Map<string, vscode.Task>();
 
         this.tasksPromise = this.createTasksPromise();
     }
@@ -93,6 +99,8 @@ export class AutoprojProvider implements vscode.TaskProvider {
             this.addTask(ws.root, this.createOsdepsTask(`${ws.name}: Install OS Dependencies`, ws), this.osdepsTasks);
             this.addTask(ws.root, this.createUpdateConfigTask(`${ws.name}: Update Configuration`, ws),
                 this.updateConfigTasks);
+            this.addTask(ws.root, this.createUpdateEnvironmentTask(`${ws.name}: Update Environment`, ws),
+                this.updateEnvironmentTasks);
             this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update`, ws, "workspace"), this.updateTasks);
         });
 
@@ -184,6 +192,17 @@ export class AutoprojProvider implements vscode.TaskProvider {
         const task = this.createWorkspaceTask(name, ws, "update-config",
             defs, [ "update", "--progress=f", "-k", "--color", "--config", ...args]);
         task.problemMatchers = ["$autoproj"];
+        return task;
+    }
+
+    private createUpdateEnvironmentTask(name, ws, defs = {}, args: string[] = []) {
+        const task = this.createWorkspaceTask(name, ws, "update-environment",
+            defs, [ "envsh", "--progress=f", "--color", ...args]);
+        task.problemMatchers = ["$autoproj"];
+        task.presentationOptions = {
+            reveal: vscode.TaskRevealKind.Silent,
+        };
+
         return task;
     }
 
