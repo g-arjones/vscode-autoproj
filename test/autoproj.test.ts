@@ -234,53 +234,6 @@ describe("Autoproj helpers tests", () => {
                 assert(called);
             });
         });
-
-        describe("envsh", () => {
-            const processMock   = helpers.createProcessMock();
-            let outputChannel: helpers.OutputChannel;
-            let subjectMock;
-            let subject;
-            let originalInfo;
-
-            beforeEach(async () => {
-                require("child_process").spawn = (...args) => processMock;
-
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
-                outputChannel = new helpers.OutputChannel();
-                subjectMock = TypeMoq.Mock.ofType2(autoproj.Workspace, [root, false, outputChannel]);
-                subject = subjectMock.target;
-                originalInfo = await subject.info();
-            });
-
-            afterEach(async () => {
-                await subject.info();
-            });
-
-            it("reloads the information on success", async () => {
-                const p = subject.envsh();
-                processMock.emit("exit", 0, null);
-                assert.notEqual(await p, originalInfo);
-            });
-
-            it("returns the known information on failure", async () => {
-                const p = subject.envsh();
-                processMock.emit("exit", 1, null);
-                assert.equal(await p, originalInfo);
-            });
-
-            it("returns the known information on signal", async () => {
-                const p = subject.envsh();
-                processMock.emit("exit", null, 5);
-                assert.equal(await p, originalInfo);
-            });
-
-            it("redirects its output to the rock channel", async () => {
-                const p = subject.envsh();
-                await assertProcessIsShown("envsh", "autoproj envsh", p, processMock, outputChannel);
-            });
-        });
-
         describe("which", () => {
             const processMock = helpers.createProcessMock();
             let outputChannel: helpers.OutputChannel;

@@ -45,11 +45,6 @@ describe("Context tests", () => {
     it("returns the given workspaces", () => {
         assert.strictEqual(testContext.workspaces, testContext.subject.workspaces);
     });
-    it("calls envsh and fires the update event", async () => {
-        const mockWs = TypeMoq.Mock.ofType<autoproj.Workspace>();
-        await testContext.subject.updateWorkspaceInfo(mockWs.object);
-        mockWs.verify((x) => x.envsh(), TypeMoq.Times.once());
-    });
     it("returns the given output channel", () => {
         assert.strictEqual(testContext.outputChannel, testContext.subject.outputChannel);
     });

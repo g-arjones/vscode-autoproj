@@ -71,22 +71,6 @@ export class Workspace {
         }
     }
 
-    public envsh(): Promise<WorkspaceInfo> {
-        const subprocess = child_process.spawn(this.autoprojExePath(), ["envsh", "--color"],
-                                               { cwd: this.root, stdio: "pipe" });
-
-        this.redirectProcessToChannel("autoproj envsh", "envsh", subprocess);
-        return new Promise<WorkspaceInfo>((resolve, reject) => {
-            subprocess.on("exit", (code, status) => {
-                if (code === 0) {
-                    resolve(this.reload());
-                } else {
-                    resolve(this.info());
-                }
-            });
-        });
-    }
-
     public which(cmd: string) {
         const options: child_process.SpawnOptions = { env: {} };
         Object.assign(options.env, process.env);

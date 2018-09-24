@@ -26,9 +26,20 @@ describe("Commands", () => {
     describe("updatePackageInfo()", () => {
         let mockWorkspace: TypeMoq.IMock<autoproj.Workspace>;
         let mockSubject: TypeMoq.IMock<commands.Commands>;
+        let mockTask: TypeMoq.IMock<vscode.Task>;
+        const taskDefinition: vscode.TaskDefinition = {
+            mode: "update-environment",
+            type: "autoproj-workspace",
+            workspace: "/path/to/workspace",
+        };
         beforeEach(() => {
             mockWorkspace = TypeMoq.Mock.ofType<autoproj.Workspace>();
+            mockTask = TypeMoq.Mock.ofType<vscode.Task>();
+            mockTask.setup((x: any) => x.then).returns(() => undefined);
+            mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
             mockWorkspace.setup((x: any) => x.then).returns(() => undefined);
+            mockTask.setup((x) => x.definition).returns(() => taskDefinition);
+            mockWrapper.setup((x) => x.fetchTasks()).returns(() => Promise.resolve([mockTask.object]));
             mockSubject = TypeMoq.Mock.ofInstance(subject);
             subject = mockSubject.target;
         });
@@ -36,35 +47,25 @@ describe("Commands", () => {
             mockSubject.setup((x) => x.showWorkspacePicker()).
                 returns(() => Promise.resolve(undefined));
             await subject.updatePackageInfo();
-            mockContext.verify((x) => x.updateWorkspaceInfo(TypeMoq.It.isAny()),
-                TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.executeTask(TypeMoq.It.isAny()), TypeMoq.Times.never());
         });
         it("handles an exception while updating workspace info", async () => {
-            mockSubject.setup((x) => x.showWorkspacePicker()).
-                returns(() => Promise.resolve(mockWorkspace.object));
-            mockContext.setup((x) => x.updateWorkspaceInfo(mockWorkspace.object)).
-                returns(() => Promise.reject(new Error("test")));
+            mockWrapper.reset();
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(mockWorkspace.object));
             await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.showErrorMessage("test"), TypeMoq.Times.once());
-            mockContext.verify((x) => x.updateWorkspaceInfo(mockWorkspace.object),
-                TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.executeTask(TypeMoq.It.isAny()), TypeMoq.Times.never());
         });
         it("handles an exception if workspace is empty", async () => {
-            mockSubject.setup((x) => x.showWorkspacePicker()).
-                returns(() => Promise.reject(new Error("test")));
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.reject(new Error("test")));
             await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.showErrorMessage("test"), TypeMoq.Times.once());
-            mockContext.verify((x) => x.updateWorkspaceInfo(TypeMoq.It.isAny()),
-                TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.executeTask(TypeMoq.It.isAny()), TypeMoq.Times.never());
         });
         it("updates workspace info", async () => {
-            mockSubject.setup((x) => x.showWorkspacePicker()).
-                returns(() => Promise.resolve(mockWorkspace.object));
-            mockContext.setup((x) => x.updateWorkspaceInfo(mockWorkspace.object)).
-                returns(() => Promise.resolve());
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(mockWorkspace.object));
             await subject.updatePackageInfo();
-            mockContext.verify((x) => x.updateWorkspaceInfo(mockWorkspace.object),
-                TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.executeTask(mockTask.object), TypeMoq.Times.once());
         });
     });
     describe("showWorkspacePicker()", () => {
