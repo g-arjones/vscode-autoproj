@@ -126,6 +126,14 @@ describe("Task provider", () => {
         const scope = workspaceFolders[0];
         assertTask(task, process, args, name, scope);
     }
+    function assertUpdateEnvironmentTask(task: vscode.Task, wsRoot: string) {
+        const process = autoprojExePath(wsRoot);
+        const args = ["envsh", "--progress=f", "--color"];
+        const name = `${pathBasename(wsRoot)}: Update Environment`;
+        const scope = workspaceFolders[0];
+        assertTask(task, process, args, name, scope);
+        assert.equal(task.presentationOptions.reveal, vscode.TaskRevealKind.Silent);
+    }
     function packageName(pkgPath: string, wsRoot: string, installManifest: autoproj.IPackage[]): string {
         const pkgInfo = installManifest.find((pkg) => pkg.srcdir === pkgPath);
         if (pkgInfo) {
@@ -177,6 +185,10 @@ describe("Task provider", () => {
         assert.notEqual(updateConfigTask, undefined);
         assertUpdateConfigTask(updateConfigTask, wsRoot);
 
+        const updateEnvironmentTask = await subject.updateEnvironmentTask(wsRoot);
+        assert.notEqual(updateEnvironmentTask, undefined);
+        assertUpdateEnvironmentTask(updateEnvironmentTask, wsRoot);
+
         const updateTask = await subject.updateTask(wsRoot);
         assert.notEqual(updateTask, undefined);
         assertUpdateTask(updateTask, wsRoot);
@@ -211,12 +223,14 @@ describe("Task provider", () => {
             addFolder(c);
             addFolder(d);
             addFolder(e);
+            addFolder(wsOneRoot);
+            addFolder(wsTwoRoot);
             subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
         });
 
         it("is initalized with all tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
-            assert.equal(providedTasks.length, 27);
+            assert.equal(providedTasks.length, 29);
         });
         it("is initalized with all workspace tasks", async () => {
             await subject.provideTasks(null);
@@ -271,9 +285,28 @@ describe("Task provider", () => {
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            await assert.equal(providedTasks.length, 11);
+            await assert.equal(providedTasks.length, 12);
             await assertAllWorkspaceTasks(helpers.fullPath());
             await assertAllPackageTasks(a, root);
+        });
+    });
+    describe("in any case", () => {
+        beforeEach(() => {
+            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
+        });
+        it("resolveTask() always returns null", async () => {
+            assert.equal(await subject.resolveTask(undefined, undefined), null);
+        });
+        it("task getters throws if there are no tasks", async () => {
+            await helpers.assertThrowsAsync(subject.buildTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.watchTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.forceBuildTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.nodepsBuildTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.updateConfigTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.updateEnvironmentTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.updateTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.checkoutTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.osdepsTask("/not/found"), /no entry/);
         });
     });
 });

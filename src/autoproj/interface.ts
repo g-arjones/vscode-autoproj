@@ -6,10 +6,6 @@ export interface IProcess extends EventEmitter {
     kill(signal: string): void;
 }
 
-export interface IOutputChannel {
-    appendLine(text: string): void;
-}
-
 export interface IVCS {
     type: string;
     url: string;

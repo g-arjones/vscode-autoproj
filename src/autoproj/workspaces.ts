@@ -1,9 +1,8 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { ConsoleOutputChannel } from "./console";
 import { findWorkspaceRoot } from "./helpers";
 import { WorkspaceInfo } from "./info";
-import { IOutputChannel, IPackage, IPackageSet } from "./interface";
+import { IPackage, IPackageSet } from "./interface";
 import { Workspace } from "./workspace";
 
 /** Dynamic management of a set of workspaces
@@ -13,14 +12,12 @@ export class Workspaces {
     public devFolder: string | null;
     public workspaces = new Map<string, Workspace>();
     public folderToWorkspace = new Map<string, Workspace>();
-    private outputChannel: { appendLine: (text: string) => void };
     private workspaceInfoEvent = new vscode.EventEmitter<WorkspaceInfo>();
     private folderInfoEvent = new vscode.EventEmitter<IPackage | IPackageSet>();
     private folderInfoDisposables = new Map<string, vscode.Disposable>();
 
-    constructor(devFolder = null, outputChannel: IOutputChannel = new ConsoleOutputChannel()) {
+    constructor(devFolder = null) {
         this.devFolder = devFolder;
-        this.outputChannel = outputChannel;
     }
 
     public dispose() {
@@ -55,7 +52,7 @@ export class Workspaces {
         } else if (this.workspaces.has(wsRoot)) {
             return { added: false, workspace: this.workspaces.get(wsRoot) };
         } else {
-            const ws = new Workspace(wsRoot, loadInfo, this.outputChannel);
+            const ws = new Workspace(wsRoot, loadInfo);
             this.add(ws);
             ws.onInfoUpdated((info) => {
                 this.workspaceInfoEvent.fire(info);

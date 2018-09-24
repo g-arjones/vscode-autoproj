@@ -5,39 +5,6 @@ import * as TypeMoq from "typemoq";
 import * as autoproj from "../src/autoproj";
 import * as helpers from "./helpers";
 
-async function assertProcessIsShown(shortname, cmd, promise, subprocess, channel) {
-    subprocess.stdout.emit("data", "STDOUT");
-    subprocess.stderr.emit("data", "STDERR");
-    subprocess.emit("exit", 0, undefined);
-    try {
-        await promise;
-    } catch (e) {
-        // no-op
-    }
-    const expected = [
-        `${shortname}: starting ${cmd}`,
-        `${shortname}: STDOUT`,
-        `${shortname}: STDERR`,
-        `${shortname}: ${cmd} quit`,
-    ];
-    assert.deepStrictEqual(channel.receivedLines, expected);
-}
-
-describe("ConsoleOutputChannel", () => {
-    it("prints to text to console", () => {
-        const mockLogFunc = TypeMoq.Mock.ofType<(text: string) => void>();
-        // tslint:disable-next-line:no-console
-        const originalLogFunc = console.log; console.log = mockLogFunc.object;
-
-        const channel = new autoproj.ConsoleOutputChannel();
-        channel.appendLine("test");
-        mockLogFunc.verify((x) => x("test"), TypeMoq.Times.once());
-
-        // tslint:disable-next-line:no-console
-        console.log = originalLogFunc;
-    });
-});
-
 describe("Autoproj helpers tests", () => {
     const originalSpawn = require("child_process").spawn;
     let root: string;
@@ -131,6 +98,10 @@ describe("Autoproj helpers tests", () => {
             assert.equal(manifest.path, root);
             assert.equal(0, manifest.packages.size);
             assert.equal(0, manifest.packages.size);
+        });
+        it("throws if manifest cannot be read", async () => {
+            helpers.mkdir(".autoproj");
+            await helpers.assertThrowsAsync(autoproj.loadWorkspaceInfo(root), /ENOENT/);
         });
     });
 
@@ -232,95 +203,6 @@ describe("Autoproj helpers tests", () => {
                 workspace.onInfoUpdated((callback) => called = true);
                 await workspace.reload();
                 assert(called);
-            });
-        });
-
-        describe("envsh", () => {
-            const processMock   = helpers.createProcessMock();
-            let outputChannel: helpers.OutputChannel;
-            let subjectMock;
-            let subject;
-            let originalInfo;
-
-            beforeEach(async () => {
-                require("child_process").spawn = (...args) => processMock;
-
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
-                outputChannel = new helpers.OutputChannel();
-                subjectMock = TypeMoq.Mock.ofType2(autoproj.Workspace, [root, false, outputChannel]);
-                subject = subjectMock.target;
-                originalInfo = await subject.info();
-            });
-
-            afterEach(async () => {
-                await subject.info();
-            });
-
-            it("reloads the information on success", async () => {
-                const p = subject.envsh();
-                processMock.emit("exit", 0, null);
-                assert.notEqual(await p, originalInfo);
-            });
-
-            it("returns the known information on failure", async () => {
-                const p = subject.envsh();
-                processMock.emit("exit", 1, null);
-                assert.equal(await p, originalInfo);
-            });
-
-            it("returns the known information on signal", async () => {
-                const p = subject.envsh();
-                processMock.emit("exit", null, 5);
-                assert.equal(await p, originalInfo);
-            });
-
-            it("redirects its output to the rock channel", async () => {
-                const p = subject.envsh();
-                await assertProcessIsShown("envsh", "autoproj envsh", p, processMock, outputChannel);
-            });
-        });
-
-        describe("which", () => {
-            const processMock = helpers.createProcessMock();
-            let outputChannel: helpers.OutputChannel;
-            let subject;
-
-            beforeEach(async () => {
-                const spawn = (...args) => processMock;
-                require("child_process").spawn = spawn;
-
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
-                outputChannel = new helpers.OutputChannel();
-                subject = autoproj.Workspace.fromDir(root, false, outputChannel) as autoproj.Workspace;
-            });
-
-            it("returns the path displayed by autoproj on success", async () => {
-                const p = subject.which("cmd");
-                processMock.stdout.emit("data", "/test/cmd\n");
-                processMock.emit("exit", 0, null);
-                assert.equal("/test/cmd", await p);
-            });
-
-            it("concatenates the data if received in chunks", async () => {
-                const p = subject.which("cmd");
-                processMock.stdout.emit("data", "/te");
-                processMock.stdout.emit("data", "st/cmd\n");
-                processMock.emit("exit", 0, null);
-                assert.equal("/test/cmd", await p);
-            });
-
-            it("rejects the promise on failure", async () => {
-                const p = subject.which("cmd");
-                processMock.emit("exit", 1, null);
-                await helpers.assertThrowsAsync(p,
-                    /cannot find cmd in the workspace/);
-            });
-
-            it("redirects its output to the rock channel", async () => {
-                const p = subject.which("cmd");
-                await assertProcessIsShown("which cmd", "autoproj which cmd", p, processMock, outputChannel);
             });
         });
     });
@@ -495,6 +377,44 @@ describe("Autoproj helpers tests", () => {
                 assert.equal(workspaces.isConfig(a), false);
                 assert.equal(workspaces.isConfig(b), false);
                 assert.equal(workspaces.isConfig(c), false);
+            });
+        });
+        describe("forEachFolder", () => {
+            it ("invokes the callback for each folder in the workspace", () => {
+                const mockCallback = TypeMoq.Mock.ofType<(ws: autoproj.Workspace, folder: string) => void>();
+                const s = new helpers.TestSetup();
+                const ws1 = s.createAndRegisterWorkspace("ws1");
+                const ws2 = s.createAndRegisterWorkspace("ws2");
+                s.workspaces.addFolder(path.join(ws1.ws.root, "pkg"));
+                s.workspaces.addFolder(path.join(ws2.ws.root, "pkg"));
+
+                s.workspaces.forEachFolder((ws, folder) => { mockCallback.object(ws, folder); });
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws1.ws.root),
+                    path.join(ws1.ws.root, "pkg")), TypeMoq.Times.once());
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws2.ws.root),
+                    path.join(ws2.ws.root, "pkg")), TypeMoq.Times.once());
+            });
+        });
+        describe("forEachWorkspace", () => {
+            it ("invokes the callback for each registered workspace", () => {
+                const mockCallback = TypeMoq.Mock.ofType<(ws: autoproj.Workspace) => void>();
+                const s = new helpers.TestSetup();
+                const ws1 = s.createAndRegisterWorkspace("ws1");
+                const ws2 = s.createAndRegisterWorkspace("ws2");
+
+                s.workspaces.forEachWorkspace((ws) => { mockCallback.object(ws); });
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws1.ws.root)), TypeMoq.Times.once());
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws2.ws.root) ), TypeMoq.Times.once());
+            });
+        });
+        describe("getWorkspaceFromFolder", () => {
+            it ("returns the workspace that owns the package", () => {
+                const s = new helpers.TestSetup();
+                const ws1 = s.createAndRegisterWorkspace("ws1");
+                s.workspaces.addFolder(path.join(ws1.ws.root, "pkg"));
+
+                const ws = s.workspaces.getWorkspaceFromFolder(path.join(ws1.ws.root, "pkg"));
+                assert.deepEqual(ws, ws1.ws);
             });
         });
     });

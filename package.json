@@ -53,11 +53,6 @@
                 "title": "Add package to workspace",
                 "category": "Autoproj",
                 "command": "autoproj.addPackageToWorkspace"
-            },
-            {
-                "title": "Show Output",
-                "category": "Autoproj",
-                "command": "autoproj.showOutputChannel"
             }
         ],
         "languages": [
@@ -243,6 +238,7 @@
                             "osdeps",
                             "watch",
                             "update-config",
+                            "update-environment",
                             "update",
                             "checkout"
                         ],
