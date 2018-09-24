@@ -9,16 +9,36 @@ import * as tasks from "./tasks";
 import * as watcher from "./watcher";
 import * as wrappers from "./wrappers";
 
-export class EventHandler {
+export class EventHandler implements vscode.Disposable {
     private wrapper: wrappers.VSCode;
     private watcher: watcher.FileWatcher;
     private workspaces: autoproj.Workspaces;
+    private workspaceRootToPid: Map<string, number>;
 
     constructor(wrapper: wrappers.VSCode, fileWatcher: watcher.FileWatcher,
                 workspaces: autoproj.Workspaces) {
         this.wrapper = wrapper;
         this.watcher = fileWatcher;
         this.workspaces = workspaces;
+        this.workspaceRootToPid = new Map();
+    }
+
+    public dispose() {
+        for (const [, pid] of this.workspaceRootToPid) {
+            try {
+                this.wrapper.killProcess(pid, "SIGINT");
+            } catch (error) {
+                // either the user terminated the task or "autoproj watch" failed
+            }
+        }
+        this.workspaceRootToPid.clear();
+    }
+
+    public onDidStartTaskProcess(event: vscode.TaskProcessStartEvent) {
+        const task = event.execution.task;
+        if (task.definition.type === "autoproj-workspace" && task.definition.mode === "watch") {
+            this.workspaceRootToPid.set(task.definition.workspace, event.processId);
+        }
     }
 
     public async onManifestChanged(ws: autoproj.Workspace): Promise<void> {
@@ -35,10 +55,18 @@ export class EventHandler {
             try {
                 await workspace.info();
             } catch (err) {
-                const errMsg = `Could not load installation manifest: ${err.message}`;
-                this.wrapper.showErrorMessage(errMsg);
+                this.wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
-            this.wrapper.executeCommand("workbench.action.tasks.runTask", `autoproj: ${workspace.name}: Watch`);
+            try {
+                const allTasks = await this.wrapper.fetchTasks();
+                const watchTask = allTasks.find((task) => task.definition.type === "autoproj-workspace" &&
+                                                          task.definition.mode === "watch" &&
+                                                          task.definition.workspace === workspace.root);
+
+                this.wrapper.executeTask(watchTask!);
+            } catch (err) {
+                this.wrapper.showErrorMessage(`Could not start autoproj watch task: ${err.message}`);
+            }
             this.watchManifest(workspace);
         }
     }
@@ -47,11 +75,15 @@ export class EventHandler {
         const deletedWs = this.workspaces.deleteFolder(folder.uri.fsPath);
         if (deletedWs) {
             this.unwatchManifest(deletedWs);
-            try {
-                const pid: number = await deletedWs.readWatchPID();
-                this.wrapper.killProcess(pid, "SIGINT");
-            } catch (err) {
-                this.wrapper.showErrorMessage(`Could not stop autoproj watch process: ${err.message}`);
+
+            const pid = this.workspaceRootToPid.get(deletedWs.root);
+            if (pid) {
+                try {
+                    this.wrapper.killProcess(pid, "SIGINT");
+                } catch (error) {
+                    // either the user stopped the task or it "autoproj watch" failed
+                }
+                this.workspaceRootToPid.delete(deletedWs.root);
             }
         }
     }
@@ -91,10 +123,12 @@ export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSC
     autoprojTaskProvider.reloadTasks();
     autoprojCommands.register();
 
+    subscriptions.push(eventHandler);
     subscriptions.push(workspaces);
     subscriptions.push(outputChannel);
     subscriptions.push(autoprojContext);
     subscriptions.push(fileWatcher);
+    subscriptions.push(vscode.tasks.onDidStartTaskProcess((event) => eventHandler.onDidStartTaskProcess(event)));
     subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
         event.added.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
         event.removed.forEach((folder) => eventHandler.onWorkspaceFolderRemoved(folder));

@@ -47,11 +47,15 @@ export class VSCode {
         return vscode.workspace.updateWorkspaceFolders(start, deleteCount, ...workspaceFoldersToAdd);
     }
 
-    public executeCommand<T>(command: string, ...rest: any[]): Thenable<T | undefined> {
-        return vscode.commands.executeCommand(command, ...rest);
-    }
-
     public killProcess(pid: number, signal: string): void {
         return process.kill(pid, signal);
+    }
+
+    public executeTask(task: vscode.Task): Thenable<vscode.TaskExecution> {
+        return vscode.tasks.executeTask(task);
+    }
+
+    public fetchTasks(filter?: vscode.TaskFilter | undefined): Thenable<vscode.Task[]> {
+        return vscode.tasks.fetchTasks(filter);
     }
 }
