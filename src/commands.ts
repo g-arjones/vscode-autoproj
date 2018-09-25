@@ -40,9 +40,8 @@ export class Commands {
         try {
             const ws = await this.showWorkspacePicker();
             if (ws) {
-                const allTasks = await this.vscode.fetchTasks();
-                const watchTask = allTasks.find((task) => task.definition.type === "autoproj-workspace" &&
-                                                          task.definition.mode === "update-environment" &&
+                const allTasks = await this.vscode.fetchTasks({ type: "autoproj-workspace" });
+                const watchTask = allTasks.find((task) => task.definition.mode === "update-environment" &&
                                                           task.definition.workspace === ws.root);
 
                 this.vscode.executeTask(watchTask!);

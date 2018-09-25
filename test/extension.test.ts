@@ -102,7 +102,8 @@ describe("EventHandler", () => {
             mockWorkspace = TypeMoq.Mock.ofType<autoproj.Workspace>();
             mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
             mockTask.setup((x) => x.definition).returns(() => taskDefinition);
-            mockWrapper.setup((x) => x.fetchTasks()).returns(() => Promise.resolve([mockTask.object]));
+            mockWrapper.setup((x) => x.fetchTasks({ type: "autoproj-workspace" })).
+                returns(() => Promise.resolve([mockTask.object]));
             mockWatchFunc = TypeMoq.Mock.ofInstance(() => {
                 // no-op
             });

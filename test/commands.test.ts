@@ -35,7 +35,8 @@ describe("Commands", () => {
             mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
             mockWorkspace.setup((x: any) => x.then).returns(() => undefined);
             mockTask.setup((x) => x.definition).returns(() => taskDefinition);
-            mockWrapper.setup((x) => x.fetchTasks()).returns(() => Promise.resolve([mockTask.object]));
+            mockWrapper.setup((x) => x.fetchTasks({ type: "autoproj-workspace" })).
+                returns(() => Promise.resolve([mockTask.object]));
             mockSubject = TypeMoq.Mock.ofInstance(subject);
             subject = mockSubject.target;
         });

@@ -57,9 +57,8 @@ export class EventHandler implements vscode.Disposable {
                 this.wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
             try {
-                const allTasks = await this.wrapper.fetchTasks();
-                const watchTask = allTasks.find((task) => task.definition.type === "autoproj-workspace" &&
-                                                          task.definition.mode === "watch" &&
+                const allTasks = await this.wrapper.fetchTasks({ type: "autoproj-workspace" });
+                const watchTask = allTasks.find((task) => task.definition.mode === "watch" &&
                                                           task.definition.workspace === workspace.root);
 
                 this.wrapper.executeTask(watchTask!);
