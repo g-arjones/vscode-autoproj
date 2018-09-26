@@ -1,6 +1,7 @@
 import { basename, dirname, join as pathjoin } from "path";
 import { CancellationTokenSource, QuickPickOptions, Uri } from "vscode";
 import * as autoproj from "./autoproj";
+import * as tasks from "./tasks";
 import * as wrappers from "./wrappers";
 
 export class Commands {
@@ -40,11 +41,12 @@ export class Commands {
         try {
             const ws = await this.showWorkspacePicker();
             if (ws) {
-                const allTasks = await this.vscode.fetchTasks({ type: "autoproj-workspace" });
-                const watchTask = allTasks.find((task) => task.definition.mode === "update-environment" &&
-                                                          task.definition.workspace === ws.root);
+                const allTasks = await this.vscode.fetchTasks(tasks.WorkspaceTaskFilter);
+                const updateEnvironmentTask = allTasks.find((task) =>
+                    task.definition.mode === tasks.WorkspaceTaskMode.UpdateEnvironment &&
+                    task.definition.workspace === ws.root);
 
-                this.vscode.executeTask(watchTask!);
+                this.vscode.executeTask(updateEnvironmentTask!);
             }
         } catch (err) {
             this.vscode.showErrorMessage(err.message);

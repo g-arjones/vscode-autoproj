@@ -35,7 +35,8 @@ export class EventHandler implements vscode.Disposable {
 
     public onDidStartTaskProcess(event: vscode.TaskProcessStartEvent) {
         const task = event.execution.task;
-        if (task.definition.type === "autoproj-workspace" && task.definition.mode === "watch") {
+        if (task.definition.type === tasks.TaskType.Workspace &&
+            task.definition.mode === tasks.WorkspaceTaskMode.Watch) {
             this.workspaceRootToPid.set(task.definition.workspace, event.processId);
         }
     }
@@ -57,8 +58,8 @@ export class EventHandler implements vscode.Disposable {
                 this.wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
             try {
-                const allTasks = await this.wrapper.fetchTasks({ type: "autoproj-workspace" });
-                const watchTask = allTasks.find((task) => task.definition.mode === "watch" &&
+                const allTasks = await this.wrapper.fetchTasks(tasks.WorkspaceTaskFilter);
+                const watchTask = allTasks.find((task) => task.definition.mode === tasks.WorkspaceTaskMode.Watch &&
                                                           task.definition.workspace === workspace.root);
 
                 this.wrapper.executeTask(watchTask!);
