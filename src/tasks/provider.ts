@@ -136,7 +136,9 @@ export class AutoprojProvider implements vscode.TaskProvider {
                        scope: vscode.TaskScope | vscode.WorkspaceFolder) {
         const definition = { type: `autoproj-${type}`, workspace: ws.root, ...defs };
         const exec = runAutoproj(ws, ...args);
-        return new vscode.Task(definition, scope, name, "autoproj", exec, []);
+        const task = new vscode.Task(definition, scope, name, "autoproj", exec, []);
+        task.presentationOptions = { reveal: vscode.TaskRevealKind.Silent };
+        return task;
     }
 
     private createWorkspaceTask(name, ws, mode, defs = {}, args: string[] = []) {

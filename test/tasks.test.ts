@@ -99,6 +99,10 @@ describe("Task provider", () => {
         assert.equal(actualProcess, process);
         assert.deepEqual(actualArgs, args);
         assert.equal(tasks.definitionsEqual(task.definition as tasks.ITaskDefinition, defs), true);
+
+        if (defs.type !== tasks.TaskType.Workspace && defs.mode !== tasks.WorkspaceTaskMode.Watch) {
+            assert.deepEqual(task.presentationOptions, { reveal: vscode.TaskRevealKind.Silent });
+        }
     }
     function autoprojExePath(basePath) {
         const wsRoot = autoproj.findWorkspaceRoot(basePath) as string;
