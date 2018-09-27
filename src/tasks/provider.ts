@@ -137,12 +137,12 @@ export class AutoprojProvider implements vscode.TaskProvider {
                 this.updateEnvironmentTasks);
 
             if (build) {
-                this.addTask(ws.root, this.createBuildTask(`${ws.name}: Build`,
+                this.addTask(ws.root, this.createBuildTask(`${ws.name}: Build all packages`,
                     ws, "workspace"), this.buildTasks);
             }
 
             if (checkout) {
-                this.addTask(ws.root, this.createCheckoutTask(`${ws.name}: Checkout`,
+                this.addTask(ws.root, this.createCheckoutTask(`${ws.name}: Checkout all packages`,
                     ws, "workspace"), this.checkoutTasks);
             }
 
@@ -157,7 +157,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
             }
 
             if (update) {
-                this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update`, ws, "workspace"),
+                this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update all packages`, ws, "workspace"),
                     this.updateTasks);
             }
         });

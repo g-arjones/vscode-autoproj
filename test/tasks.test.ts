@@ -160,12 +160,12 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["build", "--tool"];
         let scope = workspaceFolders[0];
-        let name = `${pathBasename(wsRoot)}: Build`;
+        let name = `${pathBasename(wsRoot)}: Build all packages`;
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
-            name += ` ${pkgName}`;
+            name = `${pathBasename(wsRoot)}: Build ${pkgName}`;
             scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
             defs = { ...defs, mode: tasks.PackageTaskMode.Build,
                      path: pkgPath,
@@ -211,12 +211,12 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "--progress=f", "-k", "--color"];
         let scope = workspaceFolders[0];
-        let name = `${pathBasename(wsRoot)}: Update`;
+        let name = `${pathBasename(wsRoot)}: Update all packages`;
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
-            name += ` ${pkgName}`;
+            name = `${pathBasename(wsRoot)}: Update ${pkgName}`;
             scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
             defs = { ...defs, mode: tasks.PackageTaskMode.Update,
                      path: pkgPath,
@@ -232,13 +232,13 @@ describe("Task provider", () => {
     function assertCheckoutTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "--progress=f", "-k", "--color", "--checkout-only"];
-        let name = `${pathBasename(wsRoot)}: Checkout`;
+        let name = `${pathBasename(wsRoot)}: Checkout all packages`;
         let scope = workspaceFolders[0];
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
-            name += ` ${pkgName}`;
+            name = `${pathBasename(wsRoot)}: Checkout ${pkgName}`;
             scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
             defs = { ...defs, mode: tasks.PackageTaskMode.Checkout,
                      path: pkgPath,
