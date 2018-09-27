@@ -111,6 +111,7 @@ export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSC
     const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces, vscodeWrapper);
     const autoprojCommands = new commands.Commands(workspaces, vscodeWrapper);
     const eventHandler = new EventHandler(vscodeWrapper, fileWatcher, workspaces);
+    const tasksHandler = new tasks.Handler(vscodeWrapper, workspaces);
 
     subscriptions.push(vscode.workspace.registerTaskProvider("autoproj", autoprojTaskProvider));
     if (vscode.workspace.workspaceFolders) {
@@ -123,7 +124,12 @@ export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSC
     subscriptions.push(eventHandler);
     subscriptions.push(workspaces);
     subscriptions.push(fileWatcher);
-    subscriptions.push(vscode.tasks.onDidStartTaskProcess((event) => eventHandler.onDidStartTaskProcess(event)));
+    subscriptions.push(tasksHandler);
+    subscriptions.push(vscode.tasks.onDidStartTaskProcess((event) => {
+        eventHandler.onDidStartTaskProcess(event);
+        tasksHandler.onDidStartTaskProcess(event);
+    }));
+    subscriptions.push(vscode.tasks.onDidEndTaskProcess((event) => tasksHandler.onDidEndTaskProcess(event)));
     subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
         event.added.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
         event.removed.forEach((folder) => eventHandler.onWorkspaceFolderRemoved(folder));

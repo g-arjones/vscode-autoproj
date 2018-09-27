@@ -1,2 +1,3 @@
-export * from "./tasks/provider";
 export * from "./tasks/definitions";
+export * from "./tasks/handler";
+export * from "./tasks/provider";
