@@ -65,15 +65,49 @@ describe("Task provider", () => {
     let root: string;
     let workspaces: autoproj.Workspaces;
     let subject: tasks.AutoprojProvider;
-    let wrapper: TypeMoq.IMock<wrappers.VSCode>;
+    let mockWrapper: TypeMoq.IMock<wrappers.VSCode>;
+    let mockConfiguration: TypeMoq.IMock<vscode.WorkspaceConfiguration>;
     let workspaceFolders: vscode.WorkspaceFolder[];
-
+    let packageTasks: {
+        buildNoDeps: boolean,
+        checkout: boolean,
+        forceBuild: boolean,
+        update: boolean,
+    };
+    let workspaceTasks: {
+        build: boolean,
+        checkout: boolean,
+        installOsdeps: boolean,
+        update: boolean,
+        updateConfig: boolean,
+    };
     beforeEach(() => {
+        packageTasks = {
+            buildNoDeps: true,
+            checkout: true,
+            forceBuild: true,
+            update: true,
+        };
+
+        workspaceTasks = {
+            build: true,
+            checkout: true,
+            installOsdeps: true,
+            update: true,
+            updateConfig: true,
+        };
+
+        mockWrapper = TypeMoq.Mock.ofType<wrappers.VSCode>();
+        mockConfiguration = TypeMoq.Mock.ofType<vscode.WorkspaceConfiguration>();
+        mockConfiguration.setup((x) => x.get("package")).returns(() => packageTasks);
+        mockConfiguration.setup((x) => x.get("workspace")).returns(() => workspaceTasks);
+        mockWrapper.setup((x) => x.getConfiguration("autoproj.optionalTasks")).
+            returns(() => mockConfiguration.object);
+
         root = helpers.init();
         workspaces = new autoproj.Workspaces();
-        wrapper = TypeMoq.Mock.ofType<wrappers.VSCode>();
         workspaceFolders = [];
-        wrapper.setup((x) => x.workspaceFolders).returns(() => workspaceFolders);
+        mockWrapper.setup((x) => x.workspaceFolders).returns(() => workspaceFolders);
     });
     afterEach(() => {
         helpers.clear();
@@ -88,7 +122,7 @@ describe("Task provider", () => {
 
         workspaces.addFolder(folderPath);
         workspaceFolders.push(folder);
-        wrapper.setup((x) => x.getWorkspaceFolder(folderPath)).returns(() => folder);
+        mockWrapper.setup((x) => x.getWorkspaceFolder(folderPath)).returns(() => folder);
     }
     function assertTask(task: vscode.Task, process: string, args: string[],
                         name: string, scope: vscode.TaskScope | vscode.WorkspaceFolder, defs: tasks.ITaskDefinition) {
@@ -132,7 +166,7 @@ describe("Task provider", () => {
         if (pkgPath) {
             args.push(pkgPath);
             name += ` ${pkgName}`;
-            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
             defs = { ...defs, mode: tasks.PackageTaskMode.Build,
                      path: pkgPath,
                      type: tasks.TaskType.Package,
@@ -149,7 +183,7 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--force", "--deps=f", "--no-confirm", pkgPath];
         const name = `${pathBasename(wsRoot)}: Force Build ${pkgName} (nodeps)`;
-        const scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
         const defs: tasks.IPackageTaskDefinition = {
             mode: tasks.PackageTaskMode.ForceBuild,
             path: pkgPath,
@@ -163,7 +197,7 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--deps=f", pkgPath];
         const name = `${pathBasename(wsRoot)}: Build ${pkgName} (nodeps)`;
-        const scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
         const defs: tasks.IPackageTaskDefinition = {
             mode: tasks.PackageTaskMode.BuildNoDeps,
             path: pkgPath,
@@ -183,7 +217,7 @@ describe("Task provider", () => {
         if (pkgPath) {
             args.push(pkgPath);
             name += ` ${pkgName}`;
-            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
             defs = { ...defs, mode: tasks.PackageTaskMode.Update,
                      path: pkgPath,
                      type: tasks.TaskType.Package,
@@ -205,7 +239,7 @@ describe("Task provider", () => {
         if (pkgPath) {
             args.push(pkgPath);
             name += ` ${pkgName}`;
-            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
             defs = { ...defs, mode: tasks.PackageTaskMode.Checkout,
                      path: pkgPath,
                      type: tasks.TaskType.Package,
@@ -349,7 +383,7 @@ describe("Task provider", () => {
             addFolder(e);
             addFolder(wsOneRoot);
             addFolder(wsTwoRoot);
-            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
+            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
         });
 
         it("is initalized with all tasks", async () => {
@@ -366,6 +400,28 @@ describe("Task provider", () => {
             await assertAllPackageTasks(a, wsOneRoot);
             await assertAllPackageTasks(b, wsOneRoot);
             await assertAllPackageTasks(c, wsTwoRoot);
+        });
+        it("does not create disabled tasks", async () => {
+            packageTasks = {
+                buildNoDeps: false,
+                checkout: false,
+                forceBuild: false,
+                update: false,
+            };
+
+            workspaceTasks = {
+                build: false,
+                checkout: false,
+                installOsdeps: false,
+                update: false,
+                updateConfig: false,
+            };
+            await subject.provideTasks(null);
+            subject.reloadTasks();
+
+            const providedTasks = await subject.provideTasks(null);
+            // 2 mandatory tasks per workspace + 1 mandatory task per package
+            await assert.equal(providedTasks.length, 2 * 2 + 1 * 3);
         });
         it("gets the package names from installation manifest", async () => {
             const PKG_IODRIVERS_BASE: autoproj.IPackage = {
@@ -393,7 +449,7 @@ describe("Task provider", () => {
 
     describe("in an empty workspace", () => {
         beforeEach(() => {
-            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
+            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
         });
         it("provides an empty array of tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
@@ -416,7 +472,7 @@ describe("Task provider", () => {
     });
     describe("in any case", () => {
         beforeEach(() => {
-            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
+            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
         });
         it("resolveTask() always returns null", async () => {
             assert.equal(await subject.resolveTask(undefined, undefined), null);

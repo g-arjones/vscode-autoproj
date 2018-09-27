@@ -3,6 +3,7 @@ import { relative as pathRelative } from "path";
 import * as vscode from "vscode";
 import * as autoproj from "../autoproj";
 import * as wrappers from "../wrappers";
+import { PackageTaskMode, TaskType, WorkspaceTaskMode } from "./definitions";
 
 function runAutoproj(ws, ...args) {
     return new vscode.ProcessExecution(ws.autoprojExePath(), args, { cwd: ws.root });
@@ -91,22 +92,77 @@ export class AutoprojProvider implements vscode.TaskProvider {
         return null;
     }
 
+    private isTaskEnabled(type: TaskType, mode: PackageTaskMode | WorkspaceTaskMode): boolean {
+        const optionalTasks = this.vscode.getConfiguration("autoproj.optionalTasks");
+        if (type === TaskType.Package) {
+            const packageTasks = optionalTasks.get<{ [name: string]: boolean }>("package")!;
+            switch (mode as PackageTaskMode) {
+                case PackageTaskMode.BuildNoDeps:
+                    return packageTasks.buildNoDeps;
+                case PackageTaskMode.Checkout:
+                    return packageTasks.checkout;
+                case PackageTaskMode.ForceBuild:
+                    return packageTasks.forceBuild;
+                case PackageTaskMode.Update:
+                    return packageTasks.update;
+            }
+        } else if (type === TaskType.Workspace) {
+            const workspaceTasks = optionalTasks.get<{ [name: string]: boolean }>("workspace")!;
+            switch (mode as WorkspaceTaskMode) {
+                case WorkspaceTaskMode.Build:
+                    return workspaceTasks.build;
+                case WorkspaceTaskMode.Checkout:
+                    return workspaceTasks.checkout;
+                case WorkspaceTaskMode.Update:
+                    return workspaceTasks.update;
+                case WorkspaceTaskMode.UpdateCofig:
+                    return workspaceTasks.updateConfig;
+                case WorkspaceTaskMode.Osdeps:
+                    return workspaceTasks.installOsdeps;
+            }
+        }
+        return false;
+    }
+
     private async createTasksPromise(): Promise<vscode.Task[]> {
         this.workspaces.forEachWorkspace((ws) => {
+            const build = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Build);
+            const update = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Update);
+            const checkout = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Checkout);
+            const updateConfig = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.UpdateCofig);
+            const osdeps = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Osdeps);
+
             this.addTask(ws.root, this.createWatchTask(`${ws.name}: Watch`, ws), this.watchTasks);
-            this.addTask(ws.root, this.createBuildTask(`${ws.name}: Build`, ws, "workspace"), this.buildTasks);
-            this.addTask(ws.root, this.createCheckoutTask(`${ws.name}: Checkout`, ws, "workspace"), this.checkoutTasks);
-            this.addTask(ws.root, this.createOsdepsTask(`${ws.name}: Install OS Dependencies`, ws), this.osdepsTasks);
-            this.addTask(ws.root, this.createUpdateConfigTask(`${ws.name}: Update Configuration`, ws),
-                this.updateConfigTasks);
             this.addTask(ws.root, this.createUpdateEnvironmentTask(`${ws.name}: Update Environment`, ws),
                 this.updateEnvironmentTasks);
-            this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update`, ws, "workspace"), this.updateTasks);
+
+            if (build) {
+                this.addTask(ws.root, this.createBuildTask(`${ws.name}: Build`,
+                    ws, "workspace"), this.buildTasks);
+            }
+
+            if (checkout) {
+                this.addTask(ws.root, this.createCheckoutTask(`${ws.name}: Checkout`,
+                    ws, "workspace"), this.checkoutTasks);
+            }
+
+            if (osdeps) {
+                this.addTask(ws.root, this.createOsdepsTask(`${ws.name}: Install OS Dependencies`, ws),
+                    this.osdepsTasks);
+            }
+
+            if (updateConfig) {
+                this.addTask(ws.root, this.createUpdateConfigTask(`${ws.name}: Update Configuration`, ws),
+                    this.updateConfigTasks);
+            }
+
+            if (update) {
+                this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update`, ws, "workspace"),
+                    this.updateTasks);
+            }
         });
 
-        for (const folder of this.workspaces.folderToWorkspace.keys()) {
-            const ws: autoproj.Workspace = this.workspaces.folderToWorkspace.get(folder)!;
-
+        for (const [folder, ws] of this.workspaces.folderToWorkspace) {
             if (folder === ws.root) { continue; }
             if (this.workspaces.isConfig(folder)) { continue; }
 
@@ -117,18 +173,34 @@ export class AutoprojProvider implements vscode.TaskProvider {
                 relative = pathRelative(ws.root, folder);
             }
 
+            const forceBuild = this.isTaskEnabled(TaskType.Package, PackageTaskMode.ForceBuild);
+            const buildNoDeps = this.isTaskEnabled(TaskType.Package, PackageTaskMode.BuildNoDeps);
+            const checkout = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Checkout);
+            const update = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Update);
+
             this.addTask(folder, this.createPackageBuildTask(`${ws.name}: Build ${relative}`, ws, folder),
                 this.buildTasks);
-            this.addTask(folder, this.createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
-                this.checkoutTasks);
-            this.addTask(folder, this.createPackageForceBuildTask(`${ws.name}: Force Build ${relative} (nodeps)`,
-                ws, folder), this.forceBuildTasks);
-            this.addTask(folder, this.createPackageNodepsBuildTask(`${ws.name}: Build ${relative} (nodeps)`, ws,
-                folder), this.nodepsBuildTasks);
-            this.addTask(folder, this.createPackageUpdateTask(`${ws.name}: Update ${relative}`, ws, folder),
-                this.updateTasks);
-        }
 
+            if (checkout) {
+                this.addTask(folder, this.createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
+                    this.checkoutTasks);
+            }
+
+            if (forceBuild) {
+                this.addTask(folder, this.createPackageForceBuildTask(`${ws.name}: Force Build ${relative} (nodeps)`,
+                    ws, folder), this.forceBuildTasks);
+            }
+
+            if (buildNoDeps) {
+                this.addTask(folder, this.createPackageNodepsBuildTask(`${ws.name}: Build ${relative} (nodeps)`, ws,
+                    folder), this.nodepsBuildTasks);
+            }
+
+            if (update) {
+                this.addTask(folder, this.createPackageUpdateTask(`${ws.name}: Update ${relative}`, ws, folder),
+                    this.updateTasks);
+            }
+        }
         return this.allTasks;
     }
 

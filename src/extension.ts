@@ -130,6 +130,7 @@ export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSC
         tasksHandler.onDidStartTaskProcess(event);
     }));
     subscriptions.push(vscode.tasks.onDidEndTaskProcess((event) => tasksHandler.onDidEndTaskProcess(event)));
+    subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => autoprojTaskProvider.reloadTasks()));
     subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
         event.added.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
         event.removed.forEach((folder) => eventHandler.onWorkspaceFolderRemoved(folder));

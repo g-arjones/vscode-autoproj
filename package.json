@@ -247,7 +247,57 @@
                     }
                 }
             }
-        ]
+        ],
+        "configuration": {
+            "title": "Autoproj extension configuration",
+            "properties": {
+                "autoproj.optionalTasks.package.forceBuild": {
+                    "type": "boolean",
+                    "description": "Provide \"Force Build\" tasks",
+                    "default": false
+                },
+                "autoproj.optionalTasks.package.buildNoDeps": {
+                    "type": "boolean",
+                    "description": "Provide \"Build (nodeps)\" tasks",
+                    "default": false
+                },
+                "autoproj.optionalTasks.package.checkout": {
+                    "type": "boolean",
+                    "description": "Provide \"Checkout\" tasks",
+                    "default": false
+                },
+                "autoproj.optionalTasks.package.update": {
+                    "type": "boolean",
+                    "description": "Provide \"Update\" tasks",
+                    "default": false
+                },
+                "autoproj.optionalTasks.workspace.build": {
+                    "type": "boolean",
+                    "description": "Provide \"Build all packages\" tasks",
+                    "default": false
+                },
+                "autoproj.optionalTasks.workspace.updateConfig": {
+                    "type": "boolean",
+                    "description": "Provide \"Update Configuration\" tasks",
+                    "default": false
+                },
+                "autoproj.optionalTasks.workspace.installOsdeps": {
+                    "type": "boolean",
+                    "description": "Provide \"Install OS Dependencies\" tasks",
+                    "default": false
+                },
+                "autoproj.optionalTasks.workspace.update": {
+                    "type": "boolean",
+                    "description": "Provide \"Update all packages\" tasks",
+                    "default": false
+                },
+                "autoproj.optionalTasks.workspace.checkout": {
+                    "type": "boolean",
+                    "description": "Provide \"Checkout all packages\" tasks",
+                    "default": false
+                }
+            }
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",

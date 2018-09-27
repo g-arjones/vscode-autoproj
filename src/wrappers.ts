@@ -61,4 +61,8 @@ export class VSCode {
                token: vscode.CancellationToken) => Thenable<R>): Thenable<R> {
         return vscode.window.withProgress(options, task);
     }
+
+    public getConfiguration(section?: string, resource?: vscode.Uri | null): vscode.WorkspaceConfiguration {
+        return vscode.workspace.getConfiguration(section, resource);
+    }
 }
