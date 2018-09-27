@@ -115,7 +115,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
                     return workspaceTasks.checkout;
                 case WorkspaceTaskMode.Update:
                     return workspaceTasks.update;
-                case WorkspaceTaskMode.UpdateCofig:
+                case WorkspaceTaskMode.UpdateConfig:
                     return workspaceTasks.updateConfig;
                 case WorkspaceTaskMode.Osdeps:
                     return workspaceTasks.installOsdeps;
@@ -129,7 +129,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
             const build = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Build);
             const update = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Update);
             const checkout = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Checkout);
-            const updateConfig = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.UpdateCofig);
+            const updateConfig = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.UpdateConfig);
             const osdeps = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Osdeps);
 
             this.addTask(ws.root, this.createWatchTask(`${ws.name}: Watch`, ws), this.watchTasks);

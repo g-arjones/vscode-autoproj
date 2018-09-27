@@ -271,7 +271,7 @@ describe("Task provider", () => {
         const name = `${pathBasename(wsRoot)}: Update Configuration`;
         const scope = workspaceFolders[0];
         const defs: tasks.IWorkspaceTaskDefinition = {
-            mode: tasks.WorkspaceTaskMode.UpdateCofig,
+            mode: tasks.WorkspaceTaskMode.UpdateConfig,
             type: tasks.TaskType.Workspace,
             workspace: wsRoot,
         };
