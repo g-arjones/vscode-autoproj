@@ -21,6 +21,7 @@ export enum PackageTaskMode {
     Build = "build",
     BuildNoDeps = "build-no-deps",
     ForceBuild = "force-build",
+    Rebuild = "rebuild",
 }
 
 export interface ITaskDefinition extends vscode.TaskDefinition {

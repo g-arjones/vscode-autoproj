@@ -15,6 +15,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
     private watchTasks: Map<string, vscode.Task>;
     private buildTasks: Map<string, vscode.Task>;
     private nodepsBuildTasks: Map<string, vscode.Task>;
+    private rebuildTasks: Map<string, vscode.Task>;
     private forceBuildTasks: Map<string, vscode.Task>;
     private updateTasks: Map<string, vscode.Task>;
     private checkoutTasks: Map<string, vscode.Task>;
@@ -41,6 +42,10 @@ export class AutoprojProvider implements vscode.TaskProvider {
 
     public async forceBuildTask(path: string): Promise<vscode.Task> {
         return this.getCache(this.forceBuildTasks, path);
+    }
+
+    public async rebuildTask(path: string): Promise<vscode.Task> {
+        return this.getCache(this.rebuildTasks, path);
     }
 
     public async nodepsBuildTask(path: string): Promise<vscode.Task> {
@@ -74,6 +79,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
         this.buildTasks = new Map<string, vscode.Task>();
         this.nodepsBuildTasks = new Map<string, vscode.Task>();
         this.forceBuildTasks = new Map<string, vscode.Task>();
+        this.rebuildTasks = new Map<string, vscode.Task>();
         this.updateTasks = new Map<string, vscode.Task>();
         this.checkoutTasks = new Map<string, vscode.Task>();
         this.osdepsTasks = new Map<string, vscode.Task>();
@@ -97,6 +103,8 @@ export class AutoprojProvider implements vscode.TaskProvider {
         if (type === TaskType.Package) {
             const packageTasks = optionalTasks.get<{ [name: string]: boolean }>("package")!;
             switch (mode as PackageTaskMode) {
+                case PackageTaskMode.Rebuild:
+                    return packageTasks.rebuild;
                 case PackageTaskMode.BuildNoDeps:
                     return packageTasks.buildNoDeps;
                 case PackageTaskMode.Checkout:
@@ -173,6 +181,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
                 relative = pathRelative(ws.root, folder);
             }
 
+            const rebuild = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Rebuild);
             const forceBuild = this.isTaskEnabled(TaskType.Package, PackageTaskMode.ForceBuild);
             const buildNoDeps = this.isTaskEnabled(TaskType.Package, PackageTaskMode.BuildNoDeps);
             const checkout = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Checkout);
@@ -184,6 +193,11 @@ export class AutoprojProvider implements vscode.TaskProvider {
             if (checkout) {
                 this.addTask(folder, this.createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
                     this.checkoutTasks);
+            }
+
+            if (rebuild) {
+                this.addTask(folder, this.createPackageRebuildTask(`${ws.name}: Rebuild ${relative} (nodeps)`,
+                    ws, folder), this.rebuildTasks);
             }
 
             if (forceBuild) {
@@ -303,6 +317,11 @@ export class AutoprojProvider implements vscode.TaskProvider {
     private createPackageForceBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
         return this.createPackageBuildTask(name, ws, folder,
             { mode: "force-build", ...defs }, ["--force", "--deps=f", "--no-confirm", ...args]);
+    }
+
+    private createPackageRebuildTask(name, ws, folder, defs = {}, args: string[] = []) {
+        return this.createPackageBuildTask(name, ws, folder,
+            { mode: "rebuild", ...defs }, ["--rebuild", "--deps=f", "--no-confirm", ...args]);
     }
 
     private createPackageUpdateTask(name, ws, folder, defs = {}, args: string[] = []) {

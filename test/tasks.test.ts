@@ -72,6 +72,7 @@ describe("Task provider", () => {
         buildNoDeps: boolean,
         checkout: boolean,
         forceBuild: boolean,
+        rebuild: boolean,
         update: boolean,
     };
     let workspaceTasks: {
@@ -86,6 +87,7 @@ describe("Task provider", () => {
             buildNoDeps: true,
             checkout: true,
             forceBuild: true,
+            rebuild: true,
             update: true,
         };
 
@@ -186,6 +188,20 @@ describe("Task provider", () => {
         const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
         const defs: tasks.IPackageTaskDefinition = {
             mode: tasks.PackageTaskMode.ForceBuild,
+            path: pkgPath,
+            type: tasks.TaskType.Package,
+            workspace: wsRoot,
+        };
+
+        assertTask(task, process, args, name, scope, defs);
+    }
+    function assertRebuildTask(task: vscode.Task, wsRoot: string, pkgPath: string, pkgName: string) {
+        const process = autoprojExePath(pkgPath);
+        const args = ["build", "--tool", "--rebuild", "--deps=f", "--no-confirm", pkgPath];
+        const name = `${pathBasename(wsRoot)}: Rebuild ${pkgName} (nodeps)`;
+        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+        const defs: tasks.IPackageTaskDefinition = {
+            mode: tasks.PackageTaskMode.Rebuild,
             path: pkgPath,
             type: tasks.TaskType.Package,
             workspace: wsRoot,
@@ -313,6 +329,10 @@ describe("Task provider", () => {
         assert.notEqual(forceBuildTask, undefined);
         assertForceBuildTask.apply(this, [forceBuildTask, ...args]);
 
+        const rebuildTask = await subject.rebuildTask(pkgPath);
+        assert.notEqual(rebuildTask, undefined);
+        assertRebuildTask.apply(this, [rebuildTask, ...args]);
+
         const updateTask = await subject.updateTask(pkgPath);
         assert.notEqual(updateTask, undefined);
         assertUpdateTask.apply(this, [updateTask, ...args]);
@@ -388,7 +408,7 @@ describe("Task provider", () => {
 
         it("is initalized with all tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
-            assert.equal(providedTasks.length, 29);
+            assert.equal(providedTasks.length, 32);
         });
         it("is initalized with all workspace tasks", async () => {
             await subject.provideTasks(null);
@@ -406,6 +426,7 @@ describe("Task provider", () => {
                 buildNoDeps: false,
                 checkout: false,
                 forceBuild: false,
+                rebuild: false,
                 update: false,
             };
 
@@ -465,7 +486,7 @@ describe("Task provider", () => {
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            await assert.equal(providedTasks.length, 12);
+            await assert.equal(providedTasks.length, 13);
             await assertAllWorkspaceTasks(helpers.fullPath());
             await assertAllPackageTasks(a, root);
         });
@@ -481,6 +502,7 @@ describe("Task provider", () => {
             await helpers.assertThrowsAsync(subject.buildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.watchTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.forceBuildTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.rebuildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.nodepsBuildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.updateConfigTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.updateEnvironmentTask("/not/found"), /no entry/);

@@ -26,7 +26,9 @@ export class Handler implements vscode.Disposable {
             switch (task.definition.mode) {
                 case PackageTaskMode.ForceBuild:
                 case PackageTaskMode.BuildNoDeps:
+                case PackageTaskMode.Rebuild:
                 case PackageTaskMode.Build:
+                    if (task.definition.mode === PackageTaskMode.Rebuild) { buildMode = " (rebuild)"; }
                     if (task.definition.mode === PackageTaskMode.ForceBuild) { buildMode = " (force)"; }
                     if (task.definition.mode === PackageTaskMode.BuildNoDeps) { buildMode = " (no dependencies)"; }
                     this.createAndShowView(`Building ${pkgName}${buildMode}...`, event.execution.task.definition);

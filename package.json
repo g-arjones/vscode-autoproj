@@ -251,6 +251,11 @@
         "configuration": {
             "title": "Autoproj extension configuration",
             "properties": {
+                "autoproj.optionalTasks.package.rebuild": {
+                    "type": "boolean",
+                    "description": "Provide \"Rebuild\" tasks",
+                    "default": false
+                },
                 "autoproj.optionalTasks.package.forceBuild": {
                     "type": "boolean",
                     "description": "Provide \"Force Build\" tasks",
