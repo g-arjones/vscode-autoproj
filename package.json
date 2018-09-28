@@ -94,13 +94,13 @@
                 ]
             },
             {
-                "name": "autoproj-cmake-configure-error",
+                "name": "autoproj-cmake-configure-error-relative",
                 "owner": "autoproj",
                 "fileLocation": "relative",
                 "severity": "error",
                 "pattern": [
                     {
-                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Error at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Error(?: \\(dev\\))? at (?!\\/.*$)([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
                         "message": -1
@@ -113,13 +113,51 @@
                 ]
             },
             {
-                "name": "autoproj-cmake-configure-warning",
+                "name": "autoproj-cmake-configure-warning-relative",
                 "owner": "autoproj",
                 "fileLocation": "relative",
                 "severity": "warning",
                 "pattern": [
                     {
-                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Warning at ([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Warning(?: \\(dev\\))? at (?!\\/.*$)([\\/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "file": 1,
+                        "line": 2,
+                        "message": -1
+                    },
+                    {
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?!Call Stack)(.*)",
+                        "message": 1,
+                        "loop": true
+                    }
+                ]
+            },
+            {
+                "name": "autoproj-cmake-configure-error-absolute",
+                "owner": "autoproj",
+                "fileLocation": "absolute",
+                "severity": "error",
+                "pattern": [
+                    {
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Error(?: \\(dev\\))? at (\\/+[\\/0-9a-zA-Z\\._-]+):(\\d+).*",
+                        "file": 1,
+                        "line": 2,
+                        "message": -1
+                    },
+                    {
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?!Call Stack)(.*)",
+                        "message": 1,
+                        "loop": true
+                    }
+                ]
+            },
+            {
+                "name": "autoproj-cmake-configure-warning-absolute",
+                "owner": "autoproj",
+                "fileLocation": "absolute",
+                "severity": "warning",
+                "pattern": [
+                    {
+                        "regexp": "(?:Autobuild::\\w+):(?:[^:]+):(?:configure|build): (?:.+\n)?CMake Warning(?: \\(dev\\))? at (\\/+[\\/0-9a-zA-Z\\._-]+):(\\d+).*",
                         "file": 1,
                         "line": 2,
                         "message": -1

@@ -255,8 +255,10 @@ export class AutoprojProvider implements vscode.TaskProvider {
         const task = this.createTask(name, ws, type, { mode: "build", ...defs }, ["build", "--tool", ...args], scope);
         task.group = vscode.TaskGroup.Build;
         task.problemMatchers = [
-            "$autoproj-cmake-configure-error",
-            "$autoproj-cmake-configure-warning",
+            "$autoproj-cmake-configure-error-relative",
+            "$autoproj-cmake-configure-warning-relative",
+            "$autoproj-cmake-configure-error-absolute",
+            "$autoproj-cmake-configure-warning-absolute",
             "$autoproj-gcc-compile-error",
             "$autoproj-gcc-compile-warning",
             "$autoproj-gcc-compile-template-expansion",
