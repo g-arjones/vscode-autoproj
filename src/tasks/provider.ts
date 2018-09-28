@@ -98,7 +98,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
         return null;
     }
 
-    private isTaskEnabled(type: TaskType, mode: PackageTaskMode | WorkspaceTaskMode): boolean {
+    public isTaskEnabled(type: TaskType, mode: PackageTaskMode | WorkspaceTaskMode): boolean {
         const optionalTasks = this.vscode.getConfiguration("autoproj.optionalTasks");
         if (type === TaskType.Package) {
             const packageTasks = optionalTasks.get<{ [name: string]: boolean }>("package")!;
@@ -129,7 +129,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
                     return workspaceTasks.installOsdeps;
             }
         }
-        return false;
+        throw new Error("Invalid task type");
     }
 
     private async createTasksPromise(): Promise<vscode.Task[]> {

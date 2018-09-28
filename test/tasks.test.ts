@@ -510,5 +510,57 @@ describe("Task provider", () => {
             await helpers.assertThrowsAsync(subject.checkoutTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.osdepsTask("/not/found"), /no entry/);
         });
+        describe("isTaskEnabled()", () => {
+            it("returns true for enabled tasks", () => {
+                let type = tasks.TaskType.Package;
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.BuildNoDeps), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.ForceBuild), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Rebuild), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Update), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Checkout), true);
+
+                type = tasks.TaskType.Workspace;
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Build), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Checkout), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Osdeps), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Update), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.UpdateConfig), true);
+            });
+            it("returns false for disabled tasks", () => {
+                packageTasks = {
+                    buildNoDeps: false,
+                    checkout: false,
+                    forceBuild: false,
+                    rebuild: false,
+                    update: false,
+                };
+
+                workspaceTasks = {
+                    build: false,
+                    checkout: false,
+                    installOsdeps: false,
+                    update: false,
+                    updateConfig: false,
+                };
+
+                let type = tasks.TaskType.Package;
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.BuildNoDeps), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.ForceBuild), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Rebuild), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Update), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Checkout), false);
+
+                type = tasks.TaskType.Workspace;
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Build), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Checkout), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Osdeps), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Update), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.UpdateConfig), false);
+            });
+            it("throws if task type is invalid", () => {
+                assert.throws(() => subject.isTaskEnabled("foo" as tasks.TaskType,
+                    tasks.PackageTaskMode.Build), /Invalid/);
+            });
+        });
     });
 });
