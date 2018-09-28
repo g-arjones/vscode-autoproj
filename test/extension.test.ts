@@ -3,6 +3,7 @@ import * as TypeMoq from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as extension from "../src/extension";
+import * as tasks from "../src/tasks";
 import * as watcher from "../src/watcher";
 import * as wrappers from "../src/wrappers";
 
@@ -23,8 +24,8 @@ describe("EventHandler", () => {
         let mockWorkspace: TypeMoq.IMock<autoproj.Workspace>;
         let mockTask: TypeMoq.IMock<vscode.Task>;
         const taskDefinition: vscode.TaskDefinition = {
-            mode: "watch",
-            type: "autoproj-workspace",
+            mode: tasks.WorkspaceTaskMode.Watch,
+            type: tasks.TaskType.Workspace,
             workspace: "/path/to/workspace",
         };
 
@@ -90,8 +91,8 @@ describe("EventHandler", () => {
             uri: vscode.Uri.file("/path/to/two"),
         };
         const taskDefinition: vscode.TaskDefinition = {
-            mode: "watch",
-            type: "autoproj-workspace",
+            mode: tasks.WorkspaceTaskMode.Watch,
+            type: tasks.TaskType.Workspace,
             workspace: "/path/to/workspace",
         };
         beforeEach(() => {
@@ -102,7 +103,7 @@ describe("EventHandler", () => {
             mockWorkspace = TypeMoq.Mock.ofType<autoproj.Workspace>();
             mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
             mockTask.setup((x) => x.definition).returns(() => taskDefinition);
-            mockWrapper.setup((x) => x.fetchTasks({ type: "autoproj-workspace" })).
+            mockWrapper.setup((x) => x.fetchTasks(tasks.WorkspaceTaskFilter)).
                 returns(() => Promise.resolve([mockTask.object]));
             mockWatchFunc = TypeMoq.Mock.ofInstance(() => {
                 // no-op
@@ -169,8 +170,8 @@ describe("EventHandler", () => {
         let mockUnwatchFunc: TypeMoq.IMock<(ws: autoproj.Workspace) => void>;
         let mockTask: TypeMoq.IMock<vscode.Task>;
         const taskDefinition: vscode.TaskDefinition = {
-            mode: "watch",
-            type: "autoproj-workspace",
+            mode: tasks.WorkspaceTaskMode.Watch,
+            type: tasks.TaskType.Workspace,
             workspace: "/path/to/workspace",
         };
 

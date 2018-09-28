@@ -8,19 +8,108 @@ import * as tasks from "../src/tasks";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
 
+describe("definitionsEqual()", () => {
+    it("returns false if first definition is not autoproj", () => {
+        const first: vscode.TaskDefinition = { type: "foo" };
+        const second: tasks.ITaskDefinition = { type: tasks.TaskType.Package, workspace: "" };
+        assert.equal(tasks.definitionsEqual(first as tasks.ITaskDefinition, second), false);
+    });
+    it("returns false if second definition is not autoproj", () => {
+        const first: tasks.ITaskDefinition = { type: tasks.TaskType.Package, workspace: "" };
+        const second: vscode.TaskDefinition = { type: "foo" };
+        assert.equal(tasks.definitionsEqual(first, second as tasks.ITaskDefinition), false);
+    });
+    it("returns false if both definitions are not autoproj", () => {
+        const first: vscode.TaskDefinition = { type: "bar" };
+        const second: vscode.TaskDefinition = { type: "foo" };
+        assert.equal(tasks.definitionsEqual(first as tasks.ITaskDefinition, second as tasks.ITaskDefinition), false);
+    });
+    it("returns false if definitions are of different types", () => {
+        const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "",
+                                                      type: tasks.TaskType.Package, workspace: "" };
+        const second: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
+                                                         type: tasks.TaskType.Workspace, workspace: "" };
+        assert.equal(tasks.definitionsEqual(first, second), false);
+    });
+    it("returns false if definitions have different workspaces", () => {
+        const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
+                                                      type: tasks.TaskType.Package, workspace: "/bar" };
+        const second: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
+                                                       type: tasks.TaskType.Package, workspace: "" };
+        assert.equal(tasks.definitionsEqual(first, second), false);
+    });
+    it("returns false if definitions have different packages", () => {
+        const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
+                                                      type: tasks.TaskType.Package, workspace: "/bar" };
+        const second: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/dummy",
+                                                       type: tasks.TaskType.Package, workspace: "/bar" };
+        assert.equal(tasks.definitionsEqual(first, second), false);
+    });
+    it("returns true if autoproj-package definitions are equal", () => {
+        const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
+                                                      type: tasks.TaskType.Package, workspace: "/bar" };
+        const second: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
+                                                       type: tasks.TaskType.Package, workspace: "/bar" };
+        assert.equal(tasks.definitionsEqual(first, second), true);
+    });
+    it("returns true if autoproj-workspace definitions are equal", () => {
+        const first: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
+                                                        type: tasks.TaskType.Workspace, workspace: "/bar" };
+        const second: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
+                                                         type: tasks.TaskType.Workspace, workspace: "/bar" };
+        assert.equal(tasks.definitionsEqual(first, second), true);
+    });
+});
+
 describe("Task provider", () => {
     let root: string;
     let workspaces: autoproj.Workspaces;
     let subject: tasks.AutoprojProvider;
-    let wrapper: TypeMoq.IMock<wrappers.VSCode>;
+    let mockWrapper: TypeMoq.IMock<wrappers.VSCode>;
+    let mockConfiguration: TypeMoq.IMock<vscode.WorkspaceConfiguration>;
     let workspaceFolders: vscode.WorkspaceFolder[];
-
+    let packageTasks: {
+        buildNoDeps: boolean,
+        checkout: boolean,
+        forceBuild: boolean,
+        rebuild: boolean,
+        update: boolean,
+    };
+    let workspaceTasks: {
+        build: boolean,
+        checkout: boolean,
+        installOsdeps: boolean,
+        update: boolean,
+        updateConfig: boolean,
+    };
     beforeEach(() => {
+        packageTasks = {
+            buildNoDeps: true,
+            checkout: true,
+            forceBuild: true,
+            rebuild: true,
+            update: true,
+        };
+
+        workspaceTasks = {
+            build: true,
+            checkout: true,
+            installOsdeps: true,
+            update: true,
+            updateConfig: true,
+        };
+
+        mockWrapper = TypeMoq.Mock.ofType<wrappers.VSCode>();
+        mockConfiguration = TypeMoq.Mock.ofType<vscode.WorkspaceConfiguration>();
+        mockConfiguration.setup((x) => x.get("package")).returns(() => packageTasks);
+        mockConfiguration.setup((x) => x.get("workspace")).returns(() => workspaceTasks);
+        mockWrapper.setup((x) => x.getConfiguration("autoproj.optionalTasks")).
+            returns(() => mockConfiguration.object);
+
         root = helpers.init();
         workspaces = new autoproj.Workspaces();
-        wrapper = TypeMoq.Mock.ofType<wrappers.VSCode>();
         workspaceFolders = [];
-        wrapper.setup((x) => x.workspaceFolders).returns(() => workspaceFolders);
+        mockWrapper.setup((x) => x.workspaceFolders).returns(() => workspaceFolders);
     });
     afterEach(() => {
         helpers.clear();
@@ -35,16 +124,21 @@ describe("Task provider", () => {
 
         workspaces.addFolder(folderPath);
         workspaceFolders.push(folder);
-        wrapper.setup((x) => x.getWorkspaceFolder(folderPath)).returns(() => folder);
+        mockWrapper.setup((x) => x.getWorkspaceFolder(folderPath)).returns(() => folder);
     }
     function assertTask(task: vscode.Task, process: string, args: string[],
-                        name: string, scope: vscode.TaskScope | vscode.WorkspaceFolder) {
+                        name: string, scope: vscode.TaskScope | vscode.WorkspaceFolder, defs: tasks.ITaskDefinition) {
         const actualProcess = (task.execution as vscode.ProcessExecution).process;
         const actualArgs = (task.execution as vscode.ProcessExecution).args;
         assert.deepEqual(scope, task.scope);
         assert.equal(name, task.name);
         assert.equal(actualProcess, process);
         assert.deepEqual(actualArgs, args);
+        assert.equal(tasks.definitionsEqual(task.definition as tasks.ITaskDefinition, defs), true);
+
+        if (defs.type !== tasks.TaskType.Workspace && defs.mode !== tasks.WorkspaceTaskMode.Watch) {
+            assert.deepEqual(task.presentationOptions, { reveal: vscode.TaskRevealKind.Silent });
+        }
     }
     function autoprojExePath(basePath) {
         const wsRoot = autoproj.findWorkspaceRoot(basePath) as string;
@@ -54,7 +148,13 @@ describe("Task provider", () => {
         const process = autoprojExePath(wsRoot);
         const args = ["watch", "--show-events"];
         const name = `${pathBasename(wsRoot)}: Watch`;
-        assertTask(task, process, args, name, workspaceFolders[0]);
+        const defs: tasks.IWorkspaceTaskDefinition = {
+            mode: tasks.WorkspaceTaskMode.Watch,
+            type: tasks.TaskType.Workspace,
+            workspace: wsRoot,
+        };
+
+        assertTask(task, process, args, name, workspaceFolders[0], defs);
         assert.equal(task.isBackground, true);
         assert.deepEqual(task.presentationOptions, { reveal: vscode.TaskRevealKind.Never });
     }
@@ -62,76 +162,150 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["build", "--tool"];
         let scope = workspaceFolders[0];
-        let name = `${pathBasename(wsRoot)}: Build`;
+        let name = `${pathBasename(wsRoot)}: Build all packages`;
+        let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
-            name += ` ${pkgName}`;
-            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+            name = `${pathBasename(wsRoot)}: Build ${pkgName}`;
+            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+            defs = { ...defs, mode: tasks.PackageTaskMode.Build,
+                     path: pkgPath,
+                     type: tasks.TaskType.Package,
+            };
+        } else {
+            defs = { ...defs, mode: tasks.WorkspaceTaskMode.Build,
+                     type: tasks.TaskType.Workspace,
+            };
         }
 
-        assertTask(task, process, args, name, scope);
+        assertTask(task, process, args, name, scope, defs);
     }
     function assertForceBuildTask(task: vscode.Task, wsRoot: string, pkgPath: string, pkgName: string) {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--force", "--deps=f", "--no-confirm", pkgPath];
         const name = `${pathBasename(wsRoot)}: Force Build ${pkgName} (nodeps)`;
-        const scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
-        assertTask(task, process, args, name, scope);
+        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+        const defs: tasks.IPackageTaskDefinition = {
+            mode: tasks.PackageTaskMode.ForceBuild,
+            path: pkgPath,
+            type: tasks.TaskType.Package,
+            workspace: wsRoot,
+        };
+
+        assertTask(task, process, args, name, scope, defs);
+    }
+    function assertRebuildTask(task: vscode.Task, wsRoot: string, pkgPath: string, pkgName: string) {
+        const process = autoprojExePath(pkgPath);
+        const args = ["build", "--tool", "--rebuild", "--deps=f", "--no-confirm", pkgPath];
+        const name = `${pathBasename(wsRoot)}: Rebuild ${pkgName} (nodeps)`;
+        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+        const defs: tasks.IPackageTaskDefinition = {
+            mode: tasks.PackageTaskMode.Rebuild,
+            path: pkgPath,
+            type: tasks.TaskType.Package,
+            workspace: wsRoot,
+        };
+
+        assertTask(task, process, args, name, scope, defs);
     }
     function assertNodepsBuildTask(task: vscode.Task, wsRoot: string, pkgPath: string, pkgName: string) {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--deps=f", pkgPath];
         const name = `${pathBasename(wsRoot)}: Build ${pkgName} (nodeps)`;
-        const scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
-        assertTask(task, process, args, name, scope);
+        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+        const defs: tasks.IPackageTaskDefinition = {
+            mode: tasks.PackageTaskMode.BuildNoDeps,
+            path: pkgPath,
+            type: tasks.TaskType.Package,
+            workspace: wsRoot,
+        };
+
+        assertTask(task, process, args, name, scope, defs);
     }
     function assertUpdateTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "--progress=f", "-k", "--color"];
         let scope = workspaceFolders[0];
-        let name = `${pathBasename(wsRoot)}: Update`;
+        let name = `${pathBasename(wsRoot)}: Update all packages`;
+        let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
-            name += ` ${pkgName}`;
-            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+            name = `${pathBasename(wsRoot)}: Update ${pkgName}`;
+            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+            defs = { ...defs, mode: tasks.PackageTaskMode.Update,
+                     path: pkgPath,
+                     type: tasks.TaskType.Package,
+            };
+        } else {
+            defs = { ...defs, mode: tasks.WorkspaceTaskMode.Update,
+                     type: tasks.TaskType.Workspace,
+            };
         }
-        assertTask(task, process, args, name, scope);
+        assertTask(task, process, args, name, scope, defs);
     }
     function assertCheckoutTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "--progress=f", "-k", "--color", "--checkout-only"];
-        let name = `${pathBasename(wsRoot)}: Checkout`;
+        let name = `${pathBasename(wsRoot)}: Checkout all packages`;
         let scope = workspaceFolders[0];
+        let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
-            name += ` ${pkgName}`;
-            scope = wrapper.object.getWorkspaceFolder(pkgPath)!;
+            name = `${pathBasename(wsRoot)}: Checkout ${pkgName}`;
+            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+            defs = { ...defs, mode: tasks.PackageTaskMode.Checkout,
+                     path: pkgPath,
+                     type: tasks.TaskType.Package,
+            };
+        } else {
+            defs = { ...defs, mode: tasks.WorkspaceTaskMode.Checkout,
+                     type: tasks.TaskType.Workspace,
+            };
         }
-        assertTask(task, process, args, name, scope);
+
+        assertTask(task, process, args, name, scope, defs);
     }
     function assertOsdepsTask(task: vscode.Task, wsRoot: string) {
         const process = autoprojExePath(wsRoot);
         const args = ["osdeps", "--color"];
         const name = `${pathBasename(wsRoot)}: Install OS Dependencies`;
         const scope = workspaceFolders[0];
-        assertTask(task, process, args, name, scope);
+        const defs: tasks.IWorkspaceTaskDefinition = {
+            mode: tasks.WorkspaceTaskMode.Osdeps,
+            type: tasks.TaskType.Workspace,
+            workspace: wsRoot,
+        };
+
+        assertTask(task, process, args, name, scope, defs);
     }
     function assertUpdateConfigTask(task: vscode.Task, wsRoot: string) {
         const process = autoprojExePath(wsRoot);
         const args = ["update", "--progress=f", "-k", "--color", "--config"];
         const name = `${pathBasename(wsRoot)}: Update Configuration`;
         const scope = workspaceFolders[0];
-        assertTask(task, process, args, name, scope);
+        const defs: tasks.IWorkspaceTaskDefinition = {
+            mode: tasks.WorkspaceTaskMode.UpdateConfig,
+            type: tasks.TaskType.Workspace,
+            workspace: wsRoot,
+        };
+
+        assertTask(task, process, args, name, scope, defs);
     }
     function assertUpdateEnvironmentTask(task: vscode.Task, wsRoot: string) {
         const process = autoprojExePath(wsRoot);
         const args = ["envsh", "--progress=f", "--color"];
         const name = `${pathBasename(wsRoot)}: Update Environment`;
         const scope = workspaceFolders[0];
-        assertTask(task, process, args, name, scope);
+        const defs: tasks.IWorkspaceTaskDefinition = {
+            mode: tasks.WorkspaceTaskMode.UpdateEnvironment,
+            type: tasks.TaskType.Workspace,
+            workspace: wsRoot,
+        };
+
+        assertTask(task, process, args, name, scope, defs);
         assert.equal(task.presentationOptions.reveal, vscode.TaskRevealKind.Silent);
     }
     function packageName(pkgPath: string, wsRoot: string, installManifest: autoproj.IPackage[]): string {
@@ -154,6 +328,10 @@ describe("Task provider", () => {
         const forceBuildTask = await subject.forceBuildTask(pkgPath);
         assert.notEqual(forceBuildTask, undefined);
         assertForceBuildTask.apply(this, [forceBuildTask, ...args]);
+
+        const rebuildTask = await subject.rebuildTask(pkgPath);
+        assert.notEqual(rebuildTask, undefined);
+        assertRebuildTask.apply(this, [rebuildTask, ...args]);
 
         const updateTask = await subject.updateTask(pkgPath);
         assert.notEqual(updateTask, undefined);
@@ -225,12 +403,12 @@ describe("Task provider", () => {
             addFolder(e);
             addFolder(wsOneRoot);
             addFolder(wsTwoRoot);
-            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
+            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
         });
 
         it("is initalized with all tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
-            assert.equal(providedTasks.length, 29);
+            assert.equal(providedTasks.length, 32);
         });
         it("is initalized with all workspace tasks", async () => {
             await subject.provideTasks(null);
@@ -242,6 +420,29 @@ describe("Task provider", () => {
             await assertAllPackageTasks(a, wsOneRoot);
             await assertAllPackageTasks(b, wsOneRoot);
             await assertAllPackageTasks(c, wsTwoRoot);
+        });
+        it("does not create disabled tasks", async () => {
+            packageTasks = {
+                buildNoDeps: false,
+                checkout: false,
+                forceBuild: false,
+                rebuild: false,
+                update: false,
+            };
+
+            workspaceTasks = {
+                build: false,
+                checkout: false,
+                installOsdeps: false,
+                update: false,
+                updateConfig: false,
+            };
+            await subject.provideTasks(null);
+            subject.reloadTasks();
+
+            const providedTasks = await subject.provideTasks(null);
+            // 2 mandatory tasks per workspace + 1 mandatory task per package
+            await assert.equal(providedTasks.length, 2 * 2 + 1 * 3);
         });
         it("gets the package names from installation manifest", async () => {
             const PKG_IODRIVERS_BASE: autoproj.IPackage = {
@@ -269,7 +470,7 @@ describe("Task provider", () => {
 
     describe("in an empty workspace", () => {
         beforeEach(() => {
-            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
+            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
         });
         it("provides an empty array of tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
@@ -285,14 +486,14 @@ describe("Task provider", () => {
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            await assert.equal(providedTasks.length, 12);
+            await assert.equal(providedTasks.length, 13);
             await assertAllWorkspaceTasks(helpers.fullPath());
             await assertAllPackageTasks(a, root);
         });
     });
     describe("in any case", () => {
         beforeEach(() => {
-            subject = new tasks.AutoprojProvider(workspaces, wrapper.object);
+            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
         });
         it("resolveTask() always returns null", async () => {
             assert.equal(await subject.resolveTask(undefined, undefined), null);
@@ -301,12 +502,65 @@ describe("Task provider", () => {
             await helpers.assertThrowsAsync(subject.buildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.watchTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.forceBuildTask("/not/found"), /no entry/);
+            await helpers.assertThrowsAsync(subject.rebuildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.nodepsBuildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.updateConfigTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.updateEnvironmentTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.updateTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.checkoutTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.osdepsTask("/not/found"), /no entry/);
+        });
+        describe("isTaskEnabled()", () => {
+            it("returns true for enabled tasks", () => {
+                let type = tasks.TaskType.Package;
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.BuildNoDeps), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.ForceBuild), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Rebuild), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Update), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Checkout), true);
+
+                type = tasks.TaskType.Workspace;
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Build), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Checkout), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Osdeps), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Update), true);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.UpdateConfig), true);
+            });
+            it("returns false for disabled tasks", () => {
+                packageTasks = {
+                    buildNoDeps: false,
+                    checkout: false,
+                    forceBuild: false,
+                    rebuild: false,
+                    update: false,
+                };
+
+                workspaceTasks = {
+                    build: false,
+                    checkout: false,
+                    installOsdeps: false,
+                    update: false,
+                    updateConfig: false,
+                };
+
+                let type = tasks.TaskType.Package;
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.BuildNoDeps), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.ForceBuild), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Rebuild), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Update), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Checkout), false);
+
+                type = tasks.TaskType.Workspace;
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Build), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Checkout), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Osdeps), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.Update), false);
+                assert.equal(subject.isTaskEnabled(type, tasks.WorkspaceTaskMode.UpdateConfig), false);
+            });
+            it("throws if task type is invalid", () => {
+                assert.throws(() => subject.isTaskEnabled("foo" as tasks.TaskType,
+                    tasks.PackageTaskMode.Build), /Invalid/);
+            });
         });
     });
 });

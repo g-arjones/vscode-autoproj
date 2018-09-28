@@ -54,4 +54,15 @@ export class VSCode {
     public fetchTasks(filter?: vscode.TaskFilter | undefined): Thenable<vscode.Task[]> {
         return vscode.tasks.fetchTasks(filter);
     }
+
+    public withProgress<R>(
+        options: vscode.ProgressOptions,
+        task: (progress: vscode.Progress<{ message?: string; increment?: number }>,
+               token: vscode.CancellationToken) => Thenable<R>): Thenable<R> {
+        return vscode.window.withProgress(options, task);
+    }
+
+    public getConfiguration(section?: string, resource?: vscode.Uri | null): vscode.WorkspaceConfiguration {
+        return vscode.workspace.getConfiguration(section, resource);
+    }
 }

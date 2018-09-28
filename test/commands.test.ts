@@ -5,6 +5,7 @@ import * as TypeMoq from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as commands from "../src/commands";
+import * as tasks from "../src/tasks";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
 
@@ -24,8 +25,8 @@ describe("Commands", () => {
         let mockSubject: TypeMoq.IMock<commands.Commands>;
         let mockTask: TypeMoq.IMock<vscode.Task>;
         const taskDefinition: vscode.TaskDefinition = {
-            mode: "update-environment",
-            type: "autoproj-workspace",
+            mode: tasks.WorkspaceTaskMode.UpdateEnvironment,
+            type: tasks.TaskType.Workspace,
             workspace: "/path/to/workspace",
         };
         beforeEach(() => {
@@ -35,7 +36,7 @@ describe("Commands", () => {
             mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
             mockWorkspace.setup((x: any) => x.then).returns(() => undefined);
             mockTask.setup((x) => x.definition).returns(() => taskDefinition);
-            mockWrapper.setup((x) => x.fetchTasks({ type: "autoproj-workspace" })).
+            mockWrapper.setup((x) => x.fetchTasks(tasks.WorkspaceTaskFilter)).
                 returns(() => Promise.resolve([mockTask.object]));
             mockSubject = TypeMoq.Mock.ofInstance(subject);
             subject = mockSubject.target;
