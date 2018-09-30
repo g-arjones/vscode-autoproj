@@ -37,8 +37,8 @@ export class Handler implements vscode.Disposable {
                     this.createAndShowView(`Checking out ${pkgName}...`, event.execution.task.definition);
                     break;
                 case PackageTaskMode.Update:
-                    this.createAndShowView(`Updating ${pkgName} (and its
-                        dependencies)...`, event.execution.task.definition);
+                    this.createAndShowView(`Updating ${pkgName} (and its dependencies)...`,
+                        event.execution.task.definition);
                     break;
             }
         } else if (task.definition.type === TaskType.Workspace) {
@@ -67,12 +67,6 @@ export class Handler implements vscode.Disposable {
         }
     }
 
-    public createAndShowView(title: string, definition: vscode.TaskDefinition) {
-        const view = new progress.ProgressView(this.wrapper, title);
-        this.definitionToView.set(definition as ITaskDefinition, view);
-        view.show();
-    }
-
     public onDidEndTaskProcess(event: vscode.TaskProcessEndEvent) {
         for (const [definition, view] of this.definitionToView) {
             if (definitionsEqual(definition, event.execution.task.definition as ITaskDefinition)) {
@@ -91,5 +85,11 @@ export class Handler implements vscode.Disposable {
         } catch (error) {
             return path.relative(taskDefinition.workspace, taskDefinition.path);
         }
+    }
+
+    private createAndShowView(title: string, definition: vscode.TaskDefinition) {
+        const view = progress.createProgressView(this.wrapper, title);
+        this.definitionToView.set(definition as ITaskDefinition, view);
+        view.show();
     }
 }
