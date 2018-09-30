@@ -20,12 +20,12 @@ describe("ProgressView()", () => {
             callback((options: vscode.ProgressOptions, task: TaskType) => {
             task(mockProgress.object, mockToken.object);
         });
-        subject = new progress.ProgressView(mockWrapper.object);
+        subject = progress.createProgressView(mockWrapper.object);
         subject.show();
     });
     describe("show()", () => {
         beforeEach(() => {
-            subject = new progress.ProgressView(mockWrapper.object, "the title");
+            subject = progress.createProgressView(mockWrapper.object, "the title");
         });
         it("creates an instance of a progress notification", () => {
             const expectedOptions: vscode.ProgressOptions = {
@@ -39,7 +39,7 @@ describe("ProgressView()", () => {
     });
     describe("get title()", () => {
         beforeEach(() => {
-            subject = new progress.ProgressView(mockWrapper.object, "the title");
+            subject = progress.createProgressView(mockWrapper.object, "the title");
         });
         it("returns the title being used", () => {
             assert.equal(subject.title, "the title");

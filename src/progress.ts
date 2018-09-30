@@ -1,6 +1,10 @@
 import { Progress, ProgressLocation } from "vscode";
 import * as wrappers from "./wrappers";
 
+export function createProgressView(vscode: wrappers.VSCode, title?: string) {
+    return new ProgressView(vscode, title);
+}
+
 export class ProgressView {
     private resolver: (value?: any) => void;
     private view: Progress<{ message?: string, increment?: number }>;
