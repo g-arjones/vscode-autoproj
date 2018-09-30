@@ -27,7 +27,7 @@ describe("tasks Handler", () => {
     afterEach(() => {
         require("../src/progress").createProgressView = originalFactory;
     });
-    function createTaskProcessStartEvent(definition: tasks.ITaskDefinition) {
+    function createTaskProcessStartEvent(definition: vscode.TaskDefinition) {
         const mockTaskProcessStartEvent = Mock.ofType<vscode.TaskProcessStartEvent>();
         const mockTaskExecution = Mock.ofType<vscode.TaskExecution>();
         const mockTask = Mock.ofType<vscode.Task>();
@@ -120,6 +120,12 @@ describe("tasks Handler", () => {
             setPackageName("/path/to/workspace/package", "foobar");
             testTaskView(packageTask, definition);
         });
+        it("does nothing if task is not an autoproj task", async () => {
+            const task: vscode.TaskDefinition = { type: "someTask" };
+            const startEvent = createTaskProcessStartEvent(task);
+            await subject.onDidStartTaskProcess(startEvent);
+            mockFactory.verify((x) => x(It.isAny(), It.isAny()), Times.never());
+        });
     });
     async function startTestTasks() {
         const mockViews = Array<IMock<progress.ProgressView>>();
@@ -147,7 +153,7 @@ describe("tasks Handler", () => {
         return { definitions, mockViews };
     }
     describe("onDidEndTaskProcess()", () => {
-        function createTaskProcessEndEvent(definition: tasks.ITaskDefinition) {
+        function createTaskProcessEndEvent(definition: vscode.TaskDefinition) {
             const mockTaskProcessEndEvent = Mock.ofType<vscode.TaskProcessEndEvent>();
             const mockTaskExecution = Mock.ofType<vscode.TaskExecution>();
             const mockTask = Mock.ofType<vscode.Task>();
@@ -165,6 +171,13 @@ describe("tasks Handler", () => {
                 subject.onDidEndTaskProcess(endEvent);
             }
             mockViews.forEach((view) => view.verify((x) => x.close(), Times.once()));
+        });
+        it("does nothing if task is not an autoproj task", async () => {
+            const { mockViews } = await startTestTasks();
+            const definition: vscode.TaskDefinition = { type: "someTask" };
+            const endEvent = createTaskProcessEndEvent(definition);
+            subject.onDidEndTaskProcess(endEvent);
+            mockViews.forEach((view) => view.verify((x) => x.close(), Times.never()));
         });
     });
     describe("dipose()", () => {
