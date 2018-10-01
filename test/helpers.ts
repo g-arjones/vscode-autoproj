@@ -115,22 +115,6 @@ export function addPackageToManifest(ws, path: string[], partialInfo: { [key: st
     return result;
 }
 
-// tslint:disable-next-line:max-classes-per-file
-class ProcessMock extends EventEmitter implements Autoproj.IProcess {
-    public stdout = new EventEmitter();
-    public stderr = new EventEmitter();
-    public killSignal: string | undefined;
-    public kill(signal: string) {
-        this.killSignal = signal;
-        this.emit("exit", undefined, 2);
-    }
-}
-
-export function createProcessMock(): ProcessMock {
-    return new ProcessMock();
-}
-
-// tslint:disable-next-line:max-classes-per-file
 export class TestSetup {
     public mockWrapper: TypeMoq.IMock<Wrappers.VSCode>;
     get wrapper() {

@@ -1,11 +1,3 @@
-import { EventEmitter } from "events";
-
-export interface IProcess extends EventEmitter {
-    stdout: EventEmitter;
-    stderr: EventEmitter;
-    kill(signal: string): void;
-}
-
 export interface IVCS {
     type: string;
     url: string;
