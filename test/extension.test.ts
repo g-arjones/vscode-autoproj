@@ -90,7 +90,7 @@ describe("EventHandler", () => {
         };
         beforeEach(() => {
             mockWorkspace = mockWorkspaces.addWorkspace(wsRoot);
-            task = mocks.createTask(taskDefinition).task;
+            task = mocks.createTask(taskDefinition).object;
             mockWrapper.setup((x) => x.fetchTasks(tasks.WorkspaceTaskFilter)).
                 returns(() => Promise.resolve([task]));
             mockWatchFunc = Mock.ofInstance(() => {

@@ -21,19 +21,18 @@ describe("Commands", () => {
         subject = new commands.Commands(mockWorkspaces.object, mockWrapper.object);
     });
     describe("updatePackageInfo()", () => {
-        let mockWorkspace: IMock<autoproj.Workspace>;
         let mockSubject: IMock<commands.Commands>;
-        let mockTask: IMock<vscode.Task>;
+        let workspace: autoproj.Workspace;
+        let task: vscode.Task;
         const taskDefinition: vscode.TaskDefinition = {
             mode: tasks.WorkspaceTaskMode.UpdateEnvironment,
             type: tasks.TaskType.Workspace,
             workspace: "/path/to/workspace",
         };
         beforeEach(() => {
-            mockWorkspace = mockWorkspaces.addWorkspace("/path/to/workspace");
-            mockTask = mocks.createTask(taskDefinition).mockTask;
-            mockWrapper.setup((x) => x.fetchTasks(tasks.WorkspaceTaskFilter)).
-                returns(() => Promise.resolve([mockTask.object]));
+            task = mocks.createTask(taskDefinition).object;
+            workspace = mockWorkspaces.addWorkspace("/path/to/workspace").object;
+            mockWrapper.setup((x) => x.fetchTasks(tasks.WorkspaceTaskFilter)).returns(() => Promise.resolve([task]));
             mockSubject = Mock.ofInstance(subject);
             subject = mockSubject.target;
         });
@@ -44,7 +43,7 @@ describe("Commands", () => {
         });
         it("handles an exception while updating workspace info", async () => {
             mockWrapper.reset();
-            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(mockWorkspace.object));
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
             await subject.updatePackageInfo();
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
             mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
@@ -56,9 +55,9 @@ describe("Commands", () => {
             mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
         });
         it("updates workspace info", async () => {
-            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(mockWorkspace.object));
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
             await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.executeTask(mockTask.object), Times.once());
+            mockWrapper.verify((x) => x.executeTask(task), Times.once());
         });
     });
     describe("showWorkspacePicker()", () => {

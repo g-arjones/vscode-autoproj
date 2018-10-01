@@ -8,19 +8,19 @@ export function createTask(definition: vscode.TaskDefinition) {
     mockTask.setup((x: any) => x.then).returns(() => undefined);
     mockTask.setup((x) => x.definition).returns(() => definition);
 
-    return { mockTask, task: mockTask.object };
+    return mockTask;
 }
 
 export function createTaskExecution(task: vscode.Task) {
     const mockTaskExecution = Mock.ofType<vscode.TaskExecution>();
     mockTaskExecution.setup((x) => x.task).returns(() => task);
 
-    return { mockTaskExecution, taskExecution: mockTaskExecution.object };
+    return mockTaskExecution;
 }
 
 export function createTaskProcessStartEvent(definition: vscode.TaskDefinition, processId: number = 1111) {
-    const { task } = createTask(definition);
-    const { taskExecution } = createTaskExecution(task);
+    const task = createTask(definition).object;
+    const taskExecution = createTaskExecution(task).object;
     const mockTaskProcessStartEvent = Mock.ofType<vscode.TaskProcessStartEvent>();
 
     mockTaskProcessStartEvent.setup((x) => x.execution).returns(() => taskExecution);
@@ -30,8 +30,8 @@ export function createTaskProcessStartEvent(definition: vscode.TaskDefinition, p
 }
 
 export function createTaskProcessEndEvent(definition: vscode.TaskDefinition, exitCode: number = 0) {
-    const { task } = createTask(definition);
-    const { taskExecution } = createTaskExecution(task);
+    const task = createTask(definition).object;
+    const taskExecution = createTaskExecution(task).object;
     const mockTaskProcessEndEvent = Mock.ofType<vscode.TaskProcessEndEvent>();
 
     mockTaskProcessEndEvent.setup((x) => x.exitCode).returns(() => exitCode);
@@ -45,13 +45,11 @@ export class MockWorkspaces {
 
     private readonly mockWorkspace: Map<string, IMock<autoproj.Workspace>>;
     private readonly mockWorkspaceInfo: Map<string, IMock<autoproj.WorkspaceInfo>>;
-    private readonly mockPackage: Map<string, IMock<autoproj.IPackage>>;
     private folderToWorkspace: Map<string, autoproj.Workspace>;
     private workspaces: Map<string, autoproj.Workspace>;
     public constructor() {
         this.mockWorkspace = new Map();
         this.mockWorkspaceInfo = new Map();
-        this.mockPackage = new Map();
         this.mock = Mock.ofType();
 
         this.folderToWorkspace = new Map();
