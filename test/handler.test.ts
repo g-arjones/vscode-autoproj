@@ -1,15 +1,15 @@
 import { IMock, It, Mock, Times } from "typemoq";
 import * as vscode from "vscode";
-import * as autoproj from "../src/autoproj";
 import * as progress from "../src/progress";
 import * as tasks from "../src/tasks";
 import * as wrappers from "../src/wrappers";
+import * as mocks from "./mocks";
 
 describe("tasks Handler", () => {
     let mockWrapper: IMock<wrappers.VSCode>;
-    let mockWorkspaces: IMock<autoproj.Workspaces>;
     let mockFactory: IMock<typeof progress.createProgressView>;
 
+    let mockWorkspaces: mocks.MockWorkspaces;
     let originalFactory: typeof progress.createProgressView;
     let subject: tasks.Handler;
 
@@ -17,9 +17,9 @@ describe("tasks Handler", () => {
         originalFactory = progress.createProgressView;
 
         mockWrapper = Mock.ofType<wrappers.VSCode>();
-        mockWorkspaces = Mock.ofType<autoproj.Workspaces>();
         mockFactory = Mock.ofInstance(progress.createProgressView);
 
+        mockWorkspaces = new mocks.MockWorkspaces();
         require("../src/progress").createProgressView = mockFactory.object;
         subject = new tasks.Handler(mockWrapper.object, mockWorkspaces.object);
     });
@@ -27,21 +27,10 @@ describe("tasks Handler", () => {
     afterEach(() => {
         require("../src/progress").createProgressView = originalFactory;
     });
-    function createTaskProcessStartEvent(definition: vscode.TaskDefinition) {
-        const mockTaskProcessStartEvent = Mock.ofType<vscode.TaskProcessStartEvent>();
-        const mockTaskExecution = Mock.ofType<vscode.TaskExecution>();
-        const mockTask = Mock.ofType<vscode.Task>();
-
-        mockTask.setup((x) => x.definition).returns(() => definition);
-        mockTaskProcessStartEvent.setup((x) => x.execution).returns(() => mockTaskExecution.object);
-        mockTaskExecution.setup((x) => x.task).returns(() => mockTask.object);
-
-        return mockTaskProcessStartEvent.object;
-    }
     async function testTaskView(task: { mode: tasks.PackageTaskMode | tasks.WorkspaceTaskMode, title: string },
                                 definition: tasks.ITaskDefinition) {
         const mockView = Mock.ofType<progress.ProgressView>();
-        const event = createTaskProcessStartEvent(definition);
+        const event = mocks.createTaskProcessStartEvent(definition);
 
         mockFactory.setup((x) => x(mockWrapper.object, task.title)).returns(() => mockView.object);
 
@@ -66,17 +55,9 @@ describe("tasks Handler", () => {
                     type: tasks.TaskType.Package,
                     workspace: "/path/to/workspace",
                 };
-                testTaskView(packageTask, definition);
+                await testTaskView(packageTask, definition);
             }
         });
-        function setWorkspaceName(root: string, name: string) {
-            const workspaces = new Map<string, autoproj.Workspace>();
-            const mockWorkspace = Mock.ofType<autoproj.Workspace>();
-
-            mockWorkspaces.setup((x) => x.workspaces).returns(() => workspaces);
-            mockWorkspace.setup((x) => x.name).returns(() => name);
-            workspaces.set(root, mockWorkspace.object);
-        }
         it("shows a progress view for workspace tasks", async () => {
             const workspaceTasks = [
                 { mode: tasks.WorkspaceTaskMode.Build, title: "workspace: Building all packages..." },
@@ -87,7 +68,7 @@ describe("tasks Handler", () => {
                 { mode: tasks.WorkspaceTaskMode.UpdateEnvironment, title: "workspace: Updating environment..." },
             ];
 
-            setWorkspaceName("/path/to/workspace", "workspace");
+            mockWorkspaces.addWorkspace("/path/to/workspace");
 
             for (const workspaceTask of workspaceTasks) {
                 const definition: tasks.IWorkspaceTaskDefinition = {
@@ -95,21 +76,10 @@ describe("tasks Handler", () => {
                     type: tasks.TaskType.Workspace,
                     workspace: "/path/to/workspace",
                 };
-                testTaskView(workspaceTask, definition);
+                await testTaskView(workspaceTask, definition);
             }
         });
-        function setPackageName(path: string, name: string) {
-            const mockWorkspace = Mock.ofType<autoproj.Workspace>();
-            const mockWsInfo = Mock.ofType<autoproj.WorkspaceInfo>();
-            const mockPackage = Mock.ofType<autoproj.IPackage>();
-
-            mockWsInfo.setup((x: any) => x.then).returns(() => undefined);
-            mockWorkspaces.setup((x) => x.getWorkspaceFromFolder(path)).returns(() => mockWorkspace.object);
-            mockWorkspace.setup((x) => x.info()).returns(() => Promise.resolve(mockWsInfo.object));
-            mockWsInfo.setup((x) => x.findPackage(path)).returns(() => mockPackage.object);
-            mockPackage.setup((x) => x.name).returns(() => "foobar");
-        }
-        it("gets package name from package definition", () => {
+        it("gets package name from package definition", async () => {
             const packageTask = { mode: tasks.PackageTaskMode.Build, title: "Building foobar..." };
             const definition: tasks.IPackageTaskDefinition = {
                 mode: packageTask.mode,
@@ -117,12 +87,13 @@ describe("tasks Handler", () => {
                 type: tasks.TaskType.Package,
                 workspace: "/path/to/workspace",
             };
-            setPackageName("/path/to/workspace/package", "foobar");
-            testTaskView(packageTask, definition);
+
+            mockWorkspaces.addPackageToWorkspace("/path/to/workspace/package", "/path/to/workspace", "foobar");
+            await testTaskView(packageTask, definition);
         });
         it("does nothing if task is not an autoproj task", async () => {
             const task: vscode.TaskDefinition = { type: "someTask" };
-            const startEvent = createTaskProcessStartEvent(task);
+            const startEvent = mocks.createTaskProcessStartEvent(task);
             await subject.onDidStartTaskProcess(startEvent);
             mockFactory.verify((x) => x(It.isAny(), It.isAny()), Times.never());
         });
@@ -144,7 +115,7 @@ describe("tasks Handler", () => {
             };
             mockFactory.setup((x) => x(mockWrapper.object, packageTask.title)).returns(() => mockView.object);
 
-            const startEvent = createTaskProcessStartEvent(definition);
+            const startEvent = mocks.createTaskProcessStartEvent(definition);
             await subject.onDidStartTaskProcess(startEvent);
 
             definitions.push(definition);
@@ -153,21 +124,10 @@ describe("tasks Handler", () => {
         return { definitions, mockViews };
     }
     describe("onDidEndTaskProcess()", () => {
-        function createTaskProcessEndEvent(definition: vscode.TaskDefinition) {
-            const mockTaskProcessEndEvent = Mock.ofType<vscode.TaskProcessEndEvent>();
-            const mockTaskExecution = Mock.ofType<vscode.TaskExecution>();
-            const mockTask = Mock.ofType<vscode.Task>();
-
-            mockTask.setup((x) => x.definition).returns(() => definition);
-            mockTaskProcessEndEvent.setup((x) => x.execution).returns(() => mockTaskExecution.object);
-            mockTaskExecution.setup((x) => x.task).returns(() => mockTask.object);
-
-            return mockTaskProcessEndEvent.object;
-        }
         it("closes views when tasks ends", async () => {
             const { definitions, mockViews } = await startTestTasks();
             for (const definition of definitions) {
-                const endEvent = createTaskProcessEndEvent(definition);
+                const endEvent = mocks.createTaskProcessEndEvent(definition);
                 subject.onDidEndTaskProcess(endEvent);
             }
             mockViews.forEach((view) => view.verify((x) => x.close(), Times.once()));
@@ -175,7 +135,7 @@ describe("tasks Handler", () => {
         it("does nothing if task is not an autoproj task", async () => {
             const { mockViews } = await startTestTasks();
             const definition: vscode.TaskDefinition = { type: "someTask" };
-            const endEvent = createTaskProcessEndEvent(definition);
+            const endEvent = mocks.createTaskProcessEndEvent(definition);
             subject.onDidEndTaskProcess(endEvent);
             mockViews.forEach((view) => view.verify((x) => x.close(), Times.never()));
         });
