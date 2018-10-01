@@ -1,77 +1,68 @@
 "use strict";
 import * as assert from "assert";
 import { basename, dirname } from "path";
-import * as TypeMoq from "typemoq";
+import { IMock, It, Mock, Times } from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as commands from "../src/commands";
 import * as tasks from "../src/tasks";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
+import * as mocks from "./mocks";
 
 describe("Commands", () => {
-    let mockWorkspaces: TypeMoq.IMock<autoproj.Workspaces>;
-    let mockWrapper: TypeMoq.IMock<wrappers.VSCode>;
+    let mockWorkspaces: mocks.MockWorkspaces;
+    let mockWrapper: IMock<wrappers.VSCode>;
     let subject: commands.Commands;
 
     beforeEach(() => {
-        mockWorkspaces = TypeMoq.Mock.ofType<autoproj.Workspaces>();
-        mockWrapper = TypeMoq.Mock.ofType<wrappers.VSCode>();
-        subject = new commands.Commands(mockWorkspaces.object,
-            mockWrapper.object);
+        mockWorkspaces = new mocks.MockWorkspaces();
+        mockWrapper = Mock.ofType<wrappers.VSCode>();
+        subject = new commands.Commands(mockWorkspaces.object, mockWrapper.object);
     });
     describe("updatePackageInfo()", () => {
-        let mockWorkspace: TypeMoq.IMock<autoproj.Workspace>;
-        let mockSubject: TypeMoq.IMock<commands.Commands>;
-        let mockTask: TypeMoq.IMock<vscode.Task>;
+        let mockWorkspace: IMock<autoproj.Workspace>;
+        let mockSubject: IMock<commands.Commands>;
+        let mockTask: IMock<vscode.Task>;
         const taskDefinition: vscode.TaskDefinition = {
             mode: tasks.WorkspaceTaskMode.UpdateEnvironment,
             type: tasks.TaskType.Workspace,
             workspace: "/path/to/workspace",
         };
         beforeEach(() => {
-            mockWorkspace = TypeMoq.Mock.ofType<autoproj.Workspace>();
-            mockTask = TypeMoq.Mock.ofType<vscode.Task>();
-            mockTask.setup((x: any) => x.then).returns(() => undefined);
-            mockWorkspace.setup((x) => x.root).returns(() => "/path/to/workspace");
-            mockWorkspace.setup((x: any) => x.then).returns(() => undefined);
-            mockTask.setup((x) => x.definition).returns(() => taskDefinition);
+            mockWorkspace = mockWorkspaces.addWorkspace("/path/to/workspace");
+            mockTask = mocks.createTask(taskDefinition).mockTask;
             mockWrapper.setup((x) => x.fetchTasks(tasks.WorkspaceTaskFilter)).
                 returns(() => Promise.resolve([mockTask.object]));
-            mockSubject = TypeMoq.Mock.ofInstance(subject);
+            mockSubject = Mock.ofInstance(subject);
             subject = mockSubject.target;
         });
         it("does nothing if canceled", async () => {
-            mockSubject.setup((x) => x.showWorkspacePicker()).
-                returns(() => Promise.resolve(undefined));
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(undefined));
             await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.executeTask(TypeMoq.It.isAny()), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
         });
         it("handles an exception while updating workspace info", async () => {
             mockWrapper.reset();
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(mockWorkspace.object));
             await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.once());
-            mockWrapper.verify((x) => x.executeTask(TypeMoq.It.isAny()), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
+            mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
         });
         it("handles an exception if workspace is empty", async () => {
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.reject(new Error("test")));
             await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()), TypeMoq.Times.once());
-            mockWrapper.verify((x) => x.executeTask(TypeMoq.It.isAny()), TypeMoq.Times.never());
+            mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
+            mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
         });
         it("updates workspace info", async () => {
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(mockWorkspace.object));
             await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.executeTask(mockTask.object), TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.executeTask(mockTask.object), Times.once());
         });
     });
     describe("showWorkspacePicker()", () => {
         let choices: Array<{ label, description, ws }>;
-        let mockOne: TypeMoq.IMock<autoproj.Workspace>;
-        let mockTwo: TypeMoq.IMock<autoproj.Workspace>;
-        let workspaces: Map<string, autoproj.Workspace>;
-
         function makeChoice(ws: autoproj.Workspace) {
             return {
                 description: basename(dirname(ws.root)),
@@ -80,101 +71,56 @@ describe("Commands", () => {
             };
         }
         beforeEach(() => {
-            workspaces = new Map();
-            mockOne = TypeMoq.Mock.ofType<autoproj.Workspace>();
-            mockTwo = TypeMoq.Mock.ofType<autoproj.Workspace>();
-
-            mockOne.setup((x) => x.root).returns(() => "/ws/one");
-            mockTwo.setup((x) => x.root).returns(() => "/ws/two");
-            mockOne.setup((x: any) => x.then).returns(() => undefined);
-            mockTwo.setup((x: any) => x.then).returns(() => undefined);
-
             choices = [];
-            choices.push(makeChoice(mockOne.object));
-            choices.push(makeChoice(mockTwo.object));
-            workspaces.set("/ws/one", mockOne.object);
-            workspaces.set("/ws/two", mockTwo.object);
         });
         it("throws if there are no autoproj workspaces", async () => {
-            mockWorkspaces.setup((x) => x.workspaces).returns(() => new Map());
             await helpers.assertThrowsAsync(subject.showWorkspacePicker(),
                 /No Autoproj workspace/);
         });
         it("skip picker if there is only one workspace", async () => {
-            const tempWs: Map<string, autoproj.Workspace> = new Map();
-            tempWs.set("/ws/one", mockOne.object);
-            mockWorkspaces.setup((x) => x.workspaces).returns(() => tempWs);
+            const workspace = mockWorkspaces.addWorkspace("/ws/one").object;
             const ws = await subject.showWorkspacePicker();
-            mockWrapper.verify((x) => x.showQuickPick(TypeMoq.It.isAny(),
-                TypeMoq.It.isAny()), TypeMoq.Times.never());
-            assert.strictEqual(ws, mockOne.object);
+            mockWrapper.verify((x) => x.showQuickPick(It.isAny(), It.isAny()), Times.never());
+            assert.strictEqual(ws, workspace);
         });
         it("returns undefined if canceled", async () => {
-            mockWorkspaces.setup((x) => x.workspaces).returns(() => workspaces);
-            mockWorkspaces.setup((x) => x.forEachWorkspace(TypeMoq.It.isAny())).
-                returns((callback) => workspaces.forEach(callback));
-            mockWrapper.setup((x) => x.showQuickPick(choices,
-                TypeMoq.It.isAny())).returns(() => Promise.resolve(undefined));
+            const wsOne = mockWorkspaces.addWorkspace("/ws/one").object;
+            const wsTwo = mockWorkspaces.addWorkspace("/ws/two").object;
+            choices.push(makeChoice(wsOne));
+            choices.push(makeChoice(wsTwo));
 
+            mockWrapper.setup((x) => x.showQuickPick(choices, It.isAny())).returns(() => Promise.resolve(undefined));
             const ws = await subject.showWorkspacePicker();
             assert(!ws);
         });
         it("returns the picked workspace", async () => {
-            mockWorkspaces.setup((x) => x.workspaces).returns(() => workspaces);
-            mockWorkspaces.setup((x) => x.forEachWorkspace(TypeMoq.It.isAny())).
-                returns((callback) => workspaces.forEach(callback));
-            mockWrapper.setup((x) => x.showQuickPick(choices,
-                TypeMoq.It.isAny())).returns(() => Promise.resolve(choices[0]));
+            const wsOne = mockWorkspaces.addWorkspace("/ws/one").object;
+            const wsTwo = mockWorkspaces.addWorkspace("/ws/two").object;
+            choices.push(makeChoice(wsOne));
+            choices.push(makeChoice(wsTwo));
 
+            mockWrapper.setup((x) => x.showQuickPick(choices, It.isAny())).returns(() => Promise.resolve(choices[0]));
             const ws = await subject.showWorkspacePicker();
-            mockWrapper.verify((x) => x.showQuickPick(choices, TypeMoq.It.isAny()),
-                TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.showQuickPick(choices, It.isAny()), Times.once());
             assert.strictEqual(ws, choices[0].ws);
         });
     });
     describe("packagePickerChoices()", () => {
-        let mockWs: TypeMoq.IMock<autoproj.Workspace>;
-        let mockWsInfo: TypeMoq.IMock<autoproj.WorkspaceInfo>;
-        let mockPackageOne: TypeMoq.IMock<autoproj.IPackage>;
-        let mockPackageTwo: TypeMoq.IMock<autoproj.IPackage>;
-        let mockPackageSetOne: TypeMoq.IMock<autoproj.IPackageSet>;
-        let pathToPackage: Map<string, autoproj.IPackage>;
-        let pathToPackageSet: Map<string, autoproj.IPackageSet>;
+        let packageOne: autoproj.IPackage;
+        let packageTwo: autoproj.IPackage;
         beforeEach(() => {
-            mockWs = TypeMoq.Mock.ofType<autoproj.Workspace>();
-            mockWsInfo = TypeMoq.Mock.ofType<autoproj.WorkspaceInfo>();
-            mockPackageOne = TypeMoq.Mock.ofType<autoproj.IPackage>();
-            mockPackageTwo = TypeMoq.Mock.ofType<autoproj.IPackage>();
-            mockPackageSetOne = TypeMoq.Mock.ofType<autoproj.IPackageSet>();
-            pathToPackage = new Map();
-            pathToPackageSet = new Map();
-            mockWs.setup((x) => x.name).returns(() => "to");
-            mockWs.setup((x) => x.root).returns(() => "/path/to");
-            mockWsInfo.setup((x: any) => x.then).returns(() => undefined);
-            mockWsInfo.setup((x) => x.path).returns(() => "/path/to");
-            mockPackageOne.setup((x) => x.srcdir).returns(() => "/path/to/one");
-            mockPackageSetOne.setup((x) => x.user_local_dir).returns(() => "/path/to/autoproj/remotes/set.one");
-            mockPackageTwo.setup((x) => x.srcdir).returns(() => "/path/to/two");
-            mockPackageOne.setup((x) => x.name).returns(() => "one");
-            mockPackageTwo.setup((x) => x.name).returns(() => "two");
-            mockPackageSetOne.setup((x) => x.name).returns(() => "set.one");
-            pathToPackage.set("/path/to/two", mockPackageTwo.object);
-            pathToPackage.set("/path/to/one", mockPackageOne.object);
-            pathToPackageSet.set("/path/to/autoproj/remotes/set.one", mockPackageSetOne.object);
-            mockWorkspaces.setup((x) => x.forEachWorkspace(TypeMoq.It.isAny())).
-                callback((cb) => cb(mockWs.object));
+            packageOne = mockWorkspaces.addPackageToWorkspace("/path/to/one", "/path/to").object;
+            packageTwo = mockWorkspaces.addPackageToWorkspace("/path/to/two", "/path/to").object;
+            mockWorkspaces.addPackageSetToWorkspace("/path/to/autoproj/remotes/set.one", "/path/to");
         });
         it("throws if installation manifest loading fails", async () => {
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
-            mockWs.setup((x) => x.info()).returns(() => Promise.reject("test"));
+            mockWorkspaces.invalidateWorkspaceInfo("/path/to");
             await helpers.assertThrowsAsync(subject.packagePickerChoices(),
                 /Could not load installation manifest/);
         });
         it("returns all packages if workspace is empty", async () => {
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
-            mockWs.setup((x) => x.info()).returns(() => Promise.resolve(mockWsInfo.object));
-            mockWsInfo.setup((x) => x.packages).returns(() => pathToPackage);
-            mockWsInfo.setup((x) => x.packageSets).returns(() => pathToPackageSet);
 
             const choices = await subject.packagePickerChoices();
             assert.equal(choices.length, 4);
@@ -182,14 +128,14 @@ describe("Commands", () => {
                 { name: "autoproj (buildconf)", srcdir: "/path/to/autoproj" });
             assert.strictEqual(choices[0].label, "autoproj");
             assert.strictEqual(choices[0].description, "to (buildconf)");
-            assert.strictEqual(choices[1].pkg, mockPackageOne.object);
+            assert.strictEqual(choices[1].pkg, packageOne);
             assert.strictEqual(choices[1].label, "one");
             assert.strictEqual(choices[1].description, "to");
             assert.deepStrictEqual(choices[2].pkg,
                 { name: "set.one (package set)", srcdir: "/path/to/autoproj/remotes/set.one" });
             assert.strictEqual(choices[2].label, "set.one");
             assert.strictEqual(choices[2].description, "to (package set)");
-            assert.strictEqual(choices[3].pkg, mockPackageTwo.object);
+            assert.strictEqual(choices[3].pkg, packageTwo);
             assert.strictEqual(choices[3].label, "two");
             assert.strictEqual(choices[3].description, "to");
         });
@@ -210,75 +156,63 @@ describe("Commands", () => {
                 uri: vscode.Uri.file("/path/to/one"),
             };
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => [folder1, folder2, folder3]);
-            mockWs.setup((x) => x.info()).returns(() => Promise.resolve(mockWsInfo.object));
-            mockWsInfo.setup((x) => x.packages).returns(() => pathToPackage);
-            mockWsInfo.setup((x) => x.packageSets).returns(() => pathToPackageSet);
 
             const choices = await subject.packagePickerChoices();
             assert.equal(choices.length, 1);
-            assert.strictEqual(choices[0].pkg, mockPackageTwo.object);
+            assert.strictEqual(choices[0].pkg, packageTwo);
             assert.strictEqual(choices[0].label, "two");
             assert.strictEqual(choices[0].description, "to");
         });
     });
     describe("addPackageToWorkspace()", () => {
-        let mockSubject: TypeMoq.IMock<commands.Commands>;
-        let mockPackageOne: TypeMoq.IMock<autoproj.IPackage>;
-        let mockPackageTwo: TypeMoq.IMock<autoproj.IPackage>;
+        let mockSubject: IMock<commands.Commands>;
+        let packageOne: autoproj.IPackage;
+        let packageTwo: autoproj.IPackage;
         let choices: Array<{ label, description, pkg }> = [];
         const options: vscode.QuickPickOptions = {
             matchOnDescription: true,
             placeHolder: "Select a package to add to this workspace",
         };
         beforeEach(() => {
-            mockPackageOne = TypeMoq.Mock.ofType<autoproj.IPackage>();
-            mockPackageTwo = TypeMoq.Mock.ofType<autoproj.IPackage>();
-            mockPackageOne.setup((x) => x.srcdir).returns(() => "/path/to/drivers/one");
-            mockPackageTwo.setup((x) => x.srcdir).returns(() => "/path/to/tools/two");
-            mockPackageOne.setup((x) => x.name).returns(() => "drivers/one");
-            mockPackageTwo.setup((x) => x.name).returns(() => "tools/two");
+            packageOne = mockWorkspaces.addPackageToWorkspace("/path/to/drivers/one", "/path/to").object;
+            packageTwo = mockWorkspaces.addPackageToWorkspace("/path/to/tools/two", "/path/to").object;
             choices = [{
                 description: "to",
                 label: "one",
-                pkg: mockPackageOne.object,
+                pkg: packageOne,
             },
             {
                 description: "to",
                 label: "two",
-                pkg: mockPackageTwo.object,
+                pkg: packageTwo,
             }];
-            mockSubject = TypeMoq.Mock.ofInstance(subject);
+            mockSubject = Mock.ofInstance(subject);
             subject = mockSubject.target;
         });
         it("shows an error message if manifest loading fails", async () => {
-            mockSubject.setup((x) => x.packagePickerChoices()).
-                returns(() => Promise.reject(new Error("test")));
+            mockSubject.setup((x) => x.packagePickerChoices()).returns(() => Promise.reject(new Error("test")));
             await subject.addPackageToWorkspace();
-            mockWrapper.verify((x) => x.showErrorMessage("test"),
-                TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.showErrorMessage("test"), Times.once());
         });
         it("shows a quick pick ui", async () => {
             const promise = Promise.resolve(choices);
-            mockSubject.setup((x) => x.packagePickerChoices()).
-                returns(() => promise);
+            mockSubject.setup((x) => x.packagePickerChoices()).returns(() => promise);
             await subject.addPackageToWorkspace();
 
-            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.isAny()),
-                TypeMoq.Times.never());
-            mockWrapper.verify((x) => x.showQuickPick(promise,
-                options, TypeMoq.It.isAny()), TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
+            mockWrapper.verify((x) => x.showQuickPick(promise, options, It.isAny()), Times.once());
         });
         it("handles an empty workspace", async () => {
             const promise = Promise.resolve(choices);
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
             mockSubject.setup((x) => x.packagePickerChoices()).returns(() => promise);
-            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null, TypeMoq.It.isAny())).returns(() => true);
+            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null, It.isAny())).returns(() => true);
             mockWrapper.setup((x) => x.showQuickPick(promise,
-                options, TypeMoq.It.isAny())).returns(() => Promise.resolve(choices[1]));
+                options, It.isAny())).returns(() => Promise.resolve(choices[1]));
             await subject.addPackageToWorkspace();
 
             mockWrapper.verify((x) => x.updateWorkspaceFolders(0, null,
-                { name: "tools/two", uri: vscode.Uri.file("/path/to/tools/two") }), TypeMoq.Times.once());
+                { name: "tools/two", uri: vscode.Uri.file("/path/to/tools/two") }), Times.once());
         });
         it("keeps the folder list sorted", async () => {
             const folder1: vscode.WorkspaceFolder = {
@@ -294,41 +228,40 @@ describe("Commands", () => {
             const promise = Promise.resolve(choices);
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => [folder1, folder2]);
             mockSubject.setup((x) => x.packagePickerChoices()). returns(() => promise);
-            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null, TypeMoq.It.isAny())).returns(() => true);
+            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null, It.isAny())).returns(() => true);
             mockWrapper.setup((x) => x.showQuickPick(promise,
-                options, TypeMoq.It.isAny())).returns(() => Promise.resolve(choices[0]));
+                options, It.isAny())).returns(() => Promise.resolve(choices[0]));
             await subject.addPackageToWorkspace();
 
             mockWrapper.verify((x) => x.updateWorkspaceFolders(1, null,
-                { name: "drivers/one", uri: vscode.Uri.file("/path/to/drivers/one") }), TypeMoq.Times.once());
+                { name: "drivers/one", uri: vscode.Uri.file("/path/to/drivers/one") }), Times.once());
         });
         it("shows an error if folder could not be added", async () => {
             const promise = Promise.resolve(choices);
             mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
             mockSubject.setup((x) => x.packagePickerChoices()).returns(() => promise);
             mockWrapper.setup((x) => x.showQuickPick(promise,
-                options, TypeMoq.It.isAny())).returns(() => Promise.resolve(choices[1]));
+                options, It.isAny())).returns(() => Promise.resolve(choices[1]));
             mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null,
                     { uri: vscode.Uri.file("/path/to/tools/two") })).returns(() => false);
 
             await subject.addPackageToWorkspace();
-            mockWrapper.verify((x) => x.showErrorMessage("Could not add folder: /path/to/tools/two"),
-                TypeMoq.Times.once());
+            mockWrapper.verify((x) => x.showErrorMessage("Could not add folder: /path/to/tools/two"), Times.once());
         });
     });
     describe("register()", () => {
         function setupWrapper(command: string, callback: (command, cb) => void) {
-            mockWrapper.setup((x) => x.registerAndSubscribeCommand(command, TypeMoq.It.isAny())).callback(callback);
+            mockWrapper.setup((x) => x.registerAndSubscribeCommand(command, It.isAny())).callback(callback);
         }
 
         it("registers all commands", async () => {
             let updatePackageInfoCb: () => Promise<void>;
             let addPackageToWorkspaceCb: () => Promise<void>;
 
-            const mockUpdatePackageInfo = TypeMoq.Mock.ofInstance(() => Promise.resolve());
+            const mockUpdatePackageInfo = Mock.ofInstance(() => Promise.resolve());
             subject.updatePackageInfo = mockUpdatePackageInfo.object;
 
-            const mockAddPackageToWorkspace = TypeMoq.Mock.ofInstance(() => Promise.resolve());
+            const mockAddPackageToWorkspace = Mock.ofInstance(() => Promise.resolve());
             subject.addPackageToWorkspace = mockAddPackageToWorkspace.object;
 
             setupWrapper("autoproj.updatePackageInfo", (command, cb) => updatePackageInfoCb = cb);
@@ -338,8 +271,8 @@ describe("Commands", () => {
             updatePackageInfoCb!();
             addPackageToWorkspaceCb!();
 
-            mockUpdatePackageInfo.verify((x) => x(), TypeMoq.Times.once());
-            mockAddPackageToWorkspace.verify((x) => x(), TypeMoq.Times.once());
+            mockUpdatePackageInfo.verify((x) => x(), Times.once());
+            mockAddPackageToWorkspace.verify((x) => x(), Times.once());
         });
     });
 });
