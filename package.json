@@ -358,6 +358,7 @@
     },
     "devDependencies": {
         "@types/js-yaml": "latest",
+        "@types/mocha": "latest",
         "@types/node": "^7.0.43",
         "decache": "^4.1.0",
         "del": "^3.0.0",
