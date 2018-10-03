@@ -12,9 +12,9 @@ export class Workspaces {
     public devFolder: string | null;
     public workspaces = new Map<string, Workspace>();
     public folderToWorkspace = new Map<string, Workspace>();
-    private workspaceInfoEvent = new vscode.EventEmitter<WorkspaceInfo>();
-    private folderInfoEvent = new vscode.EventEmitter<IPackage | IPackageSet>();
-    private folderInfoDisposables = new Map<string, vscode.Disposable>();
+    private _workspaceInfoEvent = new vscode.EventEmitter<WorkspaceInfo>();
+    private _folderInfoEvent = new vscode.EventEmitter<IPackage | IPackageSet>();
+    private _folderInfoDisposables = new Map<string, vscode.Disposable>();
 
     constructor(devFolder = null) {
         this.devFolder = devFolder;
@@ -22,17 +22,17 @@ export class Workspaces {
 
     public dispose() {
         this.workspaces.forEach((ws) => ws.dispose());
-        this.workspaceInfoEvent.dispose();
-        this.folderInfoEvent.dispose();
-        this.folderInfoDisposables.forEach((d) => d.dispose());
+        this._workspaceInfoEvent.dispose();
+        this._folderInfoEvent.dispose();
+        this._folderInfoDisposables.forEach((d) => d.dispose());
     }
 
     public onWorkspaceInfo(callback: (info: WorkspaceInfo) => any): vscode.Disposable {
-        return this.workspaceInfoEvent.event(callback);
+        return this._workspaceInfoEvent.event(callback);
     }
 
     public onFolderInfo(callback: (info: IPackage | IPackageSet) => any): vscode.Disposable {
-        return this.folderInfoEvent.event(callback);
+        return this._folderInfoEvent.event(callback);
     }
 
     /** Add workspaces that contain some directory paths
@@ -55,7 +55,7 @@ export class Workspaces {
             const ws = new Workspace(wsRoot, loadInfo);
             this.add(ws);
             ws.onInfoUpdated((info) => {
-                this.workspaceInfoEvent.fire(info);
+                this._workspaceInfoEvent.fire(info);
             });
             return { added: true, workspace: ws };
         }
@@ -80,10 +80,10 @@ export class Workspaces {
             const event = workspace.onInfoUpdated((info) => {
                 const pkgInfo = info.find(wsPath);
                 if (pkgInfo) {
-                    this.folderInfoEvent.fire(pkgInfo);
+                    this._folderInfoEvent.fire(pkgInfo);
                 }
             });
-            this.folderInfoDisposables.set(wsPath, event);
+            this._folderInfoDisposables.set(wsPath, event);
         }
         return { added, workspace };
     }
@@ -96,7 +96,7 @@ export class Workspaces {
      */
     public deleteFolder(wsPath: string) {
         const ws = this.folderToWorkspace.get(wsPath);
-        const event = this.folderInfoDisposables.get(wsPath);
+        const event = this._folderInfoDisposables.get(wsPath);
         if (event) {
             event.dispose();
         }

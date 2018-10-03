@@ -12,86 +12,86 @@ function runAutoproj(ws, ...args) {
 export class AutoprojProvider implements vscode.TaskProvider {
     public workspaces: autoproj.Workspaces;
 
-    private watchTasks: Map<string, vscode.Task>;
-    private buildTasks: Map<string, vscode.Task>;
-    private nodepsBuildTasks: Map<string, vscode.Task>;
-    private rebuildTasks: Map<string, vscode.Task>;
-    private forceBuildTasks: Map<string, vscode.Task>;
-    private updateTasks: Map<string, vscode.Task>;
-    private checkoutTasks: Map<string, vscode.Task>;
-    private osdepsTasks: Map<string, vscode.Task>;
-    private updateConfigTasks: Map<string, vscode.Task>;
-    private updateEnvironmentTasks: Map<string, vscode.Task>;
-    private tasksPromise: Promise<vscode.Task[]>;
-    private allTasks: vscode.Task[];
-    private vscode: wrappers.VSCode;
+    private _watchTasks: Map<string, vscode.Task>;
+    private _buildTasks: Map<string, vscode.Task>;
+    private _nodepsBuildTasks: Map<string, vscode.Task>;
+    private _rebuildTasks: Map<string, vscode.Task>;
+    private _forceBuildTasks: Map<string, vscode.Task>;
+    private _updateTasks: Map<string, vscode.Task>;
+    private _checkoutTasks: Map<string, vscode.Task>;
+    private _osdepsTasks: Map<string, vscode.Task>;
+    private _updateConfigTasks: Map<string, vscode.Task>;
+    private _updateEnvironmentTasks: Map<string, vscode.Task>;
+    private _tasksPromise: Promise<vscode.Task[]>;
+    private _allTasks: vscode.Task[];
+    private _vscode: wrappers.VSCode;
 
     constructor(workspaces: autoproj.Workspaces, wrapper: wrappers.VSCode) {
         this.workspaces = workspaces;
-        this.vscode = wrapper;
+        this._vscode = wrapper;
         this.reloadTasks();
     }
 
     public async buildTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.buildTasks, path);
+        return this._getCache(this._buildTasks, path);
     }
 
     public async watchTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.watchTasks, path);
+        return this._getCache(this._watchTasks, path);
     }
 
     public async forceBuildTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.forceBuildTasks, path);
+        return this._getCache(this._forceBuildTasks, path);
     }
 
     public async rebuildTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.rebuildTasks, path);
+        return this._getCache(this._rebuildTasks, path);
     }
 
     public async nodepsBuildTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.nodepsBuildTasks, path);
+        return this._getCache(this._nodepsBuildTasks, path);
     }
 
     public async updateTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.updateTasks, path);
+        return this._getCache(this._updateTasks, path);
     }
 
     public async checkoutTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.checkoutTasks, path);
+        return this._getCache(this._checkoutTasks, path);
     }
 
     public async osdepsTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.osdepsTasks, path);
+        return this._getCache(this._osdepsTasks, path);
     }
 
     public async updateConfigTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.updateConfigTasks, path);
+        return this._getCache(this._updateConfigTasks, path);
     }
 
     public async updateEnvironmentTask(path: string): Promise<vscode.Task> {
-        return this.getCache(this.updateEnvironmentTasks, path);
+        return this._getCache(this._updateEnvironmentTasks, path);
     }
 
     public reloadTasks(): void {
-        this.allTasks = [];
+        this._allTasks = [];
 
-        this.watchTasks = new Map<string, vscode.Task>();
-        this.buildTasks = new Map<string, vscode.Task>();
-        this.nodepsBuildTasks = new Map<string, vscode.Task>();
-        this.forceBuildTasks = new Map<string, vscode.Task>();
-        this.rebuildTasks = new Map<string, vscode.Task>();
-        this.updateTasks = new Map<string, vscode.Task>();
-        this.checkoutTasks = new Map<string, vscode.Task>();
-        this.osdepsTasks = new Map<string, vscode.Task>();
-        this.updateConfigTasks = new Map<string, vscode.Task>();
-        this.updateEnvironmentTasks = new Map<string, vscode.Task>();
+        this._watchTasks = new Map<string, vscode.Task>();
+        this._buildTasks = new Map<string, vscode.Task>();
+        this._nodepsBuildTasks = new Map<string, vscode.Task>();
+        this._forceBuildTasks = new Map<string, vscode.Task>();
+        this._rebuildTasks = new Map<string, vscode.Task>();
+        this._updateTasks = new Map<string, vscode.Task>();
+        this._checkoutTasks = new Map<string, vscode.Task>();
+        this._osdepsTasks = new Map<string, vscode.Task>();
+        this._updateConfigTasks = new Map<string, vscode.Task>();
+        this._updateEnvironmentTasks = new Map<string, vscode.Task>();
 
-        this.tasksPromise = this.createTasksPromise();
+        this._tasksPromise = this._createTasksPromise();
     }
 
     public async provideTasks(token): Promise<vscode.Task[]> {
-        await this.tasksPromise;
-        return this.allTasks;
+        await this._tasksPromise;
+        return this._allTasks;
     }
 
     public resolveTask(task, token) {
@@ -99,40 +99,40 @@ export class AutoprojProvider implements vscode.TaskProvider {
     }
 
     public isTaskEnabled(type: TaskType, mode: PackageTaskMode | WorkspaceTaskMode): boolean {
-        const optionalTasks = this.vscode.getConfiguration("autoproj.optionalTasks");
+        const optionalTasks = this._vscode.getConfiguration("autoproj.optionalTasks");
         if (type === TaskType.Package) {
             const packageTasks = optionalTasks.get<{ [name: string]: boolean }>("package")!;
             switch (mode as PackageTaskMode) {
-                case PackageTaskMode.Rebuild:
-                    return packageTasks.rebuild;
-                case PackageTaskMode.BuildNoDeps:
-                    return packageTasks.buildNoDeps;
-                case PackageTaskMode.Checkout:
-                    return packageTasks.checkout;
-                case PackageTaskMode.ForceBuild:
-                    return packageTasks.forceBuild;
-                case PackageTaskMode.Update:
-                    return packageTasks.update;
+            case PackageTaskMode.Rebuild:
+                return packageTasks.rebuild;
+            case PackageTaskMode.BuildNoDeps:
+                return packageTasks.buildNoDeps;
+            case PackageTaskMode.Checkout:
+                return packageTasks.checkout;
+            case PackageTaskMode.ForceBuild:
+                return packageTasks.forceBuild;
+            case PackageTaskMode.Update:
+                return packageTasks.update;
             }
         } else if (type === TaskType.Workspace) {
             const workspaceTasks = optionalTasks.get<{ [name: string]: boolean }>("workspace")!;
             switch (mode as WorkspaceTaskMode) {
-                case WorkspaceTaskMode.Build:
-                    return workspaceTasks.build;
-                case WorkspaceTaskMode.Checkout:
-                    return workspaceTasks.checkout;
-                case WorkspaceTaskMode.Update:
-                    return workspaceTasks.update;
-                case WorkspaceTaskMode.UpdateConfig:
-                    return workspaceTasks.updateConfig;
-                case WorkspaceTaskMode.Osdeps:
-                    return workspaceTasks.installOsdeps;
+            case WorkspaceTaskMode.Build:
+                return workspaceTasks.build;
+            case WorkspaceTaskMode.Checkout:
+                return workspaceTasks.checkout;
+            case WorkspaceTaskMode.Update:
+                return workspaceTasks.update;
+            case WorkspaceTaskMode.UpdateConfig:
+                return workspaceTasks.updateConfig;
+            case WorkspaceTaskMode.Osdeps:
+                return workspaceTasks.installOsdeps;
             }
         }
         throw new Error("Invalid task type");
     }
 
-    private async createTasksPromise(): Promise<vscode.Task[]> {
+    private async _createTasksPromise(): Promise<vscode.Task[]> {
         this.workspaces.forEachWorkspace((ws) => {
             const build = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Build);
             const update = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Update);
@@ -140,33 +140,33 @@ export class AutoprojProvider implements vscode.TaskProvider {
             const updateConfig = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.UpdateConfig);
             const osdeps = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Osdeps);
 
-            this.addTask(ws.root, this.createWatchTask(`${ws.name}: Watch`, ws), this.watchTasks);
-            this.addTask(ws.root, this.createUpdateEnvironmentTask(`${ws.name}: Update Environment`, ws),
-                this.updateEnvironmentTasks);
+            this._addTask(ws.root, this._createWatchTask(`${ws.name}: Watch`, ws), this._watchTasks);
+            this._addTask(ws.root, this._createUpdateEnvironmentTask(`${ws.name}: Update Environment`, ws),
+                this._updateEnvironmentTasks);
 
             if (build) {
-                this.addTask(ws.root, this.createBuildTask(`${ws.name}: Build all packages`,
-                    ws, "workspace"), this.buildTasks);
+                this._addTask(ws.root, this._createBuildTask(`${ws.name}: Build all packages`,
+                    ws, "workspace"), this._buildTasks);
             }
 
             if (checkout) {
-                this.addTask(ws.root, this.createCheckoutTask(`${ws.name}: Checkout all packages`,
-                    ws, "workspace"), this.checkoutTasks);
+                this._addTask(ws.root, this._createCheckoutTask(`${ws.name}: Checkout all packages`,
+                    ws, "workspace"), this._checkoutTasks);
             }
 
             if (osdeps) {
-                this.addTask(ws.root, this.createOsdepsTask(`${ws.name}: Install OS Dependencies`, ws),
-                    this.osdepsTasks);
+                this._addTask(ws.root, this._createOsdepsTask(`${ws.name}: Install OS Dependencies`, ws),
+                    this._osdepsTasks);
             }
 
             if (updateConfig) {
-                this.addTask(ws.root, this.createUpdateConfigTask(`${ws.name}: Update Configuration`, ws),
-                    this.updateConfigTasks);
+                this._addTask(ws.root, this._createUpdateConfigTask(`${ws.name}: Update Configuration`, ws),
+                    this._updateConfigTasks);
             }
 
             if (update) {
-                this.addTask(ws.root, this.createUpdateTask(`${ws.name}: Update all packages`, ws, "workspace"),
-                    this.updateTasks);
+                this._addTask(ws.root, this._createUpdateTask(`${ws.name}: Update all packages`, ws, "workspace"),
+                    this._updateTasks);
             }
         });
 
@@ -187,39 +187,39 @@ export class AutoprojProvider implements vscode.TaskProvider {
             const checkout = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Checkout);
             const update = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Update);
 
-            this.addTask(folder, this.createPackageBuildTask(`${ws.name}: Build ${relative}`, ws, folder),
-                this.buildTasks);
+            this._addTask(folder, this._createPackageBuildTask(`${ws.name}: Build ${relative}`, ws, folder),
+                this._buildTasks);
 
             if (checkout) {
-                this.addTask(folder, this.createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
-                    this.checkoutTasks);
+                this._addTask(folder, this._createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
+                    this._checkoutTasks);
             }
 
             if (rebuild) {
-                this.addTask(folder, this.createPackageRebuildTask(`${ws.name}: Rebuild ${relative} (nodeps)`,
-                    ws, folder), this.rebuildTasks);
+                this._addTask(folder, this._createPackageRebuildTask(`${ws.name}: Rebuild ${relative} (nodeps)`,
+                    ws, folder), this._rebuildTasks);
             }
 
             if (forceBuild) {
-                this.addTask(folder, this.createPackageForceBuildTask(`${ws.name}: Force Build ${relative} (nodeps)`,
-                    ws, folder), this.forceBuildTasks);
+                this._addTask(folder, this._createPackageForceBuildTask(`${ws.name}: Force Build ${relative} (nodeps)`,
+                    ws, folder), this._forceBuildTasks);
             }
 
             if (buildNoDeps) {
-                this.addTask(folder, this.createPackageNodepsBuildTask(`${ws.name}: Build ${relative} (nodeps)`, ws,
-                    folder), this.nodepsBuildTasks);
+                this._addTask(folder, this._createPackageNodepsBuildTask(`${ws.name}: Build ${relative} (nodeps)`, ws,
+                    folder), this._nodepsBuildTasks);
             }
 
             if (update) {
-                this.addTask(folder, this.createPackageUpdateTask(`${ws.name}: Update ${relative}`, ws, folder),
-                    this.updateTasks);
+                this._addTask(folder, this._createPackageUpdateTask(`${ws.name}: Update ${relative}`, ws, folder),
+                    this._updateTasks);
             }
         }
-        return this.allTasks;
+        return this._allTasks;
     }
 
-    private createTask(name, ws, type, defs = {}, args: string[] = [],
-                       scope: vscode.TaskScope | vscode.WorkspaceFolder) {
+    private _createTask(name, ws, type, defs = {}, args: string[] = [],
+                        scope: vscode.TaskScope | vscode.WorkspaceFolder) {
         const definition = { type: `autoproj-${type}`, workspace: ws.root, ...defs };
         const exec = runAutoproj(ws, ...args);
         const task = new vscode.Task(definition, scope, name, "autoproj", exec, []);
@@ -227,19 +227,19 @@ export class AutoprojProvider implements vscode.TaskProvider {
         return task;
     }
 
-    private createWorkspaceTask(name, ws, mode, defs = {}, args: string[] = []) {
+    private _createWorkspaceTask(name, ws, mode, defs = {}, args: string[] = []) {
         // vscode currently does not support workspace and global tasks
         // so we just use scope = vscode.workspaces.workspace[0] (this was the behavior of the,
         // now deprecated constructor)
-        return this.createTask(name, ws, "workspace", { mode, ...defs }, args, this.vscode.workspaceFolders![0]);
+        return this._createTask(name, ws, "workspace", { mode, ...defs }, args, this._vscode.workspaceFolders![0]);
     }
 
-    private createOsdepsTask(name, ws, defs = {}, args: string[] = []) {
-        return this.createWorkspaceTask(name, ws, "osdeps", defs, ["osdeps", "--color", ...args]);
+    private _createOsdepsTask(name, ws, defs = {}, args: string[] = []) {
+        return this._createWorkspaceTask(name, ws, "osdeps", defs, ["osdeps", "--color", ...args]);
     }
 
-    private createWatchTask(name, ws, defs = {}, args: string[] = []) {
-        const task = this.createWorkspaceTask(name, ws, "watch", defs, ["watch", "--show-events", ...args]);
+    private _createWatchTask(name, ws, defs = {}, args: string[] = []) {
+        const task = this._createWorkspaceTask(name, ws, "watch", defs, ["watch", "--show-events", ...args]);
         task.isBackground = true;
         task.presentationOptions = {
             reveal: vscode.TaskRevealKind.Never,
@@ -250,9 +250,9 @@ export class AutoprojProvider implements vscode.TaskProvider {
     // vscode currently does not support workspace and global tasks
     // so we just use scope = vscode.workspaces.workspace[0] (this was the behavior of the,
     // now deprecated constructor)
-    private createBuildTask(name, ws, type, defs = {}, args: string[] = [],
-                            scope = this.vscode.workspaceFolders![0]) {
-        const task = this.createTask(name, ws, type, { mode: "build", ...defs }, ["build", "--tool", ...args], scope);
+    private _createBuildTask(name, ws, type, defs = {}, args: string[] = [],
+                             scope = this._vscode.workspaceFolders![0]) {
+        const task = this._createTask(name, ws, type, { mode: "build", ...defs }, ["build", "--tool", ...args], scope);
         task.group = vscode.TaskGroup.Build;
         task.problemMatchers = [
             "$autoproj-cmake-configure-error-relative",
@@ -270,24 +270,24 @@ export class AutoprojProvider implements vscode.TaskProvider {
     // vscode currently does not support workspace and global tasks
     // so we just use scope = vscode.workspaces.workspace[0] (this was the behavior of the,
     // now deprecated constructor)
-    private createUpdateTask(name, ws, type, defs = {}, args: string[] = [],
-                             scope = this.vscode.workspaceFolders![0]) {
-        const task = this.createTask(name, ws, type,
-            { mode: "update",  ...defs }, ["update", "--progress=f", "-k", "--color", ...args], scope);
+    private _createUpdateTask(name, ws, type, defs = {}, args: string[] = [],
+                              scope = this._vscode.workspaceFolders![0]) {
+        const task = this._createTask(name, ws, type,
+            { mode: "update", ...defs }, ["update", "--progress=f", "-k", "--color", ...args], scope);
         task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private createUpdateConfigTask(name, ws, defs = {}, args: string[] = []) {
-        const task = this.createWorkspaceTask(name, ws, "update-config",
-            defs, [ "update", "--progress=f", "-k", "--color", "--config", ...args]);
+    private _createUpdateConfigTask(name, ws, defs = {}, args: string[] = []) {
+        const task = this._createWorkspaceTask(name, ws, "update-config",
+            defs, ["update", "--progress=f", "-k", "--color", "--config", ...args]);
         task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private createUpdateEnvironmentTask(name, ws, defs = {}, args: string[] = []) {
-        const task = this.createWorkspaceTask(name, ws, "update-environment",
-            defs, [ "envsh", "--progress=f", "--color", ...args]);
+    private _createUpdateEnvironmentTask(name, ws, defs = {}, args: string[] = []) {
+        const task = this._createWorkspaceTask(name, ws, "update-environment",
+            defs, ["envsh", "--progress=f", "--color", ...args]);
         task.problemMatchers = ["$autoproj"];
         task.presentationOptions = {
             reveal: vscode.TaskRevealKind.Silent,
@@ -296,52 +296,55 @@ export class AutoprojProvider implements vscode.TaskProvider {
         return task;
     }
 
-    private createCheckoutTask(name, ws, type, defs = {}, args: string[] = []) {
+    private _createCheckoutTask(name, ws, type, defs = {}, args: string[] = []) {
         // vscode currently does not support workspace and global tasks
         // so we just use scope = vscode.workspaces.workspace[0] (this was the behavior of the,
         // now deprecated constructor)
-        const wsFolder = this.vscode.workspaceFolders![0];
-        const task = this.createUpdateTask(name, ws, type,
+        const wsFolder = this._vscode.workspaceFolders![0];
+        const task = this._createUpdateTask(name, ws, type,
             { mode: "checkout", ...defs }, ["--checkout-only", ...args], wsFolder);
         task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private createPackageBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
-        const wsFolder = this.vscode.getWorkspaceFolder(folder);
-        return this.createBuildTask(name, ws, "package", { path: folder, ...defs }, [...args, folder], wsFolder);
+    private _createPackageBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
+        const wsFolder = this._vscode.getWorkspaceFolder(folder);
+        return this._createBuildTask(name, ws, "package", { path: folder, ...defs }, [...args, folder], wsFolder);
     }
 
-    private createPackageNodepsBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
-        return this.createPackageBuildTask(name, ws, folder, { mode: "build-no-deps", ...defs }, ["--deps=f", ...args]);
+    private _createPackageNodepsBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
+        return this._createPackageBuildTask(name, ws, folder,
+            { mode: "build-no-deps", ...defs }, ["--deps=f", ...args]);
     }
 
-    private createPackageForceBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
-        return this.createPackageBuildTask(name, ws, folder,
+    private _createPackageForceBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
+        return this._createPackageBuildTask(name, ws, folder,
             { mode: "force-build", ...defs }, ["--force", "--deps=f", "--no-confirm", ...args]);
     }
 
-    private createPackageRebuildTask(name, ws, folder, defs = {}, args: string[] = []) {
-        return this.createPackageBuildTask(name, ws, folder,
+    private _createPackageRebuildTask(name, ws, folder, defs = {}, args: string[] = []) {
+        return this._createPackageBuildTask(name, ws, folder,
             { mode: "rebuild", ...defs }, ["--rebuild", "--deps=f", "--no-confirm", ...args]);
     }
 
-    private createPackageUpdateTask(name, ws, folder, defs = {}, args: string[] = []) {
-        const wsFolder = this.vscode.getWorkspaceFolder(folder);
-        const task = this.createUpdateTask(name, ws, "package", { path: folder, ...defs }, [...args, folder], wsFolder);
+    private _createPackageUpdateTask(name, ws, folder, defs = {}, args: string[] = []) {
+        const wsFolder = this._vscode.getWorkspaceFolder(folder);
+        const task = this._createUpdateTask(name, ws, "package",
+            { path: folder, ...defs }, [...args, folder], wsFolder);
+
         task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private createPackageCheckoutTask(name, ws, folder, defs = {}, args: string[] = []) {
-        const task = this.createPackageUpdateTask(name, ws, folder,
+    private _createPackageCheckoutTask(name, ws, folder, defs = {}, args: string[] = []) {
+        const task = this._createPackageUpdateTask(name, ws, folder,
             { mode: "checkout", ...defs }, ["--checkout-only", ...args]);
         task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private async getCache(cache, key): Promise<vscode.Task> {
-        await this.tasksPromise;
+    private async _getCache(cache, key): Promise<vscode.Task> {
+        await this._tasksPromise;
         const value = cache.get(key);
         if (value) {
             return value;
@@ -349,8 +352,8 @@ export class AutoprojProvider implements vscode.TaskProvider {
         throw new Error("no entry for " + key);
     }
 
-    private addTask(root: string, task: vscode.Task, cache: Map<string, vscode.Task>) {
-        this.allTasks.push(task);
+    private _addTask(root: string, task: vscode.Task, cache: Map<string, vscode.Task>) {
+        this._allTasks.push(task);
         cache.set(root, task);
     }
 }

@@ -9,35 +9,35 @@ import * as watcher from "./watcher";
 import * as wrappers from "./wrappers";
 
 export class EventHandler implements vscode.Disposable {
-    private wrapper: wrappers.VSCode;
-    private watcher: watcher.FileWatcher;
-    private workspaces: autoproj.Workspaces;
-    private workspaceRootToPid: Map<string, number>;
+    private _wrapper: wrappers.VSCode;
+    private _watcher: watcher.FileWatcher;
+    private _workspaces: autoproj.Workspaces;
+    private _workspaceRootToPid: Map<string, number>;
 
     constructor(wrapper: wrappers.VSCode, fileWatcher: watcher.FileWatcher,
                 workspaces: autoproj.Workspaces) {
-        this.wrapper = wrapper;
-        this.watcher = fileWatcher;
-        this.workspaces = workspaces;
-        this.workspaceRootToPid = new Map();
+        this._wrapper = wrapper;
+        this._watcher = fileWatcher;
+        this._workspaces = workspaces;
+        this._workspaceRootToPid = new Map();
     }
 
     public dispose() {
-        for (const [, pid] of this.workspaceRootToPid) {
+        for (const [, pid] of this._workspaceRootToPid) {
             try {
-                this.wrapper.killProcess(pid, "SIGINT");
+                this._wrapper.killProcess(pid, "SIGINT");
             } catch (error) {
                 // either the user terminated the task or "autoproj watch" failed
             }
         }
-        this.workspaceRootToPid.clear();
+        this._workspaceRootToPid.clear();
     }
 
     public onDidStartTaskProcess(event: vscode.TaskProcessStartEvent) {
         const task = event.execution.task;
         if (task.definition.type === tasks.TaskType.Workspace &&
             task.definition.mode === tasks.WorkspaceTaskMode.Watch) {
-            this.workspaceRootToPid.set(task.definition.workspace, event.processId);
+            this._workspaceRootToPid.set(task.definition.workspace, event.processId);
         }
     }
 
@@ -45,44 +45,44 @@ export class EventHandler implements vscode.Disposable {
         try {
             await ws.reload();
         } catch (err) {
-            this.wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
+            this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
         }
     }
 
     public async onWorkspaceFolderAdded(folder: vscode.WorkspaceFolder): Promise<void> {
-        const { added, workspace } = this.workspaces.addFolder(folder.uri.fsPath);
+        const { added, workspace } = this._workspaces.addFolder(folder.uri.fsPath);
         if (added && workspace) {
             try {
                 await workspace.info();
             } catch (err) {
-                this.wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
+                this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
             try {
-                const allTasks = await this.wrapper.fetchTasks(tasks.WorkspaceTaskFilter);
+                const allTasks = await this._wrapper.fetchTasks(tasks.WORKSPACE_TASK_FILTER);
                 const watchTask = allTasks.find((task) => task.definition.mode === tasks.WorkspaceTaskMode.Watch &&
                                                           task.definition.workspace === workspace.root);
 
-                this.wrapper.executeTask(watchTask!);
+                this._wrapper.executeTask(watchTask!);
             } catch (err) {
-                this.wrapper.showErrorMessage(`Could not start autoproj watch task: ${err.message}`);
+                this._wrapper.showErrorMessage(`Could not start autoproj watch task: ${err.message}`);
             }
             this.watchManifest(workspace);
         }
     }
 
     public async onWorkspaceFolderRemoved(folder: vscode.WorkspaceFolder): Promise<void> {
-        const deletedWs = this.workspaces.deleteFolder(folder.uri.fsPath);
+        const deletedWs = this._workspaces.deleteFolder(folder.uri.fsPath);
         if (deletedWs) {
             this.unwatchManifest(deletedWs);
 
-            const pid = this.workspaceRootToPid.get(deletedWs.root);
+            const pid = this._workspaceRootToPid.get(deletedWs.root);
             if (pid) {
                 try {
-                    this.wrapper.killProcess(pid, "SIGINT");
+                    this._wrapper.killProcess(pid, "SIGINT");
                 } catch (error) {
                     // either the user stopped the task or it "autoproj watch" failed
                 }
-                this.workspaceRootToPid.delete(deletedWs.root);
+                this._workspaceRootToPid.delete(deletedWs.root);
             }
         }
     }
@@ -90,17 +90,17 @@ export class EventHandler implements vscode.Disposable {
     public watchManifest(ws: autoproj.Workspace): void {
         const manifestPath = autoproj.installationManifestPath(ws.root);
         try {
-            this.watcher.startWatching(manifestPath, () => this.onManifestChanged(ws));
+            this._watcher.startWatching(manifestPath, () => this.onManifestChanged(ws));
         } catch (err) {
-            this.wrapper.showErrorMessage(err.message);
+            this._wrapper.showErrorMessage(err.message);
         }
     }
 
     public unwatchManifest(ws: autoproj.Workspace): void {
         try {
-            this.watcher.stopWatching(autoproj.installationManifestPath(ws.root));
+            this._watcher.stopWatching(autoproj.installationManifestPath(ws.root));
         } catch (err) {
-            this.wrapper.showErrorMessage(err.message);
+            this._wrapper.showErrorMessage(err.message);
         }
     }
 }

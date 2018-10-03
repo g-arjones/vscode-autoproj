@@ -17,15 +17,15 @@ export class Workspace {
     public name: string;
     // The workspace root directory
     public readonly root: string;
-    private infoPromise: Promise<WorkspaceInfo>;
-    private infoUpdatedEvent: vscode.EventEmitter<WorkspaceInfo>;
+    private _infoPromise: Promise<WorkspaceInfo>;
+    private _infoUpdatedEvent: vscode.EventEmitter<WorkspaceInfo>;
 
     constructor(root: string, loadInfo: boolean = true) {
         this.root = root;
         this.name = path.basename(root);
-        this.infoUpdatedEvent = new vscode.EventEmitter<WorkspaceInfo>();
+        this._infoUpdatedEvent = new vscode.EventEmitter<WorkspaceInfo>();
         if (loadInfo) {
-            this.infoPromise = this.createInfoPromise();
+            this._infoPromise = this._createInfoPromise();
         }
     }
 
@@ -34,32 +34,32 @@ export class Workspace {
     }
 
     public loadingInfo(): boolean {
-        return this.infoPromise !== undefined;
+        return this._infoPromise !== undefined;
     }
 
     public reload() {
-        this.infoPromise = this.createInfoPromise();
-        this.infoPromise.then((info) => { this.infoUpdatedEvent.fire(info); });
-        return this.infoPromise;
+        this._infoPromise = this._createInfoPromise();
+        this._infoPromise.then((info) => { this._infoUpdatedEvent.fire(info); });
+        return this._infoPromise;
     }
 
     public dispose() {
-        this.infoUpdatedEvent.dispose();
+        this._infoUpdatedEvent.dispose();
     }
 
     public onInfoUpdated(callback: (info: WorkspaceInfo) => any): vscode.Disposable {
-        return this.infoUpdatedEvent.event(callback);
+        return this._infoUpdatedEvent.event(callback);
     }
 
     public info(): Promise<WorkspaceInfo> {
-        if (this.infoPromise) {
-            return this.infoPromise;
+        if (this._infoPromise) {
+            return this._infoPromise;
         } else {
             return this.reload();
         }
     }
 
-    private createInfoPromise() {
+    private _createInfoPromise() {
         return loadWorkspaceInfo(this.root);
     }
 }

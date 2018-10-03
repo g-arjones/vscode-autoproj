@@ -43,25 +43,25 @@ export function createTaskProcessEndEvent(definition: vscode.TaskDefinition, exi
 export class MockWorkspaces {
     public readonly mock: IMock<autoproj.Workspaces>;
 
-    private readonly mockWorkspace: Map<string, IMock<autoproj.Workspace>>;
-    private readonly mockWorkspaceInfo: Map<string, IMock<autoproj.WorkspaceInfo>>;
-    private folderToWorkspace: Map<string, autoproj.Workspace>;
-    private workspaces: Map<string, autoproj.Workspace>;
+    private readonly _mockWorkspace: Map<string, IMock<autoproj.Workspace>>;
+    private readonly _mockWorkspaceInfo: Map<string, IMock<autoproj.WorkspaceInfo>>;
+    private _folderToWorkspace: Map<string, autoproj.Workspace>;
+    private _workspaces: Map<string, autoproj.Workspace>;
     public constructor() {
-        this.mockWorkspace = new Map();
-        this.mockWorkspaceInfo = new Map();
+        this._mockWorkspace = new Map();
+        this._mockWorkspaceInfo = new Map();
         this.mock = Mock.ofType();
 
-        this.folderToWorkspace = new Map();
-        this.workspaces = new Map();
+        this._folderToWorkspace = new Map();
+        this._workspaces = new Map();
 
-        this.mock.setup((x) => x.folderToWorkspace).returns(() => this.folderToWorkspace);
-        this.mock.setup((x) => x.workspaces).returns(() => this.workspaces);
+        this.mock.setup((x) => x.folderToWorkspace).returns(() => this._folderToWorkspace);
+        this.mock.setup((x) => x.workspaces).returns(() => this._workspaces);
         this.mock.setup((x) => x.forEachFolder(It.isAny())).returns((callback) =>
-            this.folderToWorkspace.forEach(callback));
+            this._folderToWorkspace.forEach(callback));
 
         this.mock.setup((x) => x.forEachWorkspace(It.isAny())).returns((callback) =>
-            this.workspaces.forEach(callback));
+            this._workspaces.forEach(callback));
     }
 
     public get object() { return this.mock.object; }
@@ -74,17 +74,17 @@ export class MockWorkspaces {
         mockWorkspace.setup((x) => x.name).returns(() => name);
         mockWorkspace.setup((x) => x.root).returns(() => root);
 
-        this.mockWorkspace.set(root, mockWorkspace);
+        this._mockWorkspace.set(root, mockWorkspace);
         this.object.workspaces.set(root, mockWorkspace.object);
         return mockWorkspace;
     }
 
     public resetWorkspace(root: string) {
-        let mockWs = this.mockWorkspace.get(root);
+        let mockWs = this._mockWorkspace.get(root);
 
         if (!mockWs) {
             this.addWorkspace(root);
-            mockWs = this.mockWorkspace.get(root)!;
+            mockWs = this._mockWorkspace.get(root)!;
         }
 
         const name = mockWs.object.name;
@@ -111,19 +111,19 @@ export class MockWorkspaces {
         mockWs.setup((x) => x.info()).returns(() => Promise.resolve(mockWsInfo.object));
         mockWs.setup((x) => x.reload()).returns(() => Promise.resolve(mockWsInfo.object));
 
-        this.mockWorkspaceInfo.set(root, mockWsInfo);
+        this._mockWorkspaceInfo.set(root, mockWsInfo);
     }
 
     public addPackageToWorkspace(pkgPath: string, wsRoot: string, name: string = path.relative(wsRoot, pkgPath)):
                                  IMock<autoproj.IPackage> {
-        let mockWorkspace = this.mockWorkspace.get(wsRoot);
-        let mockWsInfo = this.mockWorkspaceInfo.get(wsRoot);
+        let mockWorkspace = this._mockWorkspace.get(wsRoot);
+        let mockWsInfo = this._mockWorkspaceInfo.get(wsRoot);
         const mockPackage = Mock.ofType<autoproj.IPackage>();
 
         if (!mockWsInfo) {
             this.createWorkspaceInfo(wsRoot);
-            mockWorkspace = this.mockWorkspace.get(wsRoot)!;
-            mockWsInfo = this.mockWorkspaceInfo.get(wsRoot)!;
+            mockWorkspace = this._mockWorkspace.get(wsRoot)!;
+            mockWsInfo = this._mockWorkspaceInfo.get(wsRoot)!;
         }
 
         this.mock.setup((x) => x.getWorkspaceFromFolder(pkgPath)).returns(() => mockWorkspace!.object);
@@ -143,17 +143,17 @@ export class MockWorkspaces {
         mockWs.setup((x) => x.info()).returns(() => Promise.reject(new Error("Invalid info")));
         mockWs.setup((x) => x.reload()).returns(() => Promise.reject(new Error("Invalid info")));
 
-        this.mockWorkspaceInfo.delete(root);
+        this._mockWorkspaceInfo.delete(root);
     }
 
     public addPackageSetToWorkspace(pkgPath: string, wsRoot: string,
                                     name: string = path.basename(pkgPath)): IMock<autoproj.IPackageSet> {
-        let mockWsInfo = this.mockWorkspaceInfo.get(wsRoot);
+        let mockWsInfo = this._mockWorkspaceInfo.get(wsRoot);
         const mockPackageSet = Mock.ofType<autoproj.IPackageSet>();
 
         if (!mockWsInfo) {
             this.createWorkspaceInfo(wsRoot);
-            mockWsInfo = this.mockWorkspaceInfo.get(wsRoot)!;
+            mockWsInfo = this._mockWorkspaceInfo.get(wsRoot)!;
         }
 
         mockWsInfo.setup((x) => x.findPackageSet(pkgPath)).returns(() => mockPackageSet.object);

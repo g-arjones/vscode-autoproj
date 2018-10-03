@@ -18,8 +18,7 @@ const testRunner: any = IstanbulTestRunner;
 testRunner.configure({
     ui: "bdd",       // the TDD UI is being used in extension.test.ts (suite, test, etc.)
     useColors: true, // colored output from test results
-},
-{
+}, {
     coverConfig: "../../coverconfig.json",
 });
 
