@@ -354,15 +354,15 @@
         "rebornix.ruby"
     ],
     "dependencies": {
-        "js-yaml": "*"
+        "js-yaml": "^3.12.0"
     },
     "devDependencies": {
-        "@types/js-yaml": "latest",
-        "@types/mocha": "latest",
+        "@types/js-yaml": "^3.11.2",
+        "@types/mocha": "^5.2.5",
         "@types/node": "^7.0.43",
         "decache": "^4.1.0",
         "del": "^3.0.0",
-        "fs-temp": "latest",
+        "fs-temp": "^1.1.2",
         "gulp": "^3.9.1",
         "gulp-coveralls": "^0.1.4",
         "gulp-json-editor": "^2.2.2",
@@ -374,7 +374,7 @@
         "tslint-consistent-codestyle": "^1.13.3",
         "tslint-eslint-rules": "^5.4.0",
         "tslint-microsoft-contrib": "^5.2.1",
-        "typemoq": "latest",
+        "typemoq": "^2.1.0",
         "typescript": "^2.6.1",
         "vscode": "^1.1.21"
     }
