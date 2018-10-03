@@ -2,8 +2,6 @@
     "enabled": false,
     "relativeSourcePath": "../src/",
     "relativeCoverageDir": "../../coverage",
-    "ignorePatterns": [
-        "**/wrappers.*"
-    ],
+    "ignorePatterns": ["**/wrappers.*"],
     "verbose": false
 }
