@@ -39,8 +39,8 @@ export interface IPackageTaskDefinition extends ITaskDefinition {
     path: string;
 }
 
-export const WorkspaceTaskFilter: vscode.TaskFilter = { type: TaskType.Workspace };
-export const PackageTaskFilter: vscode.TaskFilter = { type: TaskType.Package };
+export const WORKSPACE_TASK_FILTER: vscode.TaskFilter = { type: TaskType.Workspace };
+export const PACKAGE_TASK_FILTER: vscode.TaskFilter = { type: TaskType.Package };
 
 export function definitionsEqual(first: ITaskDefinition, second: ITaskDefinition) {
     if (first.type === second.type && first.workspace === second.workspace &&

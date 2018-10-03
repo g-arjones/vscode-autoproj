@@ -32,7 +32,7 @@ describe("Commands", () => {
         beforeEach(() => {
             task = mocks.createTask(taskDefinition).object;
             workspace = mockWorkspaces.addWorkspace("/path/to/workspace").object;
-            mockWrapper.setup((x) => x.fetchTasks(tasks.WorkspaceTaskFilter)).returns(() => Promise.resolve([task]));
+            mockWrapper.setup((x) => x.fetchTasks(tasks.WORKSPACE_TASK_FILTER)).returns(() => Promise.resolve([task]));
             mockSubject = Mock.ofInstance(subject);
             subject = mockSubject.target;
         });

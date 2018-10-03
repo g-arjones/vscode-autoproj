@@ -6,10 +6,10 @@ import * as vscode from "vscode";
  * harness is fairly bad at
  */
 export class VSCode {
-    private extensionContext: vscode.ExtensionContext;
+    private _extensionContext: vscode.ExtensionContext;
 
     public constructor(extensionContext: vscode.ExtensionContext) {
-        this.extensionContext = extensionContext;
+        this._extensionContext = extensionContext;
     }
 
     public get workspaceFolders(): vscode.WorkspaceFolder[] | undefined {
@@ -31,7 +31,7 @@ export class VSCode {
 
     public registerAndSubscribeCommand(name: string, fn): void {
         const cmd = vscode.commands.registerCommand(name, fn);
-        this.extensionContext.subscriptions.push(cmd);
+        this._extensionContext.subscriptions.push(cmd);
     }
 
     public showErrorMessage<T extends vscode.MessageItem>(message: string, ...items: T[]): Thenable<T | undefined> {
@@ -55,10 +55,10 @@ export class VSCode {
         return vscode.tasks.fetchTasks(filter);
     }
 
-    public withProgress<R>(
+    public withProgress<T>(
         options: vscode.ProgressOptions,
         task: (progress: vscode.Progress<{ message?: string; increment?: number }>,
-               token: vscode.CancellationToken) => Thenable<R>): Thenable<R> {
+               token: vscode.CancellationToken) => Thenable<T>): Thenable<T> {
         return vscode.window.withProgress(options, task);
     }
 

@@ -5,12 +5,12 @@ import * as tasks from "./tasks";
 import * as wrappers from "./wrappers";
 
 export class Commands {
-    constructor(private readonly workspaces: autoproj.Workspaces,
-                private readonly vscode: wrappers.VSCode) {
+    constructor(private readonly _workspaces: autoproj.Workspaces,
+                private readonly _vscode: wrappers.VSCode) {
     }
 
     public async showWorkspacePicker(): Promise<autoproj.Workspace | undefined> {
-        if (this.workspaces.workspaces.size === 0) {
+        if (this._workspaces.workspaces.size === 0) {
             throw new Error("No Autoproj workspace found");
         }
         const choices: Array<{ label, description, ws }> = [];
@@ -22,16 +22,16 @@ export class Commands {
             };
             choices.push(choice);
         }
-        if (this.workspaces.workspaces.size === 1) {
-            return this.workspaces.workspaces.values().next().value;
+        if (this._workspaces.workspaces.size === 1) {
+            return this._workspaces.workspaces.values().next().value;
         }
-        this.workspaces.forEachWorkspace((workspace: autoproj.Workspace) => {
+        this._workspaces.forEachWorkspace((workspace: autoproj.Workspace) => {
             addChoice(workspace);
         });
         const options: QuickPickOptions = {
             placeHolder: "Select a workspace",
         };
-        const ws = await this.vscode.showQuickPick(choices, options);
+        const ws = await this._vscode.showQuickPick(choices, options);
         if (ws) {
             return ws.ws;
         }
@@ -41,15 +41,15 @@ export class Commands {
         try {
             const ws = await this.showWorkspacePicker();
             if (ws) {
-                const allTasks = await this.vscode.fetchTasks(tasks.WorkspaceTaskFilter);
+                const allTasks = await this._vscode.fetchTasks(tasks.WORKSPACE_TASK_FILTER);
                 const updateEnvironmentTask = allTasks.find((task) =>
                     task.definition.mode === tasks.WorkspaceTaskMode.UpdateEnvironment &&
                     task.definition.workspace === ws.root);
 
-                this.vscode.executeTask(updateEnvironmentTask!);
+                this._vscode.executeTask(updateEnvironmentTask!);
             }
         } catch (err) {
-            this.vscode.showErrorMessage(err.message);
+            this._vscode.showErrorMessage(err.message);
         }
     }
 
@@ -58,9 +58,9 @@ export class Commands {
         const fsPathsObj = {};
         const wsInfos: Array<[autoproj.Workspace, Promise<autoproj.WorkspaceInfo>]> = [];
 
-        this.workspaces.forEachWorkspace((ws) => wsInfos.push([ws, ws.info()]));
-        if (this.vscode.workspaceFolders) {
-            for (const folder of this.vscode.workspaceFolders) {
+        this._workspaces.forEachWorkspace((ws) => wsInfos.push([ws, ws.info()]));
+        if (this._vscode.workspaceFolders) {
+            for (const folder of this._vscode.workspaceFolders) {
                 fsPathsObj[folder.uri.fsPath] = true;
             }
         }
@@ -111,16 +111,16 @@ export class Commands {
         };
         const choices = this.packagePickerChoices();
         choices.catch((err) => {
-            this.vscode.showErrorMessage(err.message);
+            this._vscode.showErrorMessage(err.message);
             tokenSource.cancel();
         });
 
-        const selectedOption = await this.vscode.showQuickPick(choices, options, tokenSource.token);
+        const selectedOption = await this._vscode.showQuickPick(choices, options, tokenSource.token);
 
         tokenSource.dispose();
         if (selectedOption) {
             const name = selectedOption.pkg.name;
-            const wsFolders = this.vscode.workspaceFolders;
+            const wsFolders = this._vscode.workspaceFolders;
             let start = 0;
 
             if (wsFolders) {
@@ -131,17 +131,19 @@ export class Commands {
                 }
             }
 
-            const folder = { name: selectedOption.pkg.name,
-                             uri: Uri.file(selectedOption.pkg.srcdir) };
-            if (!this.vscode.updateWorkspaceFolders(start, null, folder)) {
-                this.vscode.showErrorMessage(`Could not add folder: ${selectedOption.pkg.srcdir}`);
+            const folder = {
+                name: selectedOption.pkg.name,
+                uri: Uri.file(selectedOption.pkg.srcdir),
+            };
+            if (!this._vscode.updateWorkspaceFolders(start, null, folder)) {
+                this._vscode.showErrorMessage(`Could not add folder: ${selectedOption.pkg.srcdir}`);
             }
         }
     }
 
     public register() {
-        this.vscode.registerAndSubscribeCommand("autoproj.updatePackageInfo", () => { this.updatePackageInfo(); });
-        this.vscode.registerAndSubscribeCommand("autoproj.addPackageToWorkspace", () => {
+        this._vscode.registerAndSubscribeCommand("autoproj.updatePackageInfo", () => { this.updatePackageInfo(); });
+        this._vscode.registerAndSubscribeCommand("autoproj.addPackageToWorkspace", () => {
             this.addPackageToWorkspace();
         });
     }

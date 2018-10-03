@@ -8,6 +8,21 @@ import * as tasks from "../src/tasks";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
 
+const PKG_IODRIVERS_BASE: autoproj.IPackage = {
+    builddir: "/path/to/drivers/iodrivers_base/build",
+    dependencies: ["cmake"],
+    logdir: "/path/to/install/log",
+    name: "iodrivers_base",
+    prefix: "/path/to/install",
+    srcdir: "/path/to/drivers/iodrivers_base",
+    type: "Autobuild::CMake",
+    vcs: {
+        repository_id: "github:/rock-core/drivers-iodrivers_base.git",
+        type: "git",
+        url: "https://github.com/rock-core/drivers-iodrivers_base.git",
+    },
+};
+
 describe("definitionsEqual()", () => {
     it("returns false if first definition is not autoproj", () => {
         const first: vscode.TaskDefinition = { type: "foo" };
@@ -26,37 +41,37 @@ describe("definitionsEqual()", () => {
     });
     it("returns false if definitions are of different types", () => {
         const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "",
-                                                      type: tasks.TaskType.Package, workspace: "" };
+            type: tasks.TaskType.Package, workspace: "" };
         const second: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
-                                                         type: tasks.TaskType.Workspace, workspace: "" };
+            type: tasks.TaskType.Workspace, workspace: "" };
         assert.equal(tasks.definitionsEqual(first, second), false);
     });
     it("returns false if definitions have different workspaces", () => {
         const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
-                                                      type: tasks.TaskType.Package, workspace: "/bar" };
+            type: tasks.TaskType.Package, workspace: "/bar" };
         const second: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
-                                                       type: tasks.TaskType.Package, workspace: "" };
+            type: tasks.TaskType.Package, workspace: "" };
         assert.equal(tasks.definitionsEqual(first, second), false);
     });
     it("returns false if definitions have different packages", () => {
         const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
-                                                      type: tasks.TaskType.Package, workspace: "/bar" };
+            type: tasks.TaskType.Package, workspace: "/bar" };
         const second: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/dummy",
-                                                       type: tasks.TaskType.Package, workspace: "/bar" };
+            type: tasks.TaskType.Package, workspace: "/bar" };
         assert.equal(tasks.definitionsEqual(first, second), false);
     });
     it("returns true if autoproj-package definitions are equal", () => {
         const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
-                                                      type: tasks.TaskType.Package, workspace: "/bar" };
+            type: tasks.TaskType.Package, workspace: "/bar" };
         const second: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "/foo",
-                                                       type: tasks.TaskType.Package, workspace: "/bar" };
+            type: tasks.TaskType.Package, workspace: "/bar" };
         assert.equal(tasks.definitionsEqual(first, second), true);
     });
     it("returns true if autoproj-workspace definitions are equal", () => {
         const first: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
-                                                        type: tasks.TaskType.Workspace, workspace: "/bar" };
+            type: tasks.TaskType.Workspace, workspace: "/bar" };
         const second: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
-                                                         type: tasks.TaskType.Workspace, workspace: "/bar" };
+            type: tasks.TaskType.Workspace, workspace: "/bar" };
         assert.equal(tasks.definitionsEqual(first, second), true);
     });
 });
@@ -169,13 +184,15 @@ describe("Task provider", () => {
             args.push(pkgPath);
             name = `${pathBasename(wsRoot)}: Build ${pkgName}`;
             scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
-            defs = { ...defs, mode: tasks.PackageTaskMode.Build,
-                     path: pkgPath,
-                     type: tasks.TaskType.Package,
+            defs = {
+                ...defs, mode: tasks.PackageTaskMode.Build,
+                path: pkgPath,
+                type: tasks.TaskType.Package,
             };
         } else {
-            defs = { ...defs, mode: tasks.WorkspaceTaskMode.Build,
-                     type: tasks.TaskType.Workspace,
+            defs = {
+                ...defs, mode: tasks.WorkspaceTaskMode.Build,
+                type: tasks.TaskType.Workspace,
             };
         }
 
@@ -234,13 +251,15 @@ describe("Task provider", () => {
             args.push(pkgPath);
             name = `${pathBasename(wsRoot)}: Update ${pkgName}`;
             scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
-            defs = { ...defs, mode: tasks.PackageTaskMode.Update,
-                     path: pkgPath,
-                     type: tasks.TaskType.Package,
+            defs = {
+                ...defs, mode: tasks.PackageTaskMode.Update,
+                path: pkgPath,
+                type: tasks.TaskType.Package,
             };
         } else {
-            defs = { ...defs, mode: tasks.WorkspaceTaskMode.Update,
-                     type: tasks.TaskType.Workspace,
+            defs = {
+                ...defs, mode: tasks.WorkspaceTaskMode.Update,
+                type: tasks.TaskType.Workspace,
             };
         }
         assertTask(task, process, args, name, scope, defs);
@@ -256,13 +275,15 @@ describe("Task provider", () => {
             args.push(pkgPath);
             name = `${pathBasename(wsRoot)}: Checkout ${pkgName}`;
             scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
-            defs = { ...defs, mode: tasks.PackageTaskMode.Checkout,
-                     path: pkgPath,
-                     type: tasks.TaskType.Package,
+            defs = {
+                ...defs, mode: tasks.PackageTaskMode.Checkout,
+                path: pkgPath,
+                type: tasks.TaskType.Package,
             };
         } else {
-            defs = { ...defs, mode: tasks.WorkspaceTaskMode.Checkout,
-                     type: tasks.TaskType.Workspace,
+            defs = {
+                ...defs, mode: tasks.WorkspaceTaskMode.Checkout,
+                type: tasks.TaskType.Workspace,
             };
         }
 
@@ -445,21 +466,6 @@ describe("Task provider", () => {
             await assert.equal(providedTasks.length, 2 * 2 + 1 * 3);
         });
         it("gets the package names from installation manifest", async () => {
-            const PKG_IODRIVERS_BASE: autoproj.IPackage = {
-                builddir: "/path/to/drivers/iodrivers_base/build",
-                dependencies: ["cmake"],
-                logdir: "/path/to/install/log",
-                name: "iodrivers_base",
-                prefix: "/path/to/install",
-                srcdir: pathJoin(wsOneRoot, "drivers", "iodrivers_base"),
-                type: "Autobuild::CMake",
-                vcs: {
-                    repository_id: "github:/rock-core/drivers-iodrivers_base.git",
-                    type: "git",
-                    url: "https://github.com/rock-core/drivers-iodrivers_base.git",
-                },
-            };
-
             helpers.createInstallationManifest([PKG_IODRIVERS_BASE], "one");
             await subject.provideTasks(null);
             await assertAllPackageTasks(a, wsOneRoot, [PKG_IODRIVERS_BASE]);

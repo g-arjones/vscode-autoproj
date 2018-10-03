@@ -79,7 +79,7 @@ describe("FileWatcher", () => {
         it("returns false if file is already being watched", () => {
             assert(!subject.startWatching(fileName, () => {
                 // no-op
-             }));
+            }));
         });
         it("returns true when a new watcher is created", () => {
             const newFile = path.join(root, "newfile");

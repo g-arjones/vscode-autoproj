@@ -18,8 +18,8 @@ describe("ProgressView()", () => {
         mockProgress = TypeMoq.Mock.ofType<vscode.Progress<{ message?: string, increment?: number }>>();
         mockWrapper.setup((x) => x.withProgress(TypeMoq.It.isAny(), TypeMoq.It.isAny())).
             callback((options: vscode.ProgressOptions, task: TaskType) => {
-            task(mockProgress.object, mockToken.object);
-        });
+                task(mockProgress.object, mockToken.object);
+            });
         subject = progress.createProgressView(mockWrapper.object);
         subject.show();
     });

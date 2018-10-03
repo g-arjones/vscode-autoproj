@@ -5,6 +5,54 @@ import * as TypeMoq from "typemoq";
 import * as autoproj from "../src/autoproj";
 import * as helpers from "./helpers";
 
+const MANIFEST_TEST_FILE = `
+- package_set: orocos.toolchain
+  vcs:
+    type: git
+    url: https://github.com/orocos-toolchain/autoproj.git
+    repository_id: github:/orocos-toolchain/autoproj.git
+  raw_local_dir: raw/pkg/set/dir
+  user_local_dir: user/pkg/set/dir
+- name: tools/rest_api
+  type: Autobuild::Ruby
+  vcs:
+    type: git
+    url: https://github.com/rock-core/tools-rest_api.git
+    repository_id: github:/rock-core/tools-rest_api.git
+  srcdir: "/path/to/tools/rest_api"
+  builddir:
+  logdir: "/path/to/install/tools/rest_api/log"
+  prefix: "/path/to/install/tools/rest_api"
+  dependencies:
+  - utilrb
+  - tools/orocos.rb
+`;
+const PKG_SET_OROCOS_TOOLCHAIN = {
+    name: "orocos.toolchain",
+    raw_local_dir: "raw/pkg/set/dir",
+    user_local_dir: "user/pkg/set/dir",
+    vcs: {
+        repository_id: "github:/orocos-toolchain/autoproj.git",
+        type: "git",
+        url: "https://github.com/orocos-toolchain/autoproj.git",
+    },
+};
+
+const PKG_TOOLS_REST_API = {
+    builddir: null,
+    dependencies: ["utilrb", "tools/orocos.rb"],
+    logdir: "/path/to/install/tools/rest_api/log",
+    name: "tools/rest_api",
+    prefix: "/path/to/install/tools/rest_api",
+    srcdir: "/path/to/tools/rest_api",
+    type: "Autobuild::Ruby",
+    vcs: {
+        repository_id: "github:/rock-core/tools-rest_api.git",
+        type: "git",
+        url: "https://github.com/rock-core/tools-rest_api.git",
+    },
+};
+
 describe("Autoproj helpers tests", () => {
     const originalSpawn = require("child_process").spawn;
     let root: string;
@@ -34,55 +82,6 @@ describe("Autoproj helpers tests", () => {
             assert.equal(null, autoproj.findWorkspaceRoot(root));
         });
     });
-
-    const MANIFEST_TEST_FILE = `
-- package_set: orocos.toolchain
-  vcs:
-    type: git
-    url: https://github.com/orocos-toolchain/autoproj.git
-    repository_id: github:/orocos-toolchain/autoproj.git
-  raw_local_dir: raw/pkg/set/dir
-  user_local_dir: user/pkg/set/dir
-- name: tools/rest_api
-  type: Autobuild::Ruby
-  vcs:
-    type: git
-    url: https://github.com/rock-core/tools-rest_api.git
-    repository_id: github:/rock-core/tools-rest_api.git
-  srcdir: "/path/to/tools/rest_api"
-  builddir:
-  logdir: "/path/to/install/tools/rest_api/log"
-  prefix: "/path/to/install/tools/rest_api"
-  dependencies:
-  - utilrb
-  - tools/orocos.rb
-`;
-    const PKG_SET_OROCOS_TOOLCHAIN = {
-        name: "orocos.toolchain",
-        raw_local_dir: "raw/pkg/set/dir",
-        user_local_dir: "user/pkg/set/dir",
-        vcs: {
-            repository_id: "github:/orocos-toolchain/autoproj.git",
-            type: "git",
-            url: "https://github.com/orocos-toolchain/autoproj.git",
-        },
-    };
-
-    const PKG_TOOLS_REST_API = {
-        builddir: null,
-        dependencies: ["utilrb", "tools/orocos.rb"],
-        logdir: "/path/to/install/tools/rest_api/log",
-        name: "tools/rest_api",
-        prefix: "/path/to/install/tools/rest_api",
-        srcdir: "/path/to/tools/rest_api",
-        type: "Autobuild::Ruby",
-        vcs: {
-            repository_id: "github:/rock-core/tools-rest_api.git",
-            type: "git",
-            url: "https://github.com/rock-core/tools-rest_api.git",
-        },
-    };
-
     describe("loadWorkspaceInfo", () => {
         it("parses the manifest and returns it", async () => {
             helpers.mkdir(".autoproj");
@@ -167,7 +166,7 @@ describe("Autoproj helpers tests", () => {
                 helpers.mkdir(".autoproj");
                 helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
                 const workspace = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
-                const initial  = await workspace.info();
+                const initial = await workspace.info();
                 const reloaded = await workspace.reload();
                 assert.notEqual(reloaded, initial);
                 assert.equal(reloaded, await workspace.info());
@@ -404,7 +403,7 @@ describe("Autoproj helpers tests", () => {
 
                 s.workspaces.forEachWorkspace((ws) => { mockCallback.object(ws); });
                 mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws1.ws.root)), TypeMoq.Times.once());
-                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws2.ws.root) ), TypeMoq.Times.once());
+                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws2.ws.root)), TypeMoq.Times.once());
             });
         });
         describe("getWorkspaceFromFolder", () => {

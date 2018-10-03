@@ -91,7 +91,7 @@ describe("EventHandler", () => {
         beforeEach(() => {
             mockWorkspace = mockWorkspaces.addWorkspace(wsRoot);
             task = mocks.createTask(taskDefinition).object;
-            mockWrapper.setup((x) => x.fetchTasks(tasks.WorkspaceTaskFilter)).
+            mockWrapper.setup((x) => x.fetchTasks(tasks.WORKSPACE_TASK_FILTER)).
                 returns(() => Promise.resolve([task]));
             mockWatchFunc = Mock.ofInstance(() => {
                 // no-op
