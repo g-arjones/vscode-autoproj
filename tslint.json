@@ -6,6 +6,11 @@
     ],
     "jsRules": {},
     "rules": {
+        "no-empty-line-after-opening-brace": true,
+        "no-unnecessary-local-variable": true,
+        "no-for-each-push": true,
+        "prefer-dry-conditionals": true,
+        "no-commented-out-code": true,
         "no-multi-spaces": true,
         "ter-arrow-spacing": [
             true
@@ -65,7 +70,9 @@
           ]
     },
     "rulesDirectory": [
-        "node_modules/tslint-eslint-rules/dist/rules"
+        "node_modules/tslint-eslint-rules/dist/rules",
+        "node_modules/tslint-clean-code/dist/src",
+        "node_modules/tslint-microsoft-contrib"
     ],
     "linterOptions": {
         "exclude": [
