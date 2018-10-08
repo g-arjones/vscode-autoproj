@@ -1,6 +1,7 @@
 "use strict";
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
+import * as path from "path";
 import * as vscode from "vscode";
 import * as autoproj from "./autoproj";
 import * as commands from "./commands";
@@ -38,6 +39,18 @@ export class EventHandler implements vscode.Disposable {
         if (task.definition.type === tasks.TaskType.Workspace &&
             task.definition.mode === tasks.WorkspaceTaskMode.Watch) {
             this._workspaceRootToPid.set(task.definition.workspace, event.processId);
+        }
+    }
+
+    public onDidOpenTextDocument(event: vscode.TextDocument) {
+        const docName = path.basename(event.uri.fsPath);
+        const docDir = path.dirname(event.uri.fsPath);
+
+        for (const [, ws] of this._workspaces.workspaces) {
+            if ((docDir === path.join(ws.root, "autoproj")) && (docName.startsWith("manifest."))) {
+                this._wrapper.setTextDocumentLanguage(event, "yaml");
+                break;
+            }
         }
     }
 
@@ -128,6 +141,9 @@ export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSC
     subscriptions.push(vscode.tasks.onDidStartTaskProcess((event) => {
         eventHandler.onDidStartTaskProcess(event);
         tasksHandler.onDidStartTaskProcess(event);
+    }));
+    subscriptions.push(vscode.workspace.onDidOpenTextDocument((event: vscode.TextDocument) => {
+        eventHandler.onDidOpenTextDocument(event);
     }));
     subscriptions.push(vscode.tasks.onDidEndTaskProcess((event) => tasksHandler.onDidEndTaskProcess(event)));
     subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => autoprojTaskProvider.reloadTasks()));

@@ -28,7 +28,7 @@
         "url": "https://github.com/g-arjones/vscode-autoproj.git"
     },
     "engines": {
-        "vscode": "^1.27.0"
+        "vscode": "^1.28.0"
     },
     "activationEvents": [
         "*"
