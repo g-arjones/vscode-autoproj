@@ -40,6 +40,14 @@ export function createTaskProcessEndEvent(definition: vscode.TaskDefinition, exi
     return mockTaskProcessEndEvent.object;
 }
 
+export function createOpenTextDocumentEvent(docPath: string) {
+    const mockOpenTextDocumentEvent = Mock.ofType<vscode.TextDocument>();
+    const uri = vscode.Uri.file(docPath);
+
+    mockOpenTextDocumentEvent.setup((x) => x.uri).returns(() => uri);
+    return mockOpenTextDocumentEvent.object;
+}
+
 export class MockWorkspaces {
     public readonly mock: IMock<autoproj.Workspaces>;
 
