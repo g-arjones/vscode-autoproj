@@ -77,15 +77,11 @@ describe("FileWatcher", () => {
             assert.equal(fileHit, newFile);
         });
         it("returns false if file is already being watched", () => {
-            assert(!subject.startWatching(fileName, () => {
-                // no-op
-            }));
+            assert(!subject.startWatching(fileName, () => void 0));
         });
         it("returns true when a new watcher is created", () => {
             const newFile = path.join(root, "newfile");
-            assert(subject.startWatching(newFile, () => {
-                // no-op
-            }));
+            assert(subject.startWatching(newFile, () => void 0));
             subject.stopWatching(newFile);
         });
         it("does not watch the same file twice", async () => {
@@ -117,9 +113,7 @@ describe("FileWatcher", () => {
                 fs.appendFileSync(fileName, "modified", "utf8");
             });
             assert.equal(hits, 1);
-            assert(subject.startWatching(fileName, (file) => {
-                // no-op
-            }));
+            assert(subject.startWatching(fileName, (file) => void 0));
         });
         it("throws if file is not being watched", () => {
             assert.throws(() => subject.stopWatching("/not/watched"));

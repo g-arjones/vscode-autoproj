@@ -163,10 +163,9 @@ export class Workspaces {
      */
     public isConfig(folder: string): boolean {
         let isConfig = false;
-        const arg = folder;
         this.forEachWorkspace((ws) => {
             let lastPath = "";
-            let iterFolder = arg;
+            let iterFolder = folder;
             while (iterFolder !== lastPath) {
                 if ((iterFolder === path.join(ws.root, "autoproj")) ||
                     (iterFolder === path.join(ws.root, ".autoproj"))) {

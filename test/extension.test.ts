@@ -93,9 +93,7 @@ describe("EventHandler", () => {
             task = mocks.createTask(taskDefinition).object;
             mockWrapper.setup((x) => x.fetchTasks(tasks.WORKSPACE_TASK_FILTER)).
                 returns(() => Promise.resolve([task]));
-            mockWatchFunc = Mock.ofInstance(() => {
-                // no-op
-            });
+            mockWatchFunc = Mock.ofInstance(() => void 0);
             subject.watchManifest = mockWatchFunc.object;
         });
         it("loads installation manifest", async () => {
@@ -171,9 +169,7 @@ describe("EventHandler", () => {
         beforeEach(() => {
             mockWorkspace = mockWorkspaces.addWorkspace(wsRoot);
             taskProcessStartEvent = mocks.createTaskProcessStartEvent(taskDefinition, 1234);
-            mockUnwatchFunc = Mock.ofInstance(() => {
-                // no-op
-            });
+            mockUnwatchFunc = Mock.ofInstance(() => void 0);
             subject.onDidStartTaskProcess(taskProcessStartEvent);
             subject.unwatchManifest = mockUnwatchFunc.object;
         });
