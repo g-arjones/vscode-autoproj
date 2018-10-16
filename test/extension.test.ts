@@ -273,6 +273,22 @@ describe("EventHandler", () => {
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
         });
     });
+    describe("onDidOpenTextDocument", () => {
+        beforeEach(() => {
+            mockWorkspaces.addWorkspace("/a/foo/workspace");
+            mockWorkspaces.addWorkspace("/path/to/workspace");
+        });
+        it("changes the document language if file name starts with 'manifest.'", () => {
+            const event = mocks.createOpenTextDocumentEvent("/path/to/workspace/autoproj/manifest.robot");
+            subject.onDidOpenTextDocument(event);
+            mockWrapper.verify((x) => x.setTextDocumentLanguage(event, "yaml"), Times.once());
+        });
+        it("keeps the document language", () => {
+            const event = mocks.createOpenTextDocumentEvent("/path/to/workspace/autoproj/init.rb");
+            subject.onDidOpenTextDocument(event);
+            mockWrapper.verify((x) => x.setTextDocumentLanguage(It.isAny(), It.isAny()), Times.never());
+        });
+    });
 });
 
 describe("extension.setupExtension()", () => {

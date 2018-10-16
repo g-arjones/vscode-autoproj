@@ -65,4 +65,8 @@ export class VSCode {
     public getConfiguration(section?: string, resource?: vscode.Uri | null): vscode.WorkspaceConfiguration {
         return vscode.workspace.getConfiguration(section, resource);
     }
+
+    public setTextDocumentLanguage(document: vscode.TextDocument, languageId: string): Thenable<vscode.TextDocument> {
+        return vscode.languages.setTextDocumentLanguage(document, languageId);
+    }
 }
