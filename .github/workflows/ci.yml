@@ -1,0 +1,33 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: ^14
+      - name: Install dependencies
+        run: |
+          npm install -g --silent gulp-cli
+          npm install
+          rm -rf node_modules/fs-temp/index.d.ts
+      - name: Compile
+        run: npm run compile
+      - name: Lint
+        run: npm run lint
+      - name: Enable coverage
+        run: gulp cover:enable
+      - name: Run tests
+        uses: GabrielBB/xvfb-action@v1.0
+        with:
+          run: npm run test
+      - name: Publish coverage
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

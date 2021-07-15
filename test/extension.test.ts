@@ -221,10 +221,12 @@ describe("EventHandler", () => {
             mockOnManifestChangedFunc = Mock.ofInstance(() => Promise.resolve());
 
             subject.onManifestChanged = mockOnManifestChangedFunc.object;
-            require("../src/autoproj").installationManifestPath = mockInstallationManifestPathFunc.object;
+            Object.defineProperty(
+                require("../src/autoproj"), "installationManifestPath", mockInstallationManifestPathFunc.object);
         });
         afterEach(() => {
-            require("../src/autoproj").installationManifestPath = originalInstallationManifestPathFunc;
+            Object.defineProperty(
+                require("../src/autoproj"), "installationManifestPath", originalInstallationManifestPathFunc);
         });
         it("watches the manifest with proper callback", async () => {
             mockWatcher.setup((x) => x.startWatching(installManifestPath, It.isAny())).callback(
@@ -256,10 +258,12 @@ describe("EventHandler", () => {
             mockWorkspace = mockWorkspaces.addWorkspace(wsRoot);
             mockInstallationManifestPathFunc = Mock.ofType<(root: string) => string>();
             mockInstallationManifestPathFunc.setup((x) => x(wsRoot)).returns(() => installManifestPath);
-            require("../src/autoproj").installationManifestPath = mockInstallationManifestPathFunc.object;
+            Object.defineProperty(
+                require("../src/autoproj"), "installationManifestPath", mockInstallationManifestPathFunc.object);
         });
         afterEach(() => {
-            require("../src/autoproj").installationManifestPath = originalInstallationManifestPathFunc;
+            Object.defineProperty(
+                require("../src/autoproj"), "installationManifestPath", originalInstallationManifestPathFunc);
         });
         it("unwatches the manifest", async () => {
             mockWatcher.setup((x) => x.stopWatching(installManifestPath)).returns(() => true);

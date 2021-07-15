@@ -12,7 +12,7 @@ export class VSCode {
         this._extensionContext = extensionContext;
     }
 
-    public get workspaceFolders(): vscode.WorkspaceFolder[] | undefined {
+    public get workspaceFolders(): readonly vscode.WorkspaceFolder[] | undefined {
         return vscode.workspace.workspaceFolders;
     }
 
@@ -43,7 +43,7 @@ export class VSCode {
         return vscode.workspace.updateWorkspaceFolders(start, deleteCount, ...workspaceFoldersToAdd);
     }
 
-    public killProcess(pid: number, signal: string): void {
+    public killProcess(pid: number, signal: string): boolean {
         return process.kill(pid, signal);
     }
 
