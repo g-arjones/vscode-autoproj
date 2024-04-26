@@ -362,3 +362,31 @@ export class AutoprojProvider implements vscode.TaskProvider {
         cache.set(root, task);
     }
 }
+
+export class AutoprojWorkspaceTaskProvider implements vscode.TaskProvider {
+    private _provider: AutoprojProvider;
+    constructor(provider: AutoprojProvider) {
+        this._provider = provider;
+    }
+    async provideTasks(token: vscode.CancellationToken) {
+        let tasks = await this._provider.provideTasks(token);
+        return tasks.filter((task: vscode.Task) => task.definition.type == "autoproj-workspace");
+    }
+    resolveTask(task: vscode.Task, token: vscode.CancellationToken) {
+        return null;
+    }
+}
+
+export class AutoprojPackageTaskProvider implements vscode.TaskProvider {
+    private _provider: AutoprojProvider;
+    constructor(provider: AutoprojProvider) {
+        this._provider = provider;
+    }
+    async provideTasks(token: vscode.CancellationToken) {
+        let tasks = await this._provider.provideTasks(token);
+        return tasks.filter((task: vscode.Task) => task.definition.type == "autoproj-package");
+    }
+    resolveTask(task: vscode.Task, token: vscode.CancellationToken) {
+        return null;
+    }
+}

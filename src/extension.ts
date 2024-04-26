@@ -75,19 +75,24 @@ export class EventHandler implements vscode.Disposable {
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
-            /*
-            TODO: FIXME!
-
             try {
                 const allTasks = await this._wrapper.fetchTasks(tasks.WORKSPACE_TASK_FILTER);
                 const watchTask = allTasks.find((task) => task.definition.mode === tasks.WorkspaceTaskMode.Watch &&
                                                           task.definition.workspace === workspace.root);
 
-                this._wrapper.executeTask(watchTask!);
+                if (watchTask) {
+                    const execution = vscode.tasks.taskExecutions.find(
+                        (execution: vscode.TaskExecution) => execution.task.definition == watchTask.definition
+                    );
+                    if (!execution) {
+                        this._wrapper.executeTask(watchTask);
+                    }
+                } else {
+                    this._wrapper.showErrorMessage(`Internal error: Could not find watch task`);
+                }
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not start autoproj watch task: ${err.message}`);
             }
-            */
             this.watchManifest(workspace);
         }
     }
@@ -131,12 +136,16 @@ export async function setupExtension(subscriptions: any[], vscodeWrapper: wrappe
     const fileWatcher = new watcher.FileWatcher();
     const workspaces = new autoproj.Workspaces(null);
     const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces, vscodeWrapper);
+    const autoprojPackageTaskProvider = new tasks.AutoprojPackageTaskProvider(autoprojTaskProvider);
+    const autoprojWorkspaceTaskProvider = new tasks.AutoprojWorkspaceTaskProvider(autoprojTaskProvider);
     const autoprojCommands = new commands.Commands(workspaces, vscodeWrapper);
     const cppConfigurationProvider = new cpptools.CppConfigurationProvider(workspaces);
     const eventHandler = new EventHandler(vscodeWrapper, fileWatcher, workspaces, cppConfigurationProvider);
     const tasksHandler = new tasks.Handler(vscodeWrapper, workspaces);
 
-    subscriptions.push(vscode.tasks.registerTaskProvider("autoproj", autoprojTaskProvider));
+    subscriptions.push(vscode.tasks.registerTaskProvider("autoproj-workspace", autoprojWorkspaceTaskProvider));
+    subscriptions.push(vscode.tasks.registerTaskProvider("autoproj-package", autoprojPackageTaskProvider));
+
     if (vscode.workspace.workspaceFolders) {
         vscode.workspace.workspaceFolders.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
     }

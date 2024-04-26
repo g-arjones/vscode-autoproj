@@ -125,16 +125,9 @@ export class TestSetup {
         return this.mockWorkspaces.target;
     }
 
-    public mockTaskProvider: TypeMoq.IMock<Tasks.AutoprojProvider>;
-    get taskProvider() {
-        return this.mockTaskProvider.target;
-    }
-
     constructor() {
         this.mockWrapper = TypeMoq.Mock.ofType<Wrappers.VSCode>();
-
         this.mockWorkspaces = TypeMoq.Mock.ofType2(Autoproj.Workspaces, [undefined]);
-        this.mockTaskProvider = TypeMoq.Mock.ofType2(Tasks.AutoprojProvider, [this.workspaces]);
     }
 
     public setupWrapper(fn) {
