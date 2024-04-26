@@ -28,7 +28,7 @@
         "url": "https://github.com/g-arjones/vscode-autoproj.git"
     },
     "engines": {
-        "vscode": "^1.28.0"
+        "vscode": "^1.85.2"
     },
     "activationEvents": [
         "*"
@@ -351,34 +351,27 @@
         "lint": "node ./node_modules/tslint/bin/tslint --project ."
     },
     "extensionDependencies": [
-        "rebornix.ruby"
+        "ms-vscode.cpptools"
     ],
     "dependencies": {
-        "js-yaml": "^3.12.0"
+        "@nodelib/fs.walk": "^2.0.0",
+        "js-yaml": "^3.12.0",
+        "p-limit": "^3.1.0",
+        "vscode-cpptools": "^6.1.0"
     },
     "devDependencies": {
         "@types/js-yaml": "^3.11.2",
         "@types/mocha": "^5.2.5",
-        "@types/node": "^14.14.21",
-        "@types/vscode": "^1.58.1",
+        "@types/node": "^20.12.2",
+        "@types/vscode": "^1.85.2",
         "decache": "^4.1.0",
-        "del": "^3.0.0",
-        "fs-temp": "^1.2.1",
-        "gulp": "^4.0.2",
-        "gulp-coveralls": "^0.1.4",
-        "gulp-json-editor": "^2.5.6",
         "istanbul": "^0.4.5",
-        "mocha": "^6.1.4",
+        "mocha": "^10.4.0",
         "remap-istanbul": "^0.12.0",
         "run-sequence": "^2.2.1",
-        "source-map-support": "^0.5.19",
-        "tslint": "^5.20.1",
-        "tslint-clean-code": "^0.2.7",
-        "tslint-consistent-codestyle": "^1.13.3",
-        "tslint-eslint-rules": "^5.4.0",
-        "tslint-microsoft-contrib": "^5.2.1",
+        "source-map-support": "^0.5.12",
         "typemoq": "^2.1.0",
-        "typescript": "^4.1.3",
+        "typescript": "^5.4.5",
         "vscode-test": "^1.6.1"
     }
 }

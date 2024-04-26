@@ -1,9 +1,8 @@
 "use strict";
 
-import { EventEmitter } from "events";
 import * as FS from "fs";
-import * as Temp from "fs-temp";
 import * as YAML from "js-yaml";
+import * as os from "os";
 import * as Path from "path";
 import * as TypeMoq from "typemoq";
 import * as Autoproj from "../src/autoproj";
@@ -26,7 +25,7 @@ let root;
 let createdFS: string[][] = [];
 
 export function init(): string {
-    root = Temp.mkdirSync();
+    root = FS.mkdtempSync(Path.join(os.tmpdir(), "vscode-autoproj"));
     return root;
 }
 

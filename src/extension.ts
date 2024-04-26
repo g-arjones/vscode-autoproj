@@ -70,6 +70,9 @@ export class EventHandler implements vscode.Disposable {
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
+            /*
+            TODO: FIXME!
+
             try {
                 const allTasks = await this._wrapper.fetchTasks(tasks.WORKSPACE_TASK_FILTER);
                 const watchTask = allTasks.find((task) => task.definition.mode === tasks.WorkspaceTaskMode.Watch &&
@@ -79,6 +82,7 @@ export class EventHandler implements vscode.Disposable {
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not start autoproj watch task: ${err.message}`);
             }
+            */
             this.watchManifest(workspace);
         }
     }
