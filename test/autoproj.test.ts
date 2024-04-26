@@ -13,6 +13,14 @@ const MANIFEST_TEST_FILE = `
     repository_id: github:/orocos-toolchain/autoproj.git
   raw_local_dir: raw/pkg/set/dir
   user_local_dir: user/pkg/set/dir
+- name: ros2.common
+  vcs:
+    type: git
+    url: https://github.com/g-arjones/ros2.common-package_set.git
+    repository_id: github:/g-arjones/ros2.common-package_set.git
+  raw_local_dir: raw/ros2/pkg/set/dir
+  user_local_dir: user/ros2/pkg/set/dir
+  package_set: ros2.common
 - name: tools/rest_api
   type: Autobuild::Ruby
   vcs:
@@ -26,6 +34,37 @@ const MANIFEST_TEST_FILE = `
   dependencies:
   - utilrb
   - tools/orocos.rb
+- name: ctrl_toolbox
+  type: Autobuild::ImporterPackage
+  vcs:
+    :type: git
+    :url: git@github.com:/ethz-adrl/control-toolbox.git
+    :push_to: git@github.com:/ethz-adrl/control-toolbox.git
+    :interactive: false
+    :retry_count: 10
+    :repository_id: github:/ethz-adrl/control-toolbox.git
+  srcdir: "/path/to/ctrl_toolbox"
+  importdir: "/path/to/ctrl_toolbox"
+  prefix: "/home/jammy/dev/tfxl/install/ctrl_toolbox"
+  builddir:
+  logdir: "/home/jammy/dev/tfxl/install/ctrl_toolbox/log"
+  dependencies:
+  - ct_core
+- name: ct_core
+  type: Autobuild::CMake
+  vcs:
+    :type: git
+    :url: git@github.com:/ethz-adrl/control-toolbox.git
+    :push_to: git@github.com:/ethz-adrl/control-toolbox.git
+    :interactive: false
+    :retry_count: 10
+    :repository_id: github:/ethz-adrl/control-toolbox.git
+  srcdir: "/path/to/ctrl_toolbox/ct_core"
+  importdir: "/path/to/ctrl_toolbox"
+  prefix: "/home/jammy/dev/tfxl/install/ct_core"
+  builddir: "/home/jammy/dev/tfxl/build/ct_core"
+  logdir: "/home/jammy/dev/tfxl/install/ct_core/log"
+  dependencies: []
 `;
 const PKG_SET_OROCOS_TOOLCHAIN = {
     name: "orocos.toolchain",
@@ -35,6 +74,17 @@ const PKG_SET_OROCOS_TOOLCHAIN = {
         repository_id: "github:/orocos-toolchain/autoproj.git",
         type: "git",
         url: "https://github.com/orocos-toolchain/autoproj.git",
+    },
+};
+
+const PKG_SET_ROS2_COMMON = {
+    name: "ros2.common",
+    raw_local_dir: "raw/ros2/pkg/set/dir",
+    user_local_dir: "user/ros2/pkg/set/dir",
+    vcs: {
+        repository_id: "github:/g-arjones/ros2.common-package_set.git",
+        type: "git",
+        url: "https://github.com/g-arjones/ros2.common-package_set.git",
     },
 };
 
@@ -88,6 +138,7 @@ describe("Autoproj helpers tests", () => {
             helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
             const manifest = await autoproj.loadWorkspaceInfo(root);
             assert.deepStrictEqual(manifest.packageSets.get("user/pkg/set/dir"), PKG_SET_OROCOS_TOOLCHAIN);
+            assert.deepStrictEqual(manifest.packageSets.get("user/ros2/pkg/set/dir"), PKG_SET_ROS2_COMMON);
             assert.deepStrictEqual(manifest.packages.get("/path/to/tools/rest_api"), PKG_TOOLS_REST_API);
         });
         it("parses an empty manifest", async () => {
@@ -103,7 +154,30 @@ describe("Autoproj helpers tests", () => {
             await helpers.assertThrowsAsync(autoproj.loadWorkspaceInfo(root), /ENOENT/);
         });
     });
-
+    describe("WorkspaceInfo", () => {
+        let wsInfo: autoproj.WorkspaceInfo;
+        beforeEach(async () => {
+            helpers.mkdir(".autoproj");
+            helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+            let ws = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
+            wsInfo = await ws.info();
+        });
+        describe("findPackageByPath", () => {
+            it("finds package that contain a given file", () => {
+                assert.deepStrictEqual(
+                    wsInfo.findPackageByPath("/path/to/tools/rest_api/src/api.cpp"),
+                    PKG_TOOLS_REST_API
+                );
+            });
+            it("supports nested packages", () => {
+                let pkg = wsInfo.findPackageByPath("/path/to/ctrl_toolbox/ct_core/src/core.cpp")
+                assert.equal(pkg!.name, "ct_core");
+            });
+            it("handles packages without srcdir", () => {
+                // TODO
+            });
+        });
+    });
     describe("Workspace", () => {
         describe("constructor", () => {
             it("starts the info loading by default", async () => {

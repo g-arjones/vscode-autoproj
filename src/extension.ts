@@ -8,18 +8,21 @@ import * as commands from "./commands";
 import * as tasks from "./tasks";
 import * as watcher from "./watcher";
 import * as wrappers from "./wrappers";
+import * as cpptools from "./cpptools";
 
 export class EventHandler implements vscode.Disposable {
     private _wrapper: wrappers.VSCode;
     private _watcher: watcher.FileWatcher;
     private _workspaces: autoproj.Workspaces;
     private _workspaceRootToPid: Map<string, number>;
+    private _cppConfigurationProvider: cpptools.CppConfigurationProvider;
 
     constructor(wrapper: wrappers.VSCode, fileWatcher: watcher.FileWatcher,
-                workspaces: autoproj.Workspaces) {
+                workspaces: autoproj.Workspaces, cppConfigurationProvider: cpptools.CppConfigurationProvider) {
         this._wrapper = wrapper;
         this._watcher = fileWatcher;
         this._workspaces = workspaces;
+        this._cppConfigurationProvider = cppConfigurationProvider;
         this._workspaceRootToPid = new Map();
     }
 
@@ -57,6 +60,7 @@ export class EventHandler implements vscode.Disposable {
     public async onManifestChanged(ws: autoproj.Workspace): Promise<void> {
         try {
             await ws.reload();
+            this._cppConfigurationProvider.notifyChanges();
         } catch (err) {
             this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
         }
@@ -67,6 +71,7 @@ export class EventHandler implements vscode.Disposable {
         if (added && workspace) {
             try {
                 await workspace.info();
+                this._cppConfigurationProvider.notifyChanges();
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
@@ -122,26 +127,29 @@ export class EventHandler implements vscode.Disposable {
     }
 }
 
-export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSCode) {
+export async function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSCode) {
     const fileWatcher = new watcher.FileWatcher();
     const workspaces = new autoproj.Workspaces(null);
     const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces, vscodeWrapper);
     const autoprojCommands = new commands.Commands(workspaces, vscodeWrapper);
-    const eventHandler = new EventHandler(vscodeWrapper, fileWatcher, workspaces);
+    const cppConfigurationProvider = new cpptools.CppConfigurationProvider(workspaces);
+    const eventHandler = new EventHandler(vscodeWrapper, fileWatcher, workspaces, cppConfigurationProvider);
     const tasksHandler = new tasks.Handler(vscodeWrapper, workspaces);
 
-    subscriptions.push(vscode.workspace.registerTaskProvider("autoproj", autoprojTaskProvider));
+    subscriptions.push(vscode.tasks.registerTaskProvider("autoproj", autoprojTaskProvider));
     if (vscode.workspace.workspaceFolders) {
         vscode.workspace.workspaceFolders.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
     }
 
     autoprojTaskProvider.reloadTasks();
     autoprojCommands.register();
+    cppConfigurationProvider.register();
 
     subscriptions.push(eventHandler);
     subscriptions.push(workspaces);
     subscriptions.push(fileWatcher);
     subscriptions.push(tasksHandler);
+    subscriptions.push(cppConfigurationProvider);
     subscriptions.push(vscode.tasks.onDidStartTaskProcess((event) => {
         eventHandler.onDidStartTaskProcess(event);
         tasksHandler.onDidStartTaskProcess(event);
@@ -160,9 +168,9 @@ export function setupExtension(subscriptions: any[], vscodeWrapper: wrappers.VSC
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
-export function activate(extensionContext: vscode.ExtensionContext) {
+export async function activate(extensionContext: vscode.ExtensionContext) {
     const vscodeWrapper = new wrappers.VSCode(extensionContext);
-    setupExtension(extensionContext.subscriptions, vscodeWrapper);
+    await setupExtension(extensionContext.subscriptions, vscodeWrapper);
 }
 
 // this method is called when your extension is deactivated

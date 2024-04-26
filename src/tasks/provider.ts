@@ -9,6 +9,11 @@ function runAutoproj(ws, ...args) {
     return new vscode.ProcessExecution(ws.autoprojExePath(), args, { cwd: ws.root });
 }
 
+/*
+ TODO: Update to allow adding folders with multiple packages.
+       In this case, tasks should be generated for packages
+       contained in the given folder.
+*/
 export class AutoprojProvider implements vscode.TaskProvider {
     public workspaces: autoproj.Workspaces;
 

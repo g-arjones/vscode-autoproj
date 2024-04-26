@@ -3,6 +3,7 @@ import * as path from "path";
 import { IMock, It, Mock, Times } from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
+import * as cpptools from "../src/cpptools";
 import * as extension from "../src/extension";
 import * as tasks from "../src/tasks";
 import * as watcher from "../src/watcher";
@@ -13,13 +14,17 @@ describe("EventHandler", () => {
     let mockWorkspaces: mocks.MockWorkspaces;
     let mockWrapper: IMock<wrappers.VSCode>;
     let mockWatcher: IMock<watcher.FileWatcher>;
+    let mockCppConfigurationProvider: IMock<cpptools.CppConfigurationProvider>;
     let subject: extension.EventHandler;
 
     beforeEach(() => {
         mockWorkspaces = new mocks.MockWorkspaces();
         mockWrapper = Mock.ofType<wrappers.VSCode>();
         mockWatcher = Mock.ofType<watcher.FileWatcher>();
-        subject = new extension.EventHandler(mockWrapper.object, mockWatcher.object, mockWorkspaces.object);
+        mockCppConfigurationProvider = Mock.ofType<cpptools.CppConfigurationProvider>();
+        subject = new extension.EventHandler(
+            mockWrapper.object, mockWatcher.object, mockWorkspaces.object, mockCppConfigurationProvider.object
+        );
     });
     describe("onDidStartTaskProcess()", () => {
         let taskProcessStartEvent: vscode.TaskProcessStartEvent;

@@ -39,7 +39,7 @@ export function loadWorkspaceInfo(workspacePath: string): Promise<WorkspaceInfo>
         const packageSets = new Map();
         const packages = new Map();
         manifest.forEach((entry) => {
-            if (entry.name) {
+            if (entry.name && !entry.package_set) {
                 packages.set(entry.srcdir, entry);
             } else {
                 entry.name = entry.package_set;
