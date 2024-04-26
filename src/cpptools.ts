@@ -8,12 +8,11 @@
 import * as autoproj from "./autoproj";
 import * as shlex from './cmt/shlex';
 import * as util from './cmt/util';
-import { fs } from './cmt/pr';
 import * as compilationDb from "./cmt/compilationDatabase";
 import * as path from 'path';
 import * as vscode from 'vscode';
 import * as cpptools from 'vscode-cpptools';
-import { Version, getCppToolsApi, SourceFileConfigurationItem } from 'vscode-cpptools';
+import { Version, getCppToolsApi, SourceFileConfigurationItem, SourceFileConfiguration } from 'vscode-cpptools';
 
 type Architecture = 'x86' | 'x64' | 'arm' | 'arm64' | undefined;
 type StandardVersion = "c89" | "c99" | "c11" | "c17" | "c++98" | "c++03" | "c++11" | "c++14" | "c++17" | "c++20" | "c++23" | "gnu89" | "gnu99" | "gnu11" | "gnu17" | "gnu++98" | "gnu++03" | "gnu++11" | "gnu++14" | "gnu++17" | "gnu++20" | "gnu++23" | undefined;
@@ -157,7 +156,7 @@ function parseCompileFlags(cptVersion: cpptools.Version, args: string[], lang?: 
         } else if (value === '-D' || value === '/D') {
             const { done, value } = iter.next();
             if (done) {
-                console.error('unexpected.end.of.arguments', 'Unexpected end of parsing command line arguments');
+                console.error('Unexpected end of parsing command line arguments');
                 continue;
             }
             extraDefinitions.push(value);
@@ -169,7 +168,7 @@ function parseCompileFlags(cptVersion: cpptools.Version, args: string[], lang?: 
             if (lang === 'CXX' || lang === 'OBJCXX' || lang === 'CUDA') {
                 const s = parseCppStandard(std, canUseGnuStd, canUseCxx23);
                 if (!s) {
-                    console.warn('unknown.control.gflag.cpp', 'Unknown C++ standard control flag: {0}', value);
+                    console.warn(`Unknown C++ standard control flag: ${value}`);
                 } else {
                     standard = s;
                 }
@@ -186,12 +185,12 @@ function parseCompileFlags(cptVersion: cpptools.Version, args: string[], lang?: 
                     s = parseCStandard(std, canUseGnuStd);
                 }
                 if (!s) {
-                    console.warn('unknown.control.gflag', 'Unknown standard control flag: {0}', value);
+                    console.warn(`Unknown standard control flag: ${value}`);
                 } else {
                     standard = s;
                 }
             } else {
-                console.warn('unknown language', 'Unknown language: {0}', lang);
+                console.warn(`Unknown language: ${lang}`);
             }
         }
     }
@@ -286,10 +285,12 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
     readonly extensionId = "arjones.autoproj"
 
     private _workspaces: autoproj.Workspaces;
+    private _compilationDbsByPath: Map<string, compilationDb.CompilationDatabase>;
     private _cppToolsApi: cpptools.CppToolsApi | undefined;
 
     constructor(workspaces: autoproj.Workspaces) {
         this._workspaces = workspaces;
+        this._compilationDbsByPath = new Map<string, compilationDb.CompilationDatabase>();
     }
 
     async register(): Promise<boolean> {
@@ -314,6 +315,8 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
     }
 
     notifyChanges() {
+        this.removeOrphanedDbs();
+
         if (this._cppToolsApi) {
             this._cppToolsApi.didChangeCustomBrowseConfiguration(this);
             this._cppToolsApi.didChangeCustomConfiguration(this);
@@ -341,57 +344,21 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
      * configurations for any of the files requested.
      */
     async provideConfigurations(uris: vscode.Uri[], token?: vscode.CancellationToken) {
+        this.removeOrphanedDbs();
         if (this._workspaces.workspaces.size == 0) {
             return [];
         }
 
-        // TODO: Parallelize, cache compilation dbs, watch dbs and reload on events
-        let items: SourceFileConfigurationItem[] = []
+        const itemPromises = new Array<Promise<SourceFileConfigurationItem | undefined>>();
         for (const uri of uris) {
-            let db: compilationDb.CompilationDatabase | null = null;
-            let workspaces = [...this._workspaces.workspaces.values()];
-            for (const ws of workspaces) {
-                let wsInfo = await ws.info();
-                let pkg = wsInfo.findPackageByPath(uri.fsPath);
-                if (pkg && pkg.builddir) {
-                    let db_path = path.join(pkg.builddir, "compile_commands.json");
-                    if (await fs.exists(db_path)) {
-                        db = await compilationDb.CompilationDatabase.fromFilePaths([db_path]);
-                        if (db) {
-                            let info = db.get(uri.fsPath);
-                            if (info) {
-                                let args = info.arguments;
-                                if (args && args.length > 0) {
-                                    const getAsFlags = (fragments?: string[]) => {
-                                        if (!fragments) {
-                                            return [];
-                                        }
-                                        return [...util.flatMap(fragments, fragment => shlex.split(fragment))];
-                                    };
+            itemPromises.push(this.getSourceFileConfigurationItem(uri));
+        }
 
-                                    let compilerPath = util.platformNormalizePath(args.shift()!);
-                                    let compilerFragments = getAsFlags(args);
-                                    let compilerFlags = parseCompileFlags(this._cppToolsApi!.getVersion(), compilerFragments);
-                                    let intelliSenseMode = getIntelliSenseMode(this._cppToolsApi!.getVersion(), compilerPath, compilerFlags.targetArch);
-                                    let item: SourceFileConfigurationItem = {
-                                        uri: uri,
-                                        configuration: {
-                                            compilerPath: compilerPath,
-                                            standard: compilerFlags.standard,
-                                            intelliSenseMode: intelliSenseMode as IntelliSenseMode || undefined,
-                                            includePath: [],
-                                            defines: [],
-                                            compilerFragments: compilerFragments
-                                        }
-                                    }
-                                    console.log(item);
-                                    items.push(item);
-                                }
-                            }
-                        }
-                    }
-                    break;
-                }
+        // Process all promises concurrently
+        const items: SourceFileConfigurationItem[] = []
+        for (const item of (await Promise.all(itemPromises))) {
+            if (item) {
+                items.push(item);
             }
         }
         return items;
@@ -440,9 +407,92 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
         return null;
     }
 
+    clearDbs() {
+        for (const db of this._compilationDbsByPath.values()) {
+            db.dispose();
+        }
+
+        this._compilationDbsByPath.clear();
+    }
+
+    removeOrphanedDbs() {
+        // TODO: Remove dbs that don't belong to any package currently
+        // in any of the workspace (sub-)folders
+    }
+
+    async getCompilationDb(path: string): Promise<compilationDb.CompilationDatabase> {
+        let db = this._compilationDbsByPath.get(path);
+        if (db) {
+            if (!db.loaded && (await db.exists())) {
+                await db.load();
+            }
+            return db;
+        } else {
+            db = new compilationDb.CompilationDatabase(path, this);
+            if (await db.exists()) {
+                await db.load();
+            }
+            this._compilationDbsByPath.set(path, db);
+        }
+        return db;
+    }
+
+    async getSourceFileConfigurationItem(uri: vscode.Uri): Promise<SourceFileConfigurationItem | undefined> {
+        let db: compilationDb.CompilationDatabase | undefined;
+        for (const ws of this._workspaces.workspaces.values()) {
+            let wsInfo = await ws.info();
+            let pkg = wsInfo.findPackageByPath(uri.fsPath);
+            if (pkg && pkg.builddir) {
+                let db_path = path.join(pkg.builddir, "compile_commands.json");
+                db = await this.getCompilationDb(db_path);
+                if (!db) {
+                    return;
+                }
+
+                let info = db.get(uri.fsPath);
+                if (!info) {
+                    return;
+                }
+
+                let args = info.arguments;
+                if (args && args.length > 0) {
+                    return {
+                        uri: uri,
+                        configuration: this.getSourceFileConfiguration(args)
+                    };
+                }
+            }
+        }
+    }
+
+    getSourceFileConfiguration(command: string[]): SourceFileConfiguration {
+        const getAsFlags = (fragments?: string[]) => {
+            if (!fragments) {
+                return [];
+            }
+            return [...util.flatMap(fragments, fragment => shlex.split(fragment))];
+        };
+
+        command = new Array<string>(...command);  // copy to avoid changing the compilation db
+        let compilerPath = util.platformNormalizePath(command.shift()!);
+        let compilerFragments = getAsFlags(command);
+        let compilerFlags = parseCompileFlags(this._cppToolsApi!.getVersion(), compilerFragments);
+        let intelliSenseMode = getIntelliSenseMode(this._cppToolsApi!.getVersion(), compilerPath, compilerFlags.targetArch);
+        let configuration: SourceFileConfiguration = {
+            compilerPath: compilerPath,
+            standard: compilerFlags.standard,
+            intelliSenseMode: intelliSenseMode as IntelliSenseMode || undefined,
+            includePath: [],
+            defines: [],
+            compilerFragments: compilerFragments
+        }
+        return configuration;
+    }
+
     dispose() {
         if (this._cppToolsApi) {
             this._cppToolsApi.dispose();
         }
+        this.clearDbs();
     }
 }

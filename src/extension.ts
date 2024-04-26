@@ -98,6 +98,7 @@ export class EventHandler implements vscode.Disposable {
     }
 
     public async onWorkspaceFolderRemoved(folder: vscode.WorkspaceFolder): Promise<void> {
+        this._cppConfigurationProvider.notifyChanges();
         const deletedWs = this._workspaces.deleteFolder(folder.uri.fsPath);
         if (deletedWs) {
             this.unwatchManifest(deletedWs);
