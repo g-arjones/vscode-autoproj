@@ -61,6 +61,7 @@ export namespace fs {
     export const stat = promisify(fs_.stat);
     export const walk = promisify(walk_);
     export const realpath = promisify(fs_.realpath);
+    export const chmod = promisify(fs_.chmod);
 
     /**
      * Try and stat() a file/folder. If stat() fails for *any reason*, returns `null`.

@@ -1,10 +1,11 @@
 "use strict";
 import * as path from "path";
-import { IMock, It, Mock, Times } from "typemoq";
+import { IMock, IGlobalMock, It, Mock, Times, GlobalMock, GlobalScope } from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as cpptools from "../src/cpptools";
 import * as extension from "../src/extension";
+import * as shims from "../src/shimsWriter";
 import * as tasks from "../src/tasks";
 import * as watcher from "../src/watcher";
 import * as wrappers from "../src/wrappers";
@@ -15,6 +16,7 @@ describe("EventHandler", () => {
     let mockWrapper: IMock<wrappers.VSCode>;
     let mockWatcher: IMock<watcher.FileWatcher>;
     let mockCppConfigurationProvider: IMock<cpptools.CppConfigurationProvider>;
+    let mockShimsWriter: IGlobalMock<shims.ShimsWriter>;
     let subject: extension.EventHandler;
 
     beforeEach(() => {
@@ -22,9 +24,12 @@ describe("EventHandler", () => {
         mockWrapper = Mock.ofType<wrappers.VSCode>();
         mockWatcher = Mock.ofType<watcher.FileWatcher>();
         mockCppConfigurationProvider = Mock.ofType<cpptools.CppConfigurationProvider>();
-        subject = new extension.EventHandler(
-            mockWrapper.object, mockWatcher.object, mockWorkspaces.object, mockCppConfigurationProvider.object
-        );
+        mockShimsWriter = GlobalMock.ofType(shims.ShimsWriter, shims);
+        GlobalScope.using(mockShimsWriter).with(() => {
+            subject = new extension.EventHandler(
+                mockWrapper.object, mockWatcher.object, mockWorkspaces.object, mockCppConfigurationProvider.object
+            );
+        });
     });
     describe("onDidStartTaskProcess()", () => {
         let taskProcessStartEvent: vscode.TaskProcessStartEvent;
@@ -101,16 +106,67 @@ describe("EventHandler", () => {
             mockWatchFunc = Mock.ofInstance(() => void 0);
             subject.watchManifest = mockWatchFunc.object;
         });
-        it("loads installation manifest", async () => {
-            mockWorkspaces.createWorkspaceInfo(wsRoot);
-            mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
-                returns(() => ({ added: true, workspace: mockWorkspace.object }));
+        describe("with a valid instalatiion manifest", () => {
+            beforeEach(() => {
+                mockWorkspaces.createWorkspaceInfo(wsRoot);
+                mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
+                    returns(() => ({ added: true, workspace: mockWorkspace.object }));
+            });
+            it("loads installation manifest", async () => {
+                await subject.onWorkspaceFolderAdded(folder);
+                mockWorkspace.verify((x) => x.info(), Times.once());
+                mockWatchFunc.verify((x) => x(mockWorkspace.object), Times.once());
+                mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
+                mockWrapper.verify((x) => x.executeTask(task), Times.once());
+                mockShimsWriter.verify((x) => x.writePython(mockWorkspace.object), Times.once());
+                mockShimsWriter.verify((x) => x.writeGdb(mockWorkspace.object), Times.once());
+            });
+            it("shows error if cannot write shims", async () => {
+                mockShimsWriter.setup((x) => x.writePython(It.isAny())).returns(() => Promise.reject(new Error("foo")));
+                mockShimsWriter.setup((x) => x.writeGdb(It.isAny())).returns(() => Promise.reject(new Error("foo")));
+                await subject.onWorkspaceFolderAdded(folder);
+                mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.exactly(2));
+                mockShimsWriter.verify((x) => x.writePython(mockWorkspace.object), Times.once());
+                mockShimsWriter.verify((x) => x.writeGdb(mockWorkspace.object), Times.once());
+            });
+            it("shows error message if watch task cannot be found", async () => {
+                mockWrapper.reset();
+                mockWrapper.setup((x) => x.fetchTasks(tasks.WORKSPACE_TASK_FILTER)).
+                    returns(() => Promise.resolve([]));
 
-            await subject.onWorkspaceFolderAdded(folder);
-            mockWorkspace.verify((x) => x.info(), Times.once());
-            mockWatchFunc.verify((x) => x(mockWorkspace.object), Times.once());
-            // mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
-            // mockWrapper.verify((x) => x.executeTask(task), Times.once());
+                await subject.onWorkspaceFolderAdded(folder);
+                mockWrapper.verify((x) => x.showErrorMessage("Internal error: Could not find watch task"), Times.once());
+                mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
+            });
+            it("shows error message if watch task cannot be started", async () => {
+                mockWrapper.reset();
+                await subject.onWorkspaceFolderAdded(folder);
+                mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
+            });
+            describe("with fake tasks", () => {
+                let fakeExecution: vscode.TaskExecution;
+                let mockTasks: IGlobalMock<typeof vscode.tasks>;
+                let originalTasks: typeof vscode.tasks;
+                beforeEach(() => {
+                    mockTasks = GlobalMock.ofInstance(vscode.tasks, "tasks", vscode);
+                    originalTasks = require("vscode").tasks;
+                    require("vscode").tasks = mockTasks.object;
+                });
+                afterEach(() => {
+                    require("vscode").tasks = originalTasks;
+                });
+                it("does not execute watch task if already running", async () => {
+                    fakeExecution = {
+                        task: task,
+                        terminate: () => { }
+                    };
+                    mockTasks.setup((x) => x.taskExecutions).returns(() => [fakeExecution]);
+
+                    await subject.onWorkspaceFolderAdded(folder);
+                    mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
+                    mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
+                });
+            });
         });
         it("loads manifest and shows error if failure", async () => {
             mockWorkspaces.invalidateWorkspaceInfo(wsRoot);
@@ -120,17 +176,10 @@ describe("EventHandler", () => {
             await subject.onWorkspaceFolderAdded(folder);
             mockWorkspace.verify((x) => x.info(), Times.once());
             mockWatchFunc.verify((x) => x(mockWorkspace.object), Times.once());
-            // mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
-            // mockWrapper.verify((x) => x.executeTask(task), Times.once());
-        });
-        it("shows error message if watch task cannot be started", async () => {
-            mockWrapper.reset();
-            mockWorkspaces.createWorkspaceInfo(wsRoot);
-            mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
-                returns(() => ({ added: true, workspace: mockWorkspace.object }));
-
-            await subject.onWorkspaceFolderAdded(folder);
-            // mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
+            mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
+            mockWrapper.verify((x) => x.executeTask(task), Times.once());
+            mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
+            mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
         });
         it("does nothing if folder already in workspace", async () => {
             mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
@@ -142,6 +191,8 @@ describe("EventHandler", () => {
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
             mockWrapper.verify((x) => x.fetchTasks(It.isAny()), Times.never());
             mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
+            mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
+            mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
         });
         it("does nothing if folder not added", async () => {
             mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
@@ -153,6 +204,8 @@ describe("EventHandler", () => {
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
             mockWrapper.verify((x) => x.fetchTasks(It.isAny()), Times.never());
             mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
+            mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
+            mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
         });
     });
     describe("onWorkspaceFolderRemoved()", () => {

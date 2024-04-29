@@ -9,6 +9,7 @@ import * as tasks from "./tasks";
 import * as watcher from "./watcher";
 import * as wrappers from "./wrappers";
 import * as cpptools from "./cpptools";
+import { ShimsWriter } from "./shimsWriter";
 
 export class EventHandler implements vscode.Disposable {
     private _wrapper: wrappers.VSCode;
@@ -16,6 +17,7 @@ export class EventHandler implements vscode.Disposable {
     private _workspaces: autoproj.Workspaces;
     private _workspaceRootToPid: Map<string, number>;
     private _cppConfigurationProvider: cpptools.CppConfigurationProvider;
+    private _shimsWriter: ShimsWriter;
 
     constructor(wrapper: wrappers.VSCode, fileWatcher: watcher.FileWatcher,
                 workspaces: autoproj.Workspaces, cppConfigurationProvider: cpptools.CppConfigurationProvider) {
@@ -23,6 +25,7 @@ export class EventHandler implements vscode.Disposable {
         this._watcher = fileWatcher;
         this._workspaces = workspaces;
         this._cppConfigurationProvider = cppConfigurationProvider;
+        this._shimsWriter = new ShimsWriter();
         this._workspaceRootToPid = new Map();
     }
 
@@ -66,12 +69,23 @@ export class EventHandler implements vscode.Disposable {
         }
     }
 
+    private async _writeShim(callback: () => Promise<void>, name: string, ws: autoproj.Workspace) {
+        try {
+            await callback();
+        } catch (err) {
+            const wsName = path.basename(ws.root);
+            await this._wrapper.showErrorMessage(`Could create ${name} shim in '${wsName}' workspace: ${err.message}`);
+        }
+    }
+
     public async onWorkspaceFolderAdded(folder: vscode.WorkspaceFolder): Promise<void> {
         const { added, workspace } = this._workspaces.addFolder(folder.uri.fsPath);
         if (added && workspace) {
             try {
                 await workspace.info();
                 this._cppConfigurationProvider.notifyChanges();
+                await this._writeShim(() => this._shimsWriter.writePython(workspace), "python", workspace);
+                await this._writeShim(() => this._shimsWriter.writeGdb(workspace), "gdb", workspace);
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
@@ -88,7 +102,7 @@ export class EventHandler implements vscode.Disposable {
                         this._wrapper.executeTask(watchTask);
                     }
                 } else {
-                    this._wrapper.showErrorMessage(`Internal error: Could not find watch task`);
+                    this._wrapper.showErrorMessage("Internal error: Could not find watch task");
                 }
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not start autoproj watch task: ${err.message}`);
