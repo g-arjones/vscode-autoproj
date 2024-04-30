@@ -32,7 +32,7 @@ export function loadWorkspaceInfo(workspacePath: string): Promise<WorkspaceInfo>
             }
         });
     }).then((data) => {
-        let manifest = yaml.safeLoad(data.toString()) as any[];
+        let manifest = yaml.load(data.toString()) as any[];
         if (manifest === undefined) {
             manifest = [];
         }

@@ -65,7 +65,7 @@ export function createInstallationManifest(data: any, ...workspacePath): string 
     let joinedPath = fullPath(...workspacePath);
     joinedPath = Autoproj.installationManifestPath(joinedPath);
     mkdir(...workspacePath, ".autoproj");
-    FS.writeFileSync(joinedPath, YAML.safeDump(data));
+    FS.writeFileSync(joinedPath, YAML.dump(data));
     createdFS.push([joinedPath, "file"]);
     return joinedPath;
 }
@@ -107,9 +107,9 @@ export function addPackageToManifest(ws, path: string[], partialInfo: { [key: st
     };
 
     const manifestPath = Autoproj.installationManifestPath(ws.root);
-    const manifest = YAML.safeLoad(FS.readFileSync(manifestPath).toString()) as any[];
+    const manifest = YAML.load(FS.readFileSync(manifestPath).toString()) as any[];
     manifest.push(result);
-    FS.writeFileSync(manifestPath, YAML.safeDump(manifest));
+    FS.writeFileSync(manifestPath, YAML.dump(manifest));
     ws.reload();
     return result;
 }
