@@ -3,6 +3,8 @@ import { CancellationTokenSource, QuickPickOptions, Uri } from "vscode";
 import * as autoproj from "./autoproj";
 import * as tasks from "./tasks";
 import * as wrappers from "./wrappers";
+import * as path from "path";
+import { ShimsWriter } from "./shimsWriter";
 
 export class Commands {
     constructor(private readonly _workspaces: autoproj.Workspaces,
@@ -141,10 +143,27 @@ export class Commands {
         }
     }
 
+    public async setupPythonDefaultInterpreter() {
+        const workspaces = [...this._workspaces.workspaces.values()];
+        if (workspaces.length == 0) {
+            await this._vscode.showErrorMessage("Cannot setup Python default interpreter for an empty workspace");
+            return;
+        } else if (workspaces.length > 1) {
+            await this._vscode.showErrorMessage("Cannot setup Python default interpreter for multiple Autoproj workspaces");
+            return;
+        }
+
+        const pythonShimPath = path.join(workspaces[0].root, ShimsWriter.RELATIVE_SHIMS_PATH, "python");
+        this._vscode.getConfiguration().update("python.defaultInterpreterPath", pythonShimPath);
+    }
+
     public register() {
-        this._vscode.registerAndSubscribeCommand("autoproj.updatePackageInfo", () => { this.updatePackageInfo(); });
         this._vscode.registerAndSubscribeCommand("autoproj.addPackageToWorkspace", () => {
             this.addPackageToWorkspace();
+        });
+        this._vscode.registerAndSubscribeCommand("autoproj.updatePackageInfo", () => { this.updatePackageInfo(); });
+        this._vscode.registerAndSubscribeCommand("autoproj.setupPythonDefaultInterpreter", () => {
+            this.setupPythonDefaultInterpreter();
         });
     }
 }

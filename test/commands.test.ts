@@ -1,10 +1,12 @@
 "use strict";
 import * as assert from "assert";
+import * as path from "path";
 import { basename, dirname } from "path";
 import { IMock, It, Mock, Times } from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as commands from "../src/commands";
+import { ShimsWriter } from "../src/shimsWriter";
 import * as tasks from "../src/tasks";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
@@ -248,30 +250,52 @@ describe("Commands", () => {
             mockWrapper.verify((x) => x.showErrorMessage("Could not add folder: /path/to/tools/two"), Times.once());
         });
     });
+    describe("setupPythonDefaultInterpreter()", () => {
+        it("shows an error message if workspace is empty", async () => {
+            await subject.setupPythonDefaultInterpreter();
+            mockWrapper.verify((x) => x.showErrorMessage(
+                "Cannot setup Python default interpreter for an empty workspace"), Times.once());
+        })
+        it("shows an error message when working with multiple autoproj workspaces", async () => {
+            mockWorkspaces.addWorkspace("/ws/one");
+            mockWorkspaces.addWorkspace("/ws/two");
+            await subject.setupPythonDefaultInterpreter();
+            mockWrapper.verify((x) => x.showErrorMessage(
+                "Cannot setup Python default interpreter for multiple Autoproj workspaces"), Times.once());
+        })
+        it("sets the default python interpreter", async () => {
+            mockWorkspaces.addWorkspace("/ws/one");
+            const mockConfiguration = Mock.ofType<vscode.WorkspaceConfiguration>();
+            mockWrapper.setup((x) => x.getConfiguration()).returns(() => mockConfiguration.object);
+            await subject.setupPythonDefaultInterpreter();
+
+            const pythonShimPath = path.join("/ws/one", ShimsWriter.RELATIVE_SHIMS_PATH, "python");
+            mockConfiguration.verify((x) => x.update("python.defaultInterpreterPath", pythonShimPath), Times.once());
+        })
+    });
     describe("register()", () => {
-        function setupWrapper(command: string, callback: (command, cb) => void) {
-            mockWrapper.setup((x) => x.registerAndSubscribeCommand(command, It.isAny())).callback(callback);
+        function setupMocks(methodName: string, command: string) {
+            mockWrapper.setup((x) => x.registerAndSubscribeCommand(command, It.isAny())).callback((_, cb) => cb());
+
+            const mock = Mock.ofInstance(() => Promise.resolve());
+            Object.assign(subject, {...subject, [methodName]: mock.object });
+
+            return mock;
         }
 
         it("registers all commands", async () => {
-            let updatePackageInfoCb: () => Promise<void>;
-            let addPackageToWorkspaceCb: () => Promise<void>;
-
-            const mockUpdatePackageInfo = Mock.ofInstance(() => Promise.resolve());
-            subject.updatePackageInfo = mockUpdatePackageInfo.object;
-
-            const mockAddPackageToWorkspace = Mock.ofInstance(() => Promise.resolve());
-            subject.addPackageToWorkspace = mockAddPackageToWorkspace.object;
-
-            setupWrapper("autoproj.updatePackageInfo", (command, cb) => updatePackageInfoCb = cb);
-            setupWrapper("autoproj.addPackageToWorkspace", (command, cb) => addPackageToWorkspaceCb = cb);
+            const mockUpdatePackageInfo = setupMocks("updatePackageInfo", "autoproj.updatePackageInfo");
+            const mockAddPackageToWorkspace = setupMocks("addPackageToWorkspace", "autoproj.addPackageToWorkspace");
+            const mockSetupPythonDefaultInterpreterCb = setupMocks(
+                "setupPythonDefaultInterpreter",
+                "autoproj.setupPythonDefaultInterpreter"
+            );
 
             subject.register();
-            updatePackageInfoCb!();
-            addPackageToWorkspaceCb!();
 
             mockUpdatePackageInfo.verify((x) => x(), Times.once());
             mockAddPackageToWorkspace.verify((x) => x(), Times.once());
+            mockSetupPythonDefaultInterpreterCb.verify((x) => x(), Times.once());
         });
     });
 });

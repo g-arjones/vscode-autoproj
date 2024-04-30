@@ -45,14 +45,19 @@
     "contributes": {
         "commands": [
             {
-                "title": "Update package info",
-                "category": "Autoproj",
-                "command": "autoproj.updatePackageInfo"
-            },
-            {
                 "title": "Add package to workspace",
                 "category": "Autoproj",
                 "command": "autoproj.addPackageToWorkspace"
+            },
+            {
+                "title": "Setup Python default interpreter",
+                "category": "Autoproj",
+                "command": "autoproj.setupPythonDefaultInterpreter"
+            },
+            {
+                "title": "Update package info",
+                "category": "Autoproj",
+                "command": "autoproj.updatePackageInfo"
             }
         ],
         "languages": [
