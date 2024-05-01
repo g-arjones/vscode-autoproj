@@ -126,7 +126,7 @@ describe("Commands", () => {
             const choices = await subject.packagePickerChoices();
             assert.equal(choices.length, 4);
             assert.deepStrictEqual(choices[0].pkg,
-                { name: "autoproj (buildconf)", srcdir: "/path/to/autoproj" });
+                { name: "autoproj (to)", srcdir: "/path/to/autoproj" });
             assert.strictEqual(choices[0].label, "autoproj");
             assert.strictEqual(choices[0].description, "to (buildconf)");
             assert.strictEqual(choices[1].pkg, packageOne);
@@ -203,39 +203,42 @@ describe("Commands", () => {
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
             mockWrapper.verify((x) => x.showQuickPick(promise, options, It.isAny()), Times.once());
         });
-        it("handles an empty workspace", async () => {
-            const promise = Promise.resolve(choices);
-            mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
-            mockSubject.setup((x) => x.packagePickerChoices()).returns(() => promise);
-            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null, It.isAny())).returns(() => true);
-            mockWrapper.setup((x) => x.showQuickPick(promise,
-                options, It.isAny())).returns(() => Promise.resolve(choices[1]));
-            await subject.addPackageToWorkspace();
+        it("sorts the folder list", async () => {
+            mockWorkspaces.addPackageSetToWorkspace("/path/to/autoproj/remotes/set.foo", "/path/to");
+            const folders: vscode.WorkspaceFolder[] = [
+                {
+                    index: 0,
+                    name: "autoproj (to)",
+                    uri: vscode.Uri.file("/path/to/autoproj"),
+                },
+                {
+                    index: 1,
+                    name: "tools/two",
+                    uri: vscode.Uri.file("/path/to/tools/two"),
+                },
+                {
+                    index: 2,
+                    name: "set.foo (package set)",
+                    uri: vscode.Uri.file("/path/to/autoproj/remotes/set.foo"),
+                }
+            ];
 
-            mockWrapper.verify((x) => x.updateWorkspaceFolders(0, null,
-                { name: "tools/two", uri: vscode.Uri.file("/path/to/tools/two") }), Times.once());
-        });
-        it("keeps the folder list sorted", async () => {
-            const folder1: vscode.WorkspaceFolder = {
-                index: 0,
-                name: "autoproj",
-                uri: vscode.Uri.file("/path/to/autoproj"),
-            };
-            const folder2: vscode.WorkspaceFolder = {
-                index: 0,
-                name: "tools/two",
-                uri: vscode.Uri.file("/path/to/tools/two"),
-            };
+            type Folder = { name: string, uri: vscode.Uri };
+            const sortedFolders = [
+                It.is((x: Folder) => x.name == folders[0].name && x.uri.fsPath == folders[0].uri.fsPath),
+                It.is((x: Folder) => x.name == folders[2].name && x.uri.fsPath == folders[2].uri.fsPath),
+                It.is((x: Folder) => x.name == "drivers/one" && x.uri.fsPath == "/path/to/drivers/one"),
+                It.is((x: Folder) => x.name == folders[1].name && x.uri.fsPath == folders[1].uri.fsPath)
+            ];
+
             const promise = Promise.resolve(choices);
-            mockWrapper.setup((x) => x.workspaceFolders).returns(() => [folder1, folder2]);
+            mockWrapper.setup((x) => x.workspaceFolders).returns(() => folders);
             mockSubject.setup((x) => x.packagePickerChoices()). returns(() => promise);
-            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null, It.isAny())).returns(() => true);
+            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, 3, ...sortedFolders)).returns(() => true);
             mockWrapper.setup((x) => x.showQuickPick(promise,
                 options, It.isAny())).returns(() => Promise.resolve(choices[0]));
             await subject.addPackageToWorkspace();
-
-            mockWrapper.verify((x) => x.updateWorkspaceFolders(1, null,
-                { name: "drivers/one", uri: vscode.Uri.file("/path/to/drivers/one") }), Times.once());
+            mockWrapper.verify((x) => x.updateWorkspaceFolders(0, 3, ...sortedFolders), Times.once());
         });
         it("shows an error if folder could not be added", async () => {
             const promise = Promise.resolve(choices);

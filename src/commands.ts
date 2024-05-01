@@ -75,7 +75,7 @@ export class Commands {
                     choices.push({
                         description: `${ws.name} (buildconf)`,
                         label: name,
-                        pkg: { name: "autoproj (buildconf)", srcdir: buildconfPath },
+                        pkg: { name: `autoproj (${ws.name})`, srcdir: buildconfPath },
                     });
                 }
                 for (const pkgSet of wsInfo.packageSets) {
@@ -121,23 +121,26 @@ export class Commands {
 
         tokenSource.dispose();
         if (selectedOption) {
-            const name = selectedOption.pkg.name;
             const wsFolders = this._vscode.workspaceFolders;
-            let start = 0;
-
-            if (wsFolders) {
-                for (start = 0; start < wsFolders.length; start++) {
-                    if (name < wsFolders[start].name) {
-                        break;
-                    }
-                }
-            }
-
-            const folder = {
+            let folders = wsFolders?.map((folder) => { return { name: folder.name, uri: folder.uri }; }) || [];
+            folders = folders.concat({
                 name: selectedOption.pkg.name,
                 uri: Uri.file(selectedOption.pkg.srcdir),
-            };
-            if (!this._vscode.updateWorkspaceFolders(start, null, folder)) {
+            });
+
+            const buildconfPaths = [...this._workspaces.workspaces.values()]
+                .map((folder) => path.join(folder.root, "autoproj"));
+            const buildconfs = folders.filter((folder) => buildconfPaths.includes(folder.uri.fsPath));
+            folders = folders.filter((folder) => !buildconfs.includes(folder));
+            const pkgSets = folders.filter(
+                (folder) => buildconfPaths.some((configPath) => folder.uri.fsPath.startsWith(configPath)));
+            const pkgs = folders.filter((folder) => !pkgSets.includes(folder));
+
+            [buildconfs, pkgSets, pkgs].forEach(group => {
+                group.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+            });
+
+            if (!this._vscode.updateWorkspaceFolders(0, wsFolders?.length || null, ...buildconfs, ...pkgSets, ...pkgs)) {
                 this._vscode.showErrorMessage(`Could not add folder: ${selectedOption.pkg.srcdir}`);
             }
         }
