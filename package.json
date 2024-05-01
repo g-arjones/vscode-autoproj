@@ -357,7 +357,9 @@
         "coverage": "c8 --reporter=html --exclude='*/test/*' --exclude='*/src/wrappers.js' npm run test"
     },
     "extensionDependencies": [
-        "ms-vscode.cpptools"
+        "ms-vscode.cpptools",
+        "ms-python.python",
+        "shopify.ruby-lsp"
     ],
     "dependencies": {
         "@nodelib/fs.walk": "^2.0.0",
