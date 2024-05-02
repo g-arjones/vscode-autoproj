@@ -86,6 +86,7 @@ export class EventHandler implements vscode.Disposable {
                 this._cppConfigurationProvider.notifyChanges();
                 await this._writeShim(() => this._shimsWriter.writePython(workspace), "python", workspace);
                 await this._writeShim(() => this._shimsWriter.writeGdb(workspace), "gdb", workspace);
+                await this._writeShim(() => this._shimsWriter.writeRuby(workspace), "ruby", workspace);
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }

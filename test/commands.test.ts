@@ -11,6 +11,7 @@ import * as tasks from "../src/tasks";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
 import * as mocks from "./mocks";
+import { fs } from "../src/cmt/pr";
 
 describe("Commands", () => {
     let mockWorkspaces: mocks.MockWorkspaces;
@@ -276,6 +277,100 @@ describe("Commands", () => {
             mockConfiguration.verify((x) => x.update("python.defaultInterpreterPath", pythonShimPath), Times.once());
         })
     });
+    describe("setupRubyExtension()", () => {
+        it("shows an error message if workspace is empty", async () => {
+            await subject.setupRubyExtension();
+            mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
+            mockWrapper.verify((x) => x.showErrorMessage(
+                "Cannot setup Ruby extension for an empty workspace"), Times.once());
+        });
+        it("shows an error message when working with multiple autoproj workspaces", async () => {
+            mockWorkspaces.addWorkspace("/ws/one");
+            mockWorkspaces.addWorkspace("/ws/two");
+            await subject.setupRubyExtension();
+            mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
+            mockWrapper.verify((x) => x.showErrorMessage(
+                "Cannot setup Ruby extension for multiple Autoproj workspaces"), Times.once());
+        });
+        describe("in a real workspace", () => {
+            let root: string;
+            beforeEach(() => {
+                root = helpers.init();
+                mockWorkspaces.addWorkspace(root);
+            });
+            afterEach(() => {
+                helpers.clear();
+            });
+            it("shows an error if Gemfile cannot be created", async () => {
+                // create a file instead of a directory to force error
+                helpers.registerFile("autoproj");
+                await fs.writeFile(path.join(root, "autoproj"), "");
+
+                await subject.setupRubyExtension();
+                mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
+                mockWrapper.verify((x) => x.showErrorMessage(
+                    It.is((x) => !!x.match(/Could not create the extension's Gemfile/)), It.isAny()), Times.once());
+            });
+            describe("the Gemfile is created", () => {
+                beforeEach(() => {
+                    helpers.registerDir("autoproj");
+                    helpers.registerDir("autoproj", "overrides.d");
+                    helpers.registerFile("autoproj", "overrides.d", "vscode-autoproj.gemfile");
+                });
+                it("shows an error if environment cannot be read", async () => {
+                    await subject.setupRubyExtension();
+                    mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
+                    mockWrapper.verify((x) => x.showErrorMessage(
+                        It.is((x) => !!x.match(/Unable to read the workspaces's environment/)), It.isAny()), Times.once());
+                });
+                it("shows an error if environment is invalid", async () => {
+                    helpers.registerDir(".autoproj");
+                    helpers.registerFile(".autoproj", "env.yml");
+
+                    // write an invalid yaml to trigger an error
+                    await fs.mkdir(path.join(root, ".autoproj"));
+                    await fs.writeFile(path.join(root, ".autoproj", "env.yml"), "- :");
+
+                    await subject.setupRubyExtension();
+                    mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
+                    mockWrapper.verify((x) => x.showErrorMessage(
+                        It.is((x) => !!x.match(/Unable to read the workspaces's environment/)), It.isAny()), Times.once());
+                });
+                it("creates Gemfile and sets ruby extension configuration", async () => {
+                    helpers.registerDir(".autoproj");
+                    helpers.registerFile(".autoproj", "env.yml");
+
+                    const envContents = [
+                        "set:",
+                        "  BUNDLE_GEMFILE:",
+                        "    - /path/to/Gemfile",
+                        ""
+                    ];
+
+                    await fs.mkdir(path.join(root, ".autoproj"));
+                    await fs.writeFile(path.join(root, ".autoproj", "env.yml"), envContents.join("\n"));
+
+                    const mockConfiguration = Mock.ofType<vscode.WorkspaceConfiguration>();
+                    mockWrapper.setup((x) => x.getConfiguration("rubyLsp")).returns(() => mockConfiguration.object);
+
+                    await subject.setupRubyExtension();
+
+                    const shimsPath = path.join(root, ".autoproj", "vscode-autoproj", "bin");
+                    const wsGemfile = "/path/to/Gemfile";
+                    const gemFileContents: string = await fs.readFile(
+                        path.join(root, "autoproj", "overrides.d", "vscode-autoproj.gemfile"));
+
+                    assert(gemFileContents.includes('gem "ruby-lsp"'));
+                    assert(gemFileContents.includes('gem "debug"'));
+
+                    mockConfiguration.verify((x) => x.update("rubyVersionManager.identifier", "custom"), Times.once());
+                    mockConfiguration.verify((x) => x.update("customRubyCommand", `PATH=${shimsPath}:$PATH`), Times.once());
+                    mockConfiguration.verify((x) => x.update("bundleGemfile", wsGemfile), Times.once());
+                            mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), { modal: true }), Times.once());
+                });
+            });
+        });
+    });
     describe("register()", () => {
         function setupMocks(methodName: string, command: string) {
             mockWrapper.setup((x) => x.registerAndSubscribeCommand(command, It.isAny())).callback((_, cb) => cb());
@@ -289,7 +384,8 @@ describe("Commands", () => {
         it("registers all commands", async () => {
             const mockUpdatePackageInfo = setupMocks("updatePackageInfo", "autoproj.updatePackageInfo");
             const mockAddPackageToWorkspace = setupMocks("addPackageToWorkspace", "autoproj.addPackageToWorkspace");
-            const mockSetupPythonDefaultInterpreterCb = setupMocks(
+            const mockSetupRubyExtension = setupMocks("setupRubyExtension", "autoproj.setupRubyExtension");
+            const mockSetupPythonDefaultInterpreter = setupMocks(
                 "setupPythonDefaultInterpreter",
                 "autoproj.setupPythonDefaultInterpreter"
             );
@@ -298,7 +394,8 @@ describe("Commands", () => {
 
             mockUpdatePackageInfo.verify((x) => x(), Times.once());
             mockAddPackageToWorkspace.verify((x) => x(), Times.once());
-            mockSetupPythonDefaultInterpreterCb.verify((x) => x(), Times.once());
+            mockSetupPythonDefaultInterpreter.verify((x) => x(), Times.once());
+            mockSetupRubyExtension.verify((x) => x(), Times.once());
         });
     });
 });

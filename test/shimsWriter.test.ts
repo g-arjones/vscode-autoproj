@@ -42,4 +42,15 @@ describe("ShimsWriter instanciated", () => {
             accessSync(path.join(root, relativeShimPath), constants.X_OK);
         });
     });
+    describe("writeRuby", () => {
+        let relativeShimPath: string;
+        beforeEach(() => {
+            relativeShimPath = path.join(ShimsWriter.RELATIVE_SHIMS_PATH, "ruby");
+            helpers.registerFile(relativeShimPath);
+        });
+        it("writes ruby shim in the given workspace", async () => {
+            await subject.writeRuby(workspace);
+            accessSync(path.join(root, relativeShimPath), constants.X_OK);
+        });
+    });
 });

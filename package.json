@@ -55,6 +55,11 @@
                 "command": "autoproj.setupPythonDefaultInterpreter"
             },
             {
+                "title": "Setup Ruby LSP extension",
+                "category": "Autoproj",
+                "command": "autoproj.setupRubyExtension"
+            },
+            {
                 "title": "Update package info",
                 "category": "Autoproj",
                 "command": "autoproj.updatePackageInfo"

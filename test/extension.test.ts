@@ -120,14 +120,17 @@ describe("EventHandler", () => {
                 mockWrapper.verify((x) => x.executeTask(task), Times.once());
                 mockShimsWriter.verify((x) => x.writePython(mockWorkspace.object), Times.once());
                 mockShimsWriter.verify((x) => x.writeGdb(mockWorkspace.object), Times.once());
+                mockShimsWriter.verify((x) => x.writeRuby(mockWorkspace.object), Times.once());
             });
             it("shows error if cannot write shims", async () => {
                 mockShimsWriter.setup((x) => x.writePython(It.isAny())).returns(() => Promise.reject(new Error("foo")));
                 mockShimsWriter.setup((x) => x.writeGdb(It.isAny())).returns(() => Promise.reject(new Error("foo")));
+                mockShimsWriter.setup((x) => x.writeRuby(It.isAny())).returns(() => Promise.reject(new Error("foo")));
                 await subject.onWorkspaceFolderAdded(folder);
-                mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.exactly(2));
+                mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.exactly(3));
                 mockShimsWriter.verify((x) => x.writePython(mockWorkspace.object), Times.once());
                 mockShimsWriter.verify((x) => x.writeGdb(mockWorkspace.object), Times.once());
+                mockShimsWriter.verify((x) => x.writeRuby(mockWorkspace.object), Times.once());
             });
             it("shows error message if watch task cannot be found", async () => {
                 mockWrapper.reset();
@@ -180,6 +183,7 @@ describe("EventHandler", () => {
             mockWrapper.verify((x) => x.executeTask(task), Times.once());
             mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
             mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
+            mockShimsWriter.verify((x) => x.writeRuby(It.isAny()), Times.never());
         });
         it("does nothing if folder already in workspace", async () => {
             mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
@@ -193,6 +197,7 @@ describe("EventHandler", () => {
             mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
             mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
             mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
+            mockShimsWriter.verify((x) => x.writeRuby(It.isAny()), Times.never());
         });
         it("does nothing if folder not added", async () => {
             mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
@@ -206,6 +211,7 @@ describe("EventHandler", () => {
             mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
             mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
             mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
+            mockShimsWriter.verify((x) => x.writeRuby(It.isAny()), Times.never());
         });
     });
     describe("onWorkspaceFolderRemoved()", () => {
