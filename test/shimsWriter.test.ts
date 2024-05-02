@@ -5,7 +5,7 @@ import * as helpers from "./helpers";
 import { accessSync, constants } from "fs";
 
 describe("ShimsWriter instanciated", () => {
-    const subject = new ShimsWriter();
+    let subject: ShimsWriter;
     let root: string;
     let workspace: Workspace;
 
@@ -16,6 +16,7 @@ describe("ShimsWriter instanciated", () => {
         workspace = Workspace.fromDir(root, false)!;
         helpers.registerDir(ShimsWriter.RELATIVE_SHIMS_PATH, "..");
         helpers.registerDir(ShimsWriter.RELATIVE_SHIMS_PATH);
+        subject = new ShimsWriter();
     });
     afterEach(() => {
         helpers.clear();

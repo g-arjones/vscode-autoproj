@@ -91,19 +91,6 @@ export function* flatMap<In, Out>(rng: Iterable<In>, fn: (item: In) => Iterable<
     }
 }
 
-/**
- * Get the first non-empty item from an object that produces arrays of objects.
- */
-export function first<In, Out>(array: Iterable<In>, fn: (item: In) => Out[]): Out[] {
-    for (const item of array) {
-        const result = fn(item);
-        if (result?.length > 0) {
-            return result;
-        }
-    }
-    return [];
-}
-
 export function dropNulls<T>(items: (T | null | undefined)[]): T[] {
     return items.filter(item => (item !== null && item !== undefined)) as T[];
 }
@@ -112,12 +99,4 @@ export enum Ordering {
     Greater,
     Equivalent,
     Less,
-}
-
-export function errorToString(e: any): string {
-    if (e.stack) {
-        // e.stack has both the message and the stack in it.
-        return `\n\t${e.stack}`;
-    }
-    return `\n\t${e.toString()}`;
 }

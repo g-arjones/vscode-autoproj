@@ -6,7 +6,6 @@ import * as os from "os";
 import * as Path from "path";
 import * as TypeMoq from "typemoq";
 import * as Autoproj from "../src/autoproj";
-import * as Tasks from "../src/tasks";
 import * as Wrappers from "../src/wrappers";
 
 export async function assertThrowsAsync(p, msg: RegExp): Promise<Error> {
@@ -25,6 +24,10 @@ let root;
 let createdFS: string[][] = [];
 
 export function init(): string {
+    if (root) {
+        throw new Error("Heleprs already initialized");
+    }
+
     root = FS.mkdtempSync(Path.join(os.tmpdir(), "vscode-autoproj"));
     return root;
 }

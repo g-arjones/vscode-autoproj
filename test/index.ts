@@ -1,8 +1,12 @@
 import * as path from 'path';
 import * as Mocha from 'mocha';
+import { install } from 'source-map-support';
 import * as glob from 'glob';
 
 export function run(): Promise<void> {
+	// Source map support
+	install();
+
 	// Create the mocha test
 	const mocha = new Mocha({
 		ui: 'bdd',

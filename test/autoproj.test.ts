@@ -2,6 +2,7 @@
 import * as assert from "assert";
 import * as path from "path";
 import * as TypeMoq from "typemoq";
+import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as helpers from "./helpers";
 
@@ -174,7 +175,22 @@ describe("Autoproj helpers tests", () => {
                 assert.equal(pkg!.name, "ct_core");
             });
             it("handles packages without srcdir", () => {
-                // TODO
+                const pkg: autoproj.IPackage = {
+                    name: "foo",
+                    type: "Autobuild::CMake",
+                    vcs: {
+                        type: "git",
+                        url: "git@myserver.com:/foo.git",
+                        repository_id: "myserver:/foo.git"
+                    },
+                    srcdir: undefined!,
+                    builddir: "/path/to/ws/build/foo",
+                    logdir: "/path/to/ws/install/foo/log",
+                    prefix: "/path/to/ws/install/foo",
+                    dependencies: []
+                }
+                wsInfo.packages.set("/path/to/ws/src/foo", pkg);
+                assert.doesNotThrow(() => wsInfo.findPackageByPath("/path/to/ws/src/foo"));
             });
         });
     });
@@ -303,6 +319,29 @@ describe("Autoproj helpers tests", () => {
                 ws.name = "test";
                 workspaces.add(ws);
                 assert.equal("a", ws.name);
+            });
+        });
+
+        describe("dispose", () => {
+            it("disposes of all internal resources", async () => {
+                const mockWs = TypeMoq.Mock.ofType<autoproj.Workspace>();
+                const mockDisposable = TypeMoq.Mock.ofType<vscode.Disposable>();
+                const mockEventEmitter = TypeMoq.Mock.ofType<vscode.EventEmitter<any>>();
+                const folderInfoDisposables = new Map<string, vscode.Disposable>();
+
+                folderInfoDisposables.set("/one", mockDisposable.object);
+                folderInfoDisposables.set("/two", mockDisposable.object);
+
+                workspaces.workspaces.set("/one", mockWs.object);
+                workspaces.workspaces.set("/two", mockWs.object);
+                workspaces["_workspaceInfoEvent"] = mockEventEmitter.object;
+                workspaces["_folderInfoEvent"] = mockEventEmitter.object;
+                workspaces["_folderInfoDisposables"] = folderInfoDisposables;
+
+                workspaces.dispose();
+                mockWs.verify((x) => x.dispose(), TypeMoq.Times.exactly(2));
+                mockDisposable.verify((x) => x.dispose(), TypeMoq.Times.exactly(2));
+                mockEventEmitter.verify((x) => x.dispose(), TypeMoq.Times.exactly(2));
             });
         });
 

@@ -380,6 +380,7 @@
         "@vscode/test-electron": "^2.3.9",
         "c8": "^9.1.0",
         "mocha": "^10.4.0",
+        "source-map-support": "^0.5.21",
         "typemoq": "^2.1.0",
         "typescript": "^5.4.5"
     }

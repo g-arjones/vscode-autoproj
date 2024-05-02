@@ -69,18 +69,3 @@ export function* split(str: string, opt?: ShlexOptions): Iterable<string> {
         yield token;
     }
 }
-
-export function quote(str: string, opt?: ShlexOptions): string {
-    opt = opt || {
-        mode: process.platform === 'win32' ? 'windows' : 'posix'
-    };
-    if (str === '') {
-        return '""';
-    }
-    if (/[^\w@%\-+=:,./|><]/.test(str)) {
-        str = str.replace(/"/g, '\\"');
-        return `"${str}"`;
-    } else {
-        return str;
-    }
-}

@@ -23,9 +23,9 @@ export class WorkspaceInfo {
         filePath = util.platformNormalizePath(filePath);
         const parentPkgs = (pkg: IPackage) => {
             if (pkg.srcdir) {
-                return filePath.startsWith(util.platformNormalizePath(pkg.srcdir));;
+                return filePath.startsWith(util.platformNormalizePath(pkg.srcdir));
             } else {
-                console.warn(`Package ${pkg.name} has no srcdir`);
+                return false;
             }
         }
 

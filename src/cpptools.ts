@@ -8,7 +8,7 @@
 import * as autoproj from "./autoproj";
 import * as shlex from './cmt/shlex';
 import * as util from './cmt/util';
-import * as compilationDb from "./cmt/compilationDatabase";
+import * as compilationDb from "./compilationDatabase";
 import * as path from 'path';
 import * as vscode from 'vscode';
 import * as cpptools from 'vscode-cpptools';
@@ -284,28 +284,22 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
     readonly name = "Autoproj";
     readonly extensionId = "arjones.autoproj"
 
+    private _pathToCompilationDb: Map<string, compilationDb.CompilationDatabase>;
     private _workspaces: autoproj.Workspaces;
-    private _compilationDbsByPath: Map<string, compilationDb.CompilationDatabase>;
     private _cppToolsApi: cpptools.CppToolsApi | undefined;
 
     constructor(workspaces: autoproj.Workspaces) {
         this._workspaces = workspaces;
-        this._compilationDbsByPath = new Map<string, compilationDb.CompilationDatabase>();
+        this._pathToCompilationDb = new Map<string, compilationDb.CompilationDatabase>();
     }
 
     async register(): Promise<boolean> {
         this._cppToolsApi = await getCppToolsApi(Version.v6);
         if (this._cppToolsApi) {
-            console.log(`cpptools-api-version: ${this._cppToolsApi.getVersion()}`);
             if (this._cppToolsApi.notifyReady) {
-                // Inform cpptools that a custom config provider will be able to service the current workspace.
                 this._cppToolsApi.registerCustomConfigurationProvider(this);
-
-                // Notify cpptools that the provider is ready to provide IntelliSense configurations.
                 this._cppToolsApi.notifyReady(this);
             } else {
-                // Running on a version of cpptools that doesn't support v2 yet.
-                // Inform cpptools that a custom config provider will be able to service the current workspace.
                 this._cppToolsApi.registerCustomConfigurationProvider(this);
                 this._cppToolsApi.didChangeCustomConfiguration(this);
             }
@@ -315,7 +309,7 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
     }
 
     notifyChanges() {
-        this.removeOrphanedDbs();
+        this._removeOrphanedDbs();
 
         if (this._cppToolsApi) {
             this._cppToolsApi.didChangeCustomBrowseConfiguration(this);
@@ -323,28 +317,12 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
         }
     }
 
-    /**
-     * A request to determine whether this provider can provide IntelliSense configurations for the given document.
-     * @param uri The URI of the document.
-     * @param token (optional) The cancellation token.
-     * @returns 'true' if this provider can provide IntelliSense configurations for the given document.
-     */
     async canProvideConfiguration(uri: vscode.Uri, token?: vscode.CancellationToken) {
         return true;
     }
 
-    /**
-     * A request to get Intellisense configurations for the given files.
-     * @param uris A list of one of more URIs for the files to provide configurations for.
-     * @param token (optional) The cancellation token.
-     * @returns A list of [SourceFileConfigurationItem](#SourceFileConfigurationItem) for the documents that this provider
-     * is able to provide IntelliSense configurations for.
-     * Note: If this provider cannot provide configurations for any of the files in `uris`, the provider may omit the
-     * configuration for that file in the return value. An empty array may be returned if the provider cannot provide
-     * configurations for any of the files requested.
-     */
     async provideConfigurations(uris: vscode.Uri[], token?: vscode.CancellationToken) {
-        this.removeOrphanedDbs();
+        this._removeOrphanedDbs();
         if (this._workspaces.workspaces.size == 0) {
             return [];
         }
@@ -355,84 +333,53 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
         }
 
         // Process all promises concurrently
-        const items: SourceFileConfigurationItem[] = []
-        for (const item of (await Promise.all(itemPromises))) {
-            if (item) {
-                items.push(item);
-            }
-        }
-        return items;
+        return util.dropNulls(await Promise.all(itemPromises));
     }
 
-    /**
-     * A request to determine whether this provider can provide a code browsing configuration for the workspace folder.
-     * @param token (optional) The cancellation token.
-     * @returns 'true' if this provider can provide a code browsing configuration for the workspace folder.
-     */
     async canProvideBrowseConfiguration(token?: vscode.CancellationToken) {
         return false;
     }
 
-    /**
-     * A request to get the code browsing configuration for the workspace folder.
-     * @param token (optional) The cancellation token.
-     * @returns A [WorkspaceBrowseConfiguration](#WorkspaceBrowseConfiguration) with the information required to
-     * construct the equivalent of `browse.path` from `c_cpp_properties.json`. If there is no configuration to report, or
-     * the provider indicated that it cannot provide a [WorkspaceBrowseConfiguration](#WorkspaceBrowseConfiguration)
-     * then `null` should be returned.
-     */
     async provideBrowseConfiguration(token?: vscode.CancellationToken) {
         return null;
     }
 
-    /**
-     * A request to determine whether this provider can provide a code browsing configuration for each folder in a multi-root workspace.
-     * @param token (optional) The cancellation token.
-     * @returns 'true' if this provider can provide a code browsing configuration for each folder in a multi-root workspace.
-     */
     async canProvideBrowseConfigurationsPerFolder(token?: vscode.CancellationToken) {
         return false;
     }
 
-    /**
-     * A request to get the code browsing configuration for the workspace folder.
-     * @param uri The URI of the folder to provide a browse configuration for.
-     * @param token (optional) The cancellation token.
-     * @returns A [WorkspaceBrowseConfiguration](#WorkspaceBrowseConfiguration) with the information required to
-     * construct the equivalent of `browse.path` from `c_cpp_properties.json`. If there is no configuration for this folder, or
-     * the provider indicated that it cannot provide a [WorkspaceBrowseConfiguration](#WorkspaceBrowseConfiguration) per folder
-     * then `null` should be returned.
-     */
     async provideFolderBrowseConfiguration(uri: vscode.Uri, token?: vscode.CancellationToken) {
         return null;
     }
 
     clearDbs() {
-        for (const db of this._compilationDbsByPath.values()) {
+        for (const db of this._pathToCompilationDb.values()) {
             db.dispose();
         }
 
-        this._compilationDbsByPath.clear();
+        this._pathToCompilationDb.clear();
     }
 
-    removeOrphanedDbs() {
+    private _removeOrphanedDbs() {
         // TODO: Remove dbs that don't belong to any package currently
         // in any of the workspace (sub-)folders
     }
 
     async getCompilationDb(path: string): Promise<compilationDb.CompilationDatabase> {
-        let db = this._compilationDbsByPath.get(path);
+        let db = this._pathToCompilationDb.get(path);
         if (db) {
             if (!db.loaded && (await db.exists())) {
                 await db.load();
             }
             return db;
         } else {
-            db = new compilationDb.CompilationDatabase(path, this);
+            db = new compilationDb.CompilationDatabase(path);
+            db.onChange((db) => this.notifyChanges());
+
             if (await db.exists()) {
                 await db.load();
             }
-            this._compilationDbsByPath.set(path, db);
+            this._pathToCompilationDb.set(path, db);
         }
         return db;
     }
@@ -445,13 +392,10 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
             if (pkg && pkg.builddir) {
                 let db_path = path.join(pkg.builddir, "compile_commands.json");
                 db = await this.getCompilationDb(db_path);
-                if (!db) {
-                    return;
-                }
 
                 let info = db.get(uri.fsPath);
                 if (!info) {
-                    return;
+                    break;
                 }
 
                 let args = info.arguments;
@@ -474,11 +418,11 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
         };
 
         command = new Array<string>(...command);  // copy to avoid changing the compilation db
-        let compilerPath = util.platformNormalizePath(command.shift()!);
-        let compilerFragments = getAsFlags(command);
-        let compilerFlags = parseCompileFlags(this._cppToolsApi!.getVersion(), compilerFragments);
-        let intelliSenseMode = getIntelliSenseMode(this._cppToolsApi!.getVersion(), compilerPath, compilerFlags.targetArch);
-        let configuration: SourceFileConfiguration = {
+        const compilerPath = util.platformNormalizePath(command.shift()!);
+        const compilerFragments = getAsFlags(command);
+        const compilerFlags = parseCompileFlags(this._cppToolsApi!.getVersion(), compilerFragments);
+        const intelliSenseMode = getIntelliSenseMode(this._cppToolsApi!.getVersion(), compilerPath, compilerFlags.targetArch);
+        const configuration: SourceFileConfiguration = {
             compilerPath: compilerPath,
             standard: compilerFlags.standard,
             intelliSenseMode: intelliSenseMode as IntelliSenseMode || undefined,

@@ -1,8 +1,7 @@
-import * as shlex from "./shlex";
-import * as cpptools from "../cpptools";
-import { fs } from "./pr";
+import * as shlex from "./cmt/shlex";
+import { fs } from "./cmt/pr";
 import { statSync } from "fs";
-import * as util from "./util";
+import * as util from "./cmt/util";
 import * as vscode from "vscode";
 
 
@@ -15,19 +14,21 @@ export interface CompileCommand {
 }
 
 export class CompilationDatabase implements vscode.Disposable {
+    static POLLING_INTERVAL: number = 2000;
+
     private _infoByFilePath: Map<string, CompileCommand>;
     private _loaded: boolean;
-    private _cppConfigurationProvider: cpptools.CppConfigurationProvider;
+    private _eventEmitter: vscode.EventEmitter<CompilationDatabase>;
     private _mtime: Date | undefined;
     private _timeout: NodeJS.Timeout;
 
     public readonly path: string;
 
-    constructor(path: string, cppConfigurationProvider: cpptools.CppConfigurationProvider) {
+    constructor(path: string) {
         this.path = path;
         this._loaded = false;
         this._infoByFilePath = new Map<string, CompileCommand>();
-        this._cppConfigurationProvider = cppConfigurationProvider;
+        this._eventEmitter = new vscode.EventEmitter<CompilationDatabase>();
 
         if (fs.existsSync(this.path)) {
             this._mtime = statSync(this.path).mtime;
@@ -41,10 +42,10 @@ export class CompilationDatabase implements vscode.Disposable {
             if (mtime?.getTime() != this._mtime?.getTime()) {
                 this._loaded = false;
                 this._infoByFilePath.clear();
-                this._cppConfigurationProvider.notifyChanges();
+                this._eventEmitter.fire(this);
             }
             this._mtime = mtime;
-        }, 2000);
+        }, CompilationDatabase.POLLING_INTERVAL);
     }
 
     get loaded() {
@@ -55,9 +56,13 @@ export class CompilationDatabase implements vscode.Disposable {
         return await fs.exists(this.path);
     }
 
+    onChange(callback: (db: CompilationDatabase) => void) {
+        this._eventEmitter.event(callback);
+    }
+
     async load() {
-        const fileContent = await fs.readFile(this.path);
         try {
+            const fileContent = await fs.readFile(this.path);
             const content = JSON.parse(fileContent.toString()) as CompileCommand[];
             this._infoByFilePath = content.reduce(
                 (acc, cur) => acc.set(util.platformNormalizePath(cur.file), {
@@ -71,7 +76,8 @@ export class CompilationDatabase implements vscode.Disposable {
             );
             this._loaded = true;
         } catch (e) {
-            console.warn('Error parsing compilation database {0}: {1}', `"${this.path}"`, util.errorToString(e));
+            vscode.window.showErrorMessage(
+                `Error parsing compilation database "${this.path}": ${e.message}`)
         }
     }
 
@@ -81,5 +87,6 @@ export class CompilationDatabase implements vscode.Disposable {
 
     dispose() {
         clearInterval(this._timeout);
+        this._eventEmitter.dispose();
     }
 }
