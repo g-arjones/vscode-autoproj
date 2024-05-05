@@ -184,4 +184,25 @@ export class Workspaces {
     public getWorkspaceFromFolder(folder: string): Workspace | undefined {
         return this.folderToWorkspace.get(folder);
     }
+
+    /** Returns the workspace and package a Uri belongs to
+    */
+    public async getWorkspaceAndPackage(uri: vscode.Uri): Promise<{ workspace: Workspace, package: IPackage | undefined } | undefined> {
+        if (uri.scheme == "file") {
+            for (const ws of this.workspaces.values()) {
+                if (!uri.fsPath.startsWith(ws.root)) {
+                    continue;
+                }
+
+                let info: WorkspaceInfo;
+                try {
+                    info = await ws.info();
+                } catch (error) {
+                    throw new Error(`Could not load '${ws.name}' installation manifest: ${error.message}`);
+                }
+
+                return { workspace: ws, package: info.findPackageByPath(uri.fsPath) };
+            }
+        }
+    }
 }

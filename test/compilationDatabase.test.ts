@@ -71,6 +71,20 @@ describe("CompilationDatabase", () => {
             await fs.unlink(dbPath);
             await event;
         });
+        it("fires event when db is deleted and then recreated", async () => {
+            await fs.writeFile(dbPath, "{}");
+
+            subject.dispose();
+            subject = new CompilationDatabase(dbPath);
+
+            let event = createEvent();
+            await fs.unlink(dbPath);
+            await event;
+
+            event = createEvent();
+            await fs.writeFile(dbPath, "{}");
+            await event;
+        });
         it("fires event when build dir is removed and then recreated", async () => {
             // wait until subject is aware the db exists
             let event = createEvent();

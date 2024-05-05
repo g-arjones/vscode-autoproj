@@ -2,10 +2,9 @@ import * as assert from "assert";
 import * as path from "path";
 import * as cpptools from "vscode-cpptools";
 import * as vscode from "vscode";
-import * as YAML from "js-yaml";
 import { GlobalMock, IGlobalMock, IMock, Mock, MockBehavior, Times } from "typemoq";
 import { replaceAll } from "../src/cmt/util";
-import { IPackage, IPackageSet, Workspaces } from "../src/autoproj";
+import { IPackage, Workspaces } from "../src/autoproj";
 import { CompilationDatabase } from "../src/compilationDatabase";
 import { CppConfigurationProvider } from "../src/cpptools";
 import * as helpers from "./helpers";
@@ -57,63 +56,6 @@ function generateCompileCommands(root: string) {
             "output": "test/gtest/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o"
         }
     ]), "/home/jammy/dev/foo", root);
-}
-
-class WorkspaceBuilder {
-    public readonly packages: Array<IPackage>;
-    public readonly packageSets: Array<IPackageSet>;
-
-    constructor(
-        public root: string,
-        public builddir: { dir: string[], relative: boolean } = { dir: ["build"], relative: false },
-        public srcdir: string[] = ["src"]
-    ) {
-        helpers.mkdir(".autoproj");
-        this.packages = [];
-        this.packageSets = [];
-        this.writeManifest();
-    }
-
-    public packageSrcDir(name: string, ...move: string[]): string[] {
-        return [...this.srcdir, ...move, ...name.split("/")];
-    }
-    public packageBuildDir(name: string): string[] {
-        if (this.builddir.relative) {
-            return [...this.packageSrcDir(name), ...this.builddir.dir];
-        } else {
-            return [...this.builddir.dir, ...name.split("/")];
-        }
-    }
-    public packagePrefix(name: string): string[] {
-        return ["install", ...name.split("/")];
-    }
-    public addPackage(name: string, ...move: string[]) {
-        const pkg: IPackage = {
-            builddir: path.join(this.root, ...this.packageBuildDir(name)),
-            dependencies: [],
-            logdir: path.join(this.root, ...this.packagePrefix(name), "log"),
-            name: name,
-            prefix: path.join(this.root, ...this.packagePrefix(name)),
-            srcdir: path.join(this.root, ...this.packageSrcDir(name, ...move)),
-            type: "Autobuild::CMake",
-            vcs: {
-                repository_id: `myserver:/${name}.git`,
-                type: "git",
-                url: `git@myserver.com:/${name}.git`,
-            },
-        };
-        helpers.mkdir(...this.packageSrcDir(name, ...move));
-        helpers.mkdir(...this.packageBuildDir(name));
-
-        this.packages.push(pkg);
-        this.writeManifest();
-
-        return pkg;
-    }
-    public writeManifest() {
-        const info = [...this.packages, ...this.packageSets];
-        helpers.mkfile(YAML.dump(info), ".autoproj", "installation-manifest");
-    }
 }
 
 describe("CppConfigurationProvider", () => {
@@ -247,17 +189,17 @@ describe("CppConfigurationProvider", () => {
             });
             describe("provideConfigurations()", () => {
                 it("returns an empty array if workspace is empty", async () => {
-                    new WorkspaceBuilder(root).writeManifest();
+                    new helpers.WorkspaceBuilder(root).writeManifest();
                     assert.equal(await subject.provideConfigurations([vscode.Uri.file("/path/to/file.cpp")]), 0);
                 });
             });
             describe("in a workspace with a cmake package", () => {
                 let pkg: IPackage;
                 let files: vscode.Uri[];
-                let builder: WorkspaceBuilder;
+                let builder: helpers.WorkspaceBuilder;
                 let compileCommandsPath: string[];
                 beforeEach(() => {
-                    builder = new WorkspaceBuilder(root);
+                    builder = new helpers.WorkspaceBuilder(root);
                     pkg = builder.addPackage("sample_driver", "drivers");
                     files = [
                         vscode.Uri.file(path.join(pkg.srcdir, "src", "driver.cpp")),
@@ -282,8 +224,10 @@ describe("CppConfigurationProvider", () => {
                         const event = new Promise<void>((resolve) => {
                             mock.setup((x) => x()).callback(() => resolve())
                         });
+                        Promise.race
 
                         await subject.getCompilationDb(joinedPath);
+                        await new Promise((r) => setTimeout(r, 20));
                         await using(mock).do(async () => {
                             await fs.writeFile(joinedPath, "{}");
                             await event;

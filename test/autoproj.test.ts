@@ -529,5 +529,28 @@ describe("Autoproj helpers tests", () => {
                 assert.deepEqual(ws, ws1.ws);
             });
         });
+        describe("getWorkspaceAndPackage", () => {
+            let pkg: autoproj.IPackage;
+            beforeEach(() => {
+                pkg = new helpers.WorkspaceBuilder(root).addPackage("foobar");
+                workspaces.addFolder(root);
+            });
+            it("returns the workspace and package file belongs to", async () => {
+                const r = await workspaces.getWorkspaceAndPackage(
+                    vscode.Uri.file(path.join(pkg.srcdir, "CMakeLists.txt")));
+
+                assert(r);
+                assert.deepEqual(pkg, r.package);
+                assert.deepEqual(workspaces.folderToWorkspace.get(root), r.workspace);
+            });
+            it("throws if manifest cannot be read", async () => {
+                helpers.mkfile("- bla: [", ".autoproj", "installation-manifest");
+
+                const ws = workspaces.folderToWorkspace.get(root)!;
+                await assert.rejects(
+                    workspaces.getWorkspaceAndPackage(vscode.Uri.file(path.join(pkg.srcdir, "CMakeLists.txt"))),
+                    new RegExp(`Could not load '${ws.name}' installation manifest`));
+            });
+        });
     });
 });

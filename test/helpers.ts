@@ -8,6 +8,63 @@ import * as TypeMoq from "typemoq";
 import * as Autoproj from "../src/autoproj";
 import * as Wrappers from "../src/wrappers";
 
+export class WorkspaceBuilder {
+    public readonly packages: Array<Autoproj.IPackage>;
+    public readonly packageSets: Array<Autoproj.IPackageSet>;
+
+    constructor(
+        public root: string,
+        public builddir: { dir: string[], relative: boolean } = { dir: ["build"], relative: false },
+        public srcdir: string[] = ["src"]
+    ) {
+        mkdir(".autoproj");
+        this.packages = [];
+        this.packageSets = [];
+        this.writeManifest();
+    }
+
+    public packageSrcDir(name: string, ...move: string[]): string[] {
+        return [...this.srcdir, ...move, ...name.split("/")];
+    }
+    public packageBuildDir(name: string): string[] {
+        if (this.builddir.relative) {
+            return [...this.packageSrcDir(name), ...this.builddir.dir];
+        } else {
+            return [...this.builddir.dir, ...name.split("/")];
+        }
+    }
+    public packagePrefix(name: string): string[] {
+        return ["install", ...name.split("/")];
+    }
+    public addPackage(name: string, ...move: string[]) {
+        const pkg: Autoproj.IPackage = {
+            builddir: Path.join(this.root, ...this.packageBuildDir(name)),
+            dependencies: [],
+            logdir: Path.join(this.root, ...this.packagePrefix(name), "log"),
+            name: name,
+            prefix: Path.join(this.root, ...this.packagePrefix(name)),
+            srcdir: Path.join(this.root, ...this.packageSrcDir(name, ...move)),
+            type: "Autobuild::CMake",
+            vcs: {
+                repository_id: `myserver:/${name}.git`,
+                type: "git",
+                url: `git@myserver.com:/${name}.git`,
+            },
+        };
+        mkdir(...this.packageSrcDir(name, ...move));
+        mkdir(...this.packageBuildDir(name));
+
+        this.packages.push(pkg);
+        this.writeManifest();
+
+        return pkg;
+    }
+    public writeManifest() {
+        const info = [...this.packages, ...this.packageSets];
+        mkfile(YAML.dump(info), ".autoproj", "installation-manifest");
+    }
+}
+
 export async function assertThrowsAsync(p, msg: RegExp): Promise<Error> {
     try {
         await p;

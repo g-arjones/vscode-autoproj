@@ -3,6 +3,7 @@ import * as assert from "assert";
 import * as path from "path";
 import { basename, dirname } from "path";
 import { IMock, It, Mock, Times } from "typemoq";
+import * as _ from "lodash";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as commands from "../src/commands";
@@ -256,16 +257,14 @@ describe("Commands", () => {
     });
     describe("setupPythonDefaultInterpreter()", () => {
         it("shows an error message if workspace is empty", async () => {
-            await subject.setupPythonDefaultInterpreter();
-            mockWrapper.verify((x) => x.showErrorMessage(
-                "Cannot setup Python default interpreter for an empty workspace"), Times.once());
-        })
+            await assert.rejects(subject.setupPythonDefaultInterpreter(),
+                /Cannot setup Python default interpreter for an empty workspace/);
+        });
         it("shows an error message when working with multiple autoproj workspaces", async () => {
             mockWorkspaces.addWorkspace("/ws/one");
             mockWorkspaces.addWorkspace("/ws/two");
-            await subject.setupPythonDefaultInterpreter();
-            mockWrapper.verify((x) => x.showErrorMessage(
-                "Cannot setup Python default interpreter for multiple Autoproj workspaces"), Times.once());
+            await assert.rejects(subject.setupPythonDefaultInterpreter(),
+                /Cannot setup Python default interpreter for multiple Autoproj workspaces/);
         })
         it("sets the default python interpreter", async () => {
             mockWorkspaces.addWorkspace("/ws/one");
@@ -279,18 +278,14 @@ describe("Commands", () => {
     });
     describe("setupRubyExtension()", () => {
         it("shows an error message if workspace is empty", async () => {
-            await subject.setupRubyExtension();
-            mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
-            mockWrapper.verify((x) => x.showErrorMessage(
-                "Cannot setup Ruby extension for an empty workspace"), Times.once());
+            await assert.rejects(subject.setupRubyExtension(),
+                /Cannot setup Ruby extension for an empty workspace/);
         });
         it("shows an error message when working with multiple autoproj workspaces", async () => {
             mockWorkspaces.addWorkspace("/ws/one");
             mockWorkspaces.addWorkspace("/ws/two");
-            await subject.setupRubyExtension();
-            mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
-            mockWrapper.verify((x) => x.showErrorMessage(
-                "Cannot setup Ruby extension for multiple Autoproj workspaces"), Times.once());
+            await assert.rejects(subject.setupRubyExtension(),
+                /Cannot setup Ruby extension for multiple Autoproj workspaces/);
         });
         describe("in a real workspace", () => {
             let root: string;
@@ -306,10 +301,8 @@ describe("Commands", () => {
                 helpers.registerFile("autoproj");
                 await fs.writeFile(path.join(root, "autoproj"), "");
 
-                await subject.setupRubyExtension();
-                mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
-                mockWrapper.verify((x) => x.showErrorMessage(
-                    It.is((x) => !!x.match(/Could not create the extension's Gemfile/)), It.isAny()), Times.once());
+                await assert.rejects(subject.setupRubyExtension(),
+                    /Could not create the extension's Gemfile/);
             });
             describe("the Gemfile is created", () => {
                 beforeEach(() => {
@@ -318,10 +311,8 @@ describe("Commands", () => {
                     helpers.registerFile("autoproj", "overrides.d", "vscode-autoproj.gemfile");
                 });
                 it("shows an error if environment cannot be read", async () => {
-                    await subject.setupRubyExtension();
-                    mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
-                    mockWrapper.verify((x) => x.showErrorMessage(
-                        It.is((x) => !!x.match(/Unable to read the workspaces's environment/)), It.isAny()), Times.once());
+                    await assert.rejects(subject.setupRubyExtension(),
+                        /Unable to read the workspaces's environment/);
                 });
                 it("shows an error if environment is invalid", async () => {
                     helpers.registerDir(".autoproj");
@@ -331,10 +322,8 @@ describe("Commands", () => {
                     await fs.mkdir(path.join(root, ".autoproj"));
                     await fs.writeFile(path.join(root, ".autoproj", "env.yml"), "- :");
 
-                    await subject.setupRubyExtension();
-                    mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), It.isAny()), Times.never());
-                    mockWrapper.verify((x) => x.showErrorMessage(
-                        It.is((x) => !!x.match(/Unable to read the workspaces's environment/)), It.isAny()), Times.once());
+                    await assert.rejects(subject.setupRubyExtension(),
+                        /Unable to read the workspaces's environment/);
                 });
                 it("creates Gemfile and sets ruby extension configuration", async () => {
                     helpers.registerDir(".autoproj");
@@ -371,6 +360,232 @@ describe("Commands", () => {
             });
         });
     });
+    describe("guessCurrentTestBinaryDir()", () => {
+        let root: string;
+        let builder: helpers.WorkspaceBuilder;
+        let workspaces: autoproj.Workspaces;
+        let pkg: autoproj.IPackage;
+        beforeEach(() => {
+            root = helpers.init();
+            builder = new helpers.WorkspaceBuilder(root);
+            workspaces = new autoproj.Workspaces();
+            subject = new commands.Commands(workspaces, mockWrapper.object);
+
+            pkg = builder.addPackage("foobar");
+            workspaces.addFolder(pkg.srcdir);
+        });
+        afterEach(() => {
+            helpers.clear();
+        })
+        it("returns the first workspace root if no editors are open", async () => {
+            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
+        });
+        it("returns the first workspace root if the current open file is not in any workspace", async () => {
+            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file("/path/to/file.cpp"));
+            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
+        });
+        it("returns the first workspace root if the current open file is not in any package", async () => {
+            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file(path.join(root, "file.cpp")));
+            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
+        });
+        it("returns the first workspace root if the build folder does not exist", async () => {
+            helpers.rmdir(...builder.packageBuildDir(pkg.name));
+            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file(path.join(pkg.srcdir, "file.cpp")));
+            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
+        });
+        it("returns the build folder if test folder does not exist", async () => {
+            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file(path.join(pkg.srcdir, "file.cpp")));
+            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, pkg.builddir);
+        });
+        it("returns the test folder if it exists", async () => {
+            helpers.mkdir(...builder.packageBuildDir(pkg.name), "test");
+            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file(path.join(pkg.srcdir, "file.cpp")));
+            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, path.join(pkg.builddir, "test"));
+        });
+    });
+    describe("startDebugging()", () => {
+        let root: string;
+        let builder: helpers.WorkspaceBuilder;
+        let workspaces: autoproj.Workspaces;
+        let pkg: autoproj.IPackage;
+        let testArguments: string;
+        let testExecutable: vscode.Uri;
+        beforeEach(() => {
+            root = helpers.init();
+            builder = new helpers.WorkspaceBuilder(root);
+            workspaces = new autoproj.Workspaces();
+            subject = new commands.Commands(workspaces, mockWrapper.object);
+
+            pkg = builder.addPackage("foobar");
+            workspaces.addFolder(pkg.srcdir);
+
+            const openDialogReturn = () => Promise.resolve(testExecutable ? [testExecutable] : undefined);
+            mockWrapper.setup((x) => x.showOpenDialog(It.isAny())).returns(openDialogReturn);
+            mockWrapper.setup((x) => x.showInputBox(It.isAny())).returns(() => Promise.resolve(testArguments));
+        });
+        afterEach(() => {
+            helpers.clear();
+        })
+        it("throws if workspace is empty", async () => {
+            workspaces.deleteFolder(pkg.srcdir);
+            await assert.rejects(subject.startDebugging(), new Error("Cannot debug an empty workspace"));
+        });
+        it("aborts if canceled while waiting for program selection", async () => {
+            await subject.startDebugging();
+            mockWrapper.verify((x) => x.showInputBox(It.isAny()), Times.never());
+        });
+        it("aborts if canceled while waiting for program arguments", async () => {
+            testExecutable = vscode.Uri.file(path.join(pkg.builddir, "test", "test_suite"));
+            await subject.startDebugging();
+            mockWrapper.verify((x) => x.startDebugging(It.isAny(), It.isAny()), Times.never());
+        });
+        it("throws if the selected program is not in the workspace", async () => {
+            testExecutable = vscode.Uri.file(path.join("/test", "test_suite"));
+            testArguments = "";
+            await assert.rejects(subject.startDebugging(),
+                new Error("The selected program is not in any open Autoproj workspace"));
+        });
+        describe("when a debugging session is started", () => {
+            let ws: autoproj.Workspace;
+            beforeEach(() => {
+                testArguments = "";
+                testExecutable = vscode.Uri.file(path.join(pkg.builddir, "test", "test_suite"));
+                ws = [...workspaces.workspaces.values()][0];
+            });
+            function assertStartsDebuggingWith(config: any) {
+                const matches = It.is(_.matches(config));
+                mockWrapper.verify((x) => x.startDebugging(It.isAny(), matches), Times.once());
+            }
+            it("splits the test arguments", async () => {
+                testArguments = "--gtest_filter=*foobar* --gtest_catch_exceptions=0";
+                await subject.startDebugging();
+                const args = ["--gtest_filter=*foobar*", "--gtest_catch_exceptions=0"];
+                assertStartsDebuggingWith({ "args": args });
+            });
+            it("sets the debugger path", async () => {
+                await subject.startDebugging();
+                const debuggerPath = path.join(root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb")
+                assertStartsDebuggingWith({ "miDebuggerPath": debuggerPath });
+            });
+            it("sets working dir to program dir", async () => {
+                await subject.startDebugging();
+                assertStartsDebuggingWith({ "cwd": path.dirname(testExecutable.fsPath) });
+            });
+            it("uses pkg name and ws name in config name when in builddir", async () => {
+                testExecutable = vscode.Uri.file(path.join(pkg.builddir, "test", "test_suite"));
+                await subject.startDebugging();
+                assertStartsDebuggingWith({ "name": `${pkg.name}/test_suite (${ws.name})` });
+            });
+            it("uses pkg name and ws name in config name when in srcdir", async () => {
+                testExecutable = vscode.Uri.file(path.join(pkg.srcdir, "test", "test_suite"));
+                await subject.startDebugging();
+                assertStartsDebuggingWith({ "name": `${pkg.name}/test_suite (${ws.name})` });
+            });
+            it("uses ws name in config name when binary is from unknown pkg", async () => {
+                testExecutable = vscode.Uri.file(path.join(ws.root, "some_binary"));
+                await subject.startDebugging();
+                assertStartsDebuggingWith({ "name": `some_binary (${ws.name})` });
+            });
+            it("saves debugging session for later use", async () => {
+                const wsFolder: vscode.WorkspaceFolder = {
+                    index: 0,
+                    name: pkg.name,
+                    uri: vscode.Uri.file(pkg.srcdir)
+                }
+
+                let selectedWs;
+                let selectedConfig
+
+                mockWrapper.setup((x) => x.getWorkspaceFolder(It.isAny())).returns(() => wsFolder);
+                mockWrapper.setup((x) => x.startDebugging(It.isAny(), It.isAny())).callback((ws, config) => {
+                    selectedWs = ws;
+                    selectedConfig = config;
+                });
+
+                await subject.startDebugging();
+                assert.deepEqual({ ws: selectedWs, config: selectedConfig }, subject["_lastDebuggingSession"]);
+            });
+        });
+    });
+    describe("restartDebugging()", () => {
+        it("restarts last debugging session", async () => {
+            const wsFolder: vscode.WorkspaceFolder = {
+                index: 0,
+                name: "foobar",
+                uri: vscode.Uri.file("/path/to/ws/src/foobar")
+            }
+            const config = { name: "launch (gdb)" };
+            subject["_lastDebuggingSession"]= { ws: wsFolder, config: config! } as any;
+            await subject.restartDebugging();
+            mockWrapper.verify((x) => x.startDebugging(wsFolder, config as any), Times.once());
+        });
+        it("throws if no debugging session was started", async () => {
+            await assert.rejects(subject.restartDebugging(), /You have not started a debugging session yet/);
+        });
+    });
+    describe("saveLastDebuggingSession()", () => {
+        it("throws if no debugging session was started", async () => {
+            await assert.rejects(subject.saveLastDebuggingSession(), /You have not started a debugging session yet/);
+        });
+        it("throws if workspace is empty", async () => {
+            subject["_lastDebuggingSession"] = { ws: "" as any, config: "" as any };
+            await assert.rejects(subject.saveLastDebuggingSession(),
+                /Cannot save a debugging session in an empty workspace/);
+        });
+        describe("in a non empty workspace", () => {
+            let builder: helpers.WorkspaceBuilder;
+            let pkg: autoproj.IPackage;
+            let root: string;
+            let workspaces: autoproj.Workspaces;
+            let mockWorkspaceConfig: IMock<vscode.WorkspaceConfiguration>;
+            let currentConfigs: { name: string }[];
+            beforeEach(() => {
+                root = helpers.init();
+                builder = new helpers.WorkspaceBuilder(root);
+                workspaces = new autoproj.Workspaces();
+                subject = new commands.Commands(workspaces, mockWrapper.object);
+                mockWorkspaceConfig = Mock.ofType<vscode.WorkspaceConfiguration>();
+
+                pkg = builder.addPackage("foobar");
+                workspaces.addFolder(pkg.srcdir);
+                subject["_lastDebuggingSession"] = { ws: "" as any, config: { name: "foobar (gdb)" } as any };
+                mockWrapper.setup((x) => x.getConfiguration("launch")).returns(() => mockWorkspaceConfig.object);
+                mockWorkspaceConfig.setup((x) => x.configurations).returns(() => currentConfigs);
+            });
+            it("does not add the same launch configuration", async () => {
+                currentConfigs = [{ name: "foobar (gdb)" }]
+                await subject.saveLastDebuggingSession();
+                mockWorkspaceConfig.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
+            });
+            it("sorts launch configurations while addings", async () => {
+                currentConfigs = [{ name: "a" }, { name: "c"}];
+                subject["_lastDebuggingSession"] = { ws: "" as any, config: { name: "b" } as any };
+                await subject.saveLastDebuggingSession();
+                const expectedConfigs = [{ name: "a" }, { name: "b" }, { name: "c" }];
+                const isEqual = (received) => { return It.is((value) => { return _.isEqual(value, received); }) };
+                mockWorkspaceConfig.verify((x) => x.update("configurations", isEqual(expectedConfigs)), Times.once());
+            });
+            afterEach(() => {
+                helpers.clear();
+            });
+        });
+    });
+    describe("handleError()", () => {
+        it("runs and handles errors on functions and async functions", async () => {
+            const fn = Mock.ofInstance(() => {});
+            const asyncFn = Mock.ofInstance(async () => { });
+
+            await subject.handleError(fn.object);
+            await subject.handleError(asyncFn.object);
+
+            await subject.handleError(() => { throw new Error("foobar"); });
+            await subject.handleError(async () => { throw new Error("foobar"); });
+
+            fn.verify((x) => x(), Times.once());
+            asyncFn.verify((x) => x(), Times.once());
+            mockWrapper.verify((x) => x.showErrorMessage("foobar"), Times.exactly(2));
+        });
+    });
     describe("register()", () => {
         function setupMocks(methodName: string, command: string) {
             mockWrapper.setup((x) => x.registerAndSubscribeCommand(command, It.isAny())).callback((_, cb) => cb());
@@ -380,22 +595,24 @@ describe("Commands", () => {
 
             return mock;
         }
-
         it("registers all commands", async () => {
-            const mockUpdatePackageInfo = setupMocks("updatePackageInfo", "autoproj.updatePackageInfo");
-            const mockAddPackageToWorkspace = setupMocks("addPackageToWorkspace", "autoproj.addPackageToWorkspace");
-            const mockSetupRubyExtension = setupMocks("setupRubyExtension", "autoproj.setupRubyExtension");
-            const mockSetupPythonDefaultInterpreter = setupMocks(
-                "setupPythonDefaultInterpreter",
-                "autoproj.setupPythonDefaultInterpreter"
-            );
+            const mocks = [
+                setupMocks("updatePackageInfo", "autoproj.updatePackageInfo"),
+                setupMocks("addPackageToWorkspace", "autoproj.addPackageToWorkspace"),
+                setupMocks("setupRubyExtension", "autoproj.setupRubyExtension"),
+                setupMocks("startDebugging", "autoproj.startDebugging"),
+                setupMocks("saveLastDebuggingSession", "autoproj.saveLastDebuggingSession"),
+                setupMocks("restartDebugging", "autoproj.restartDebugging"),
+                setupMocks(
+                    "setupPythonDefaultInterpreter",
+                    "autoproj.setupPythonDefaultInterpreter"
+                )
+            ];
 
             subject.register();
-
-            mockUpdatePackageInfo.verify((x) => x(), Times.once());
-            mockAddPackageToWorkspace.verify((x) => x(), Times.once());
-            mockSetupPythonDefaultInterpreter.verify((x) => x(), Times.once());
-            mockSetupRubyExtension.verify((x) => x(), Times.once());
+            for (const mock of mocks) {
+                mock.verify((x) => x(), Times.once());
+            }
         });
     });
 });

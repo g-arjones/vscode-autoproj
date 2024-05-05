@@ -385,26 +385,22 @@ export class CppConfigurationProvider implements cpptools.CustomConfigurationPro
     }
 
     async getSourceFileConfigurationItem(uri: vscode.Uri): Promise<SourceFileConfigurationItem | undefined> {
-        let db: compilationDb.CompilationDatabase | undefined;
-        for (const ws of this._workspaces.workspaces.values()) {
-            let wsInfo = await ws.info();
-            let pkg = wsInfo.findPackageByPath(uri.fsPath);
-            if (pkg && pkg.builddir) {
-                let db_path = path.join(pkg.builddir, "compile_commands.json");
-                db = await this.getCompilationDb(db_path);
+        const pkg = (await this._workspaces.getWorkspaceAndPackage(uri))?.package;
+        if (pkg && pkg.builddir) {
+            const db_path = path.join(pkg.builddir, "compile_commands.json");
+            const db = await this.getCompilationDb(db_path);
 
-                let info = db.get(uri.fsPath);
-                if (!info) {
-                    break;
-                }
+            const info = db.get(uri.fsPath);
+            if (!info) {
+                return;
+            }
 
-                let args = info.arguments;
-                if (args && args.length > 0) {
-                    return {
-                        uri: uri,
-                        configuration: this.getSourceFileConfiguration(args)
-                    };
-                }
+            const args = info.arguments;
+            if (args && args.length > 0) {
+                return {
+                    uri: uri,
+                    configuration: this.getSourceFileConfiguration(args)
+                };
             }
         }
     }

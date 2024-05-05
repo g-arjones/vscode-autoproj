@@ -16,6 +16,15 @@ export class VSCode {
         return vscode.workspace.workspaceFolders;
     }
 
+    public get workspaceFile(): vscode.Uri | undefined {
+        return vscode.workspace.workspaceFile;
+    }
+
+    public get activeDocumentURI() : vscode.Uri | undefined
+    {
+        return vscode.window.activeTextEditor?.document.uri;
+    }
+
     public getWorkspaceFolder(uri: vscode.Uri | string): vscode.WorkspaceFolder | undefined {
         if (typeof uri === "string") {
             uri = vscode.Uri.file(uri);
@@ -40,6 +49,18 @@ export class VSCode {
 
     public showInformationMessage<T extends vscode.MessageItem>(message: string, options: vscode.MessageOptions, ...items: T[]): Thenable<T | undefined> {
         return vscode.window.showInformationMessage(message, options, ...items);
+    }
+
+    public showInputBox(options?: vscode.InputBoxOptions, token?: vscode.CancellationToken): Thenable<string | undefined> {
+        return vscode.window.showInputBox(options, token);
+    }
+
+    public showOpenDialog(options?: vscode.OpenDialogOptions): Thenable<vscode.Uri[] | undefined> {
+        return vscode.window.showOpenDialog(options);
+    }
+
+    public startDebugging(folder: vscode.WorkspaceFolder | undefined, nameOrConfiguration: string | vscode.DebugConfiguration, parentSessionOrOptions?: vscode.DebugSession | vscode.DebugSessionOptions): Thenable<boolean> {
+        return vscode.debug.startDebugging(folder, nameOrConfiguration, parentSessionOrOptions);
     }
 
     public updateWorkspaceFolders(start: number, deleteCount: number | undefined | null,
