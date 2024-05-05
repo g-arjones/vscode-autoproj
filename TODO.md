@@ -1,0 +1,27 @@
+- Add linter
+- Add output channel
+- Combine autoproj-package and autoproj-workspace in a single task provider
+- Support adding parent folders (i.e. `drivers/`) in task provider
+- Dynamic debug config (with vars resolving)
+- Add command to enable debug symbols (by creating rb file in overrides.d)
+- Run `autoproj watch` with `child_process.spawn` instead of as a task (and monitor it)
+- Refactor `extension.test.ts` and `commands.test.ts` to use a real workspace instead of mocks (see `cpptools.test.ts`)
+- Install `ruby-lsp` automatically
+  - Create a Gemfile in `.autoproj/vscode-autoproj` that does `eval_gemfile` on `install/gems/Gemfile` and adds `ruby-lsp` and `debug`
+  - Do a `bundler install` after that
+  - See `tasks.Handler` how to create a progress view
+  - On startup (also manifest changes / folder added / folder removed?):
+    - If `.autoproj/vscode-autoproj/Gemfile.lock` does not exist
+      - Does nothing
+    - If `.autoproj/vscode-autoproj/Gemfile.lock` exists
+      - If previous state is unknown, run `bundler install`
+      - If current state != previous (saved as a json, file contents hash) state, run `bundler install`
+      - If current state == previous state, does nothing
+  - Monitor `install/gems/Gemfile.lock` for changes:
+    - If `.autoproj/vscode-autoproj/Gemfile.lock` does not exist
+      - Does nothing
+    - If `.autoproj/vscode-autoproj/Gemfile.lock` exists
+      - If previous state is unknown, run `bundler install`
+      - If current state != previous (saved as a json) state, run `bundler install`
+      - If current state == previous state, does nothing
+  - Consider doing `eval_gemfile` on `.autoproj/Gemfile` as well (and monitoring the respective lock)
