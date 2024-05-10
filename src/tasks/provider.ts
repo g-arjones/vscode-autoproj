@@ -17,7 +17,6 @@ function runAutoproj(ws, ...args) {
 export class AutoprojProvider implements vscode.TaskProvider {
     public workspaces: autoproj.Workspaces;
 
-    private _watchTasks: Map<string, vscode.Task>;
     private _buildTasks: Map<string, vscode.Task>;
     private _nodepsBuildTasks: Map<string, vscode.Task>;
     private _rebuildTasks: Map<string, vscode.Task>;
@@ -39,10 +38,6 @@ export class AutoprojProvider implements vscode.TaskProvider {
 
     public async buildTask(path: string): Promise<vscode.Task> {
         return this._getCache(this._buildTasks, path);
-    }
-
-    public async watchTask(path: string): Promise<vscode.Task> {
-        return this._getCache(this._watchTasks, path);
     }
 
     public async forceBuildTask(path: string): Promise<vscode.Task> {
@@ -80,7 +75,6 @@ export class AutoprojProvider implements vscode.TaskProvider {
     public reloadTasks(): void {
         this._allTasks = [];
 
-        this._watchTasks = new Map<string, vscode.Task>();
         this._buildTasks = new Map<string, vscode.Task>();
         this._nodepsBuildTasks = new Map<string, vscode.Task>();
         this._forceBuildTasks = new Map<string, vscode.Task>();
@@ -145,7 +139,6 @@ export class AutoprojProvider implements vscode.TaskProvider {
             const updateConfig = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.UpdateConfig);
             const osdeps = this.isTaskEnabled(TaskType.Workspace, WorkspaceTaskMode.Osdeps);
 
-            this._addTask(ws.root, this._createWatchTask(`${ws.name}: Watch`, ws), this._watchTasks);
             this._addTask(ws.root, this._createUpdateEnvironmentTask(`${ws.name}: Update Environment`, ws),
                 this._updateEnvironmentTasks);
 
@@ -241,15 +234,6 @@ export class AutoprojProvider implements vscode.TaskProvider {
 
     private _createOsdepsTask(name, ws, defs = {}, args: string[] = []) {
         return this._createWorkspaceTask(name, ws, "osdeps", defs, ["osdeps", "--color", ...args]);
-    }
-
-    private _createWatchTask(name, ws, defs = {}, args: string[] = []) {
-        const task = this._createWorkspaceTask(name, ws, "watch", defs, ["watch", "--show-events", ...args]);
-        task.isBackground = true;
-        task.presentationOptions = {
-            reveal: vscode.TaskRevealKind.Never,
-        };
-        return task;
     }
 
     // vscode currently does not support workspace and global tasks

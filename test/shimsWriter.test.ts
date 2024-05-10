@@ -54,4 +54,15 @@ describe("ShimsWriter instanciated", () => {
             accessSync(path.join(root, relativeShimPath), constants.X_OK);
         });
     });
+    describe("writeOps", () => {
+        let relativeOptsPath: string;
+        beforeEach(() => {
+            relativeOptsPath = path.join(ShimsWriter.RELATIVE_OPTS_PATH, "rubyopt.rb");
+            helpers.registerFile(relativeOptsPath);
+        });
+        it("writes rubyopts.rb in the given workspace", async () => {
+            await subject.writeOpts(workspace);
+            accessSync(path.join(root, relativeOptsPath), constants.F_OK);
+        });
+    });
 });

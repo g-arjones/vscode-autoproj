@@ -42,7 +42,7 @@ describe("definitionsEqual()", () => {
     it("returns false if definitions are of different types", () => {
         const first: tasks.IPackageTaskDefinition = { mode: tasks.PackageTaskMode.Build, path: "",
             type: tasks.TaskType.Package, workspace: "" };
-        const second: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
+        const second: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Checkout,
             type: tasks.TaskType.Workspace, workspace: "" };
         assert.equal(tasks.definitionsEqual(first, second), false);
     });
@@ -68,9 +68,9 @@ describe("definitionsEqual()", () => {
         assert.equal(tasks.definitionsEqual(first, second), true);
     });
     it("returns true if autoproj-workspace definitions are equal", () => {
-        const first: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
+        const first: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Osdeps,
             type: tasks.TaskType.Workspace, workspace: "/bar" };
-        const second: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Watch,
+        const second: tasks.IWorkspaceTaskDefinition = { mode: tasks.WorkspaceTaskMode.Osdeps,
             type: tasks.TaskType.Workspace, workspace: "/bar" };
         assert.equal(tasks.definitionsEqual(first, second), true);
     });
@@ -151,27 +151,13 @@ describe("Task provider", () => {
         assert.deepEqual(actualArgs, args);
         assert.equal(tasks.definitionsEqual(task.definition as tasks.ITaskDefinition, defs), true);
 
-        if (defs.type !== tasks.TaskType.Workspace && defs.mode !== tasks.WorkspaceTaskMode.Watch) {
+        if (defs.type !== tasks.TaskType.Workspace) {
             assert.deepEqual(task.presentationOptions, { reveal: vscode.TaskRevealKind.Silent });
         }
     }
     function autoprojExePath(basePath) {
         const wsRoot = autoproj.findWorkspaceRoot(basePath) as string;
         return autoproj.autoprojExePath(wsRoot);
-    }
-    function assertWatchTask(task: vscode.Task, wsRoot: string) {
-        const process = autoprojExePath(wsRoot);
-        const args = ["watch", "--show-events"];
-        const name = `${pathBasename(wsRoot)}: Watch`;
-        const defs: tasks.IWorkspaceTaskDefinition = {
-            mode: tasks.WorkspaceTaskMode.Watch,
-            type: tasks.TaskType.Workspace,
-            workspace: wsRoot,
-        };
-
-        assertTask(task, process, args, name, workspaceFolders[0], defs);
-        assert.equal(task.isBackground, true);
-        assert.deepEqual(task.presentationOptions, { reveal: vscode.TaskRevealKind.Never });
     }
     function assertBuildTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
@@ -364,10 +350,6 @@ describe("Task provider", () => {
     }
 
     async function assertAllWorkspaceTasks(wsRoot: string) {
-        const watchTask = await subject.watchTask(wsRoot);
-        assert.notEqual(watchTask, undefined);
-        assertWatchTask(watchTask, wsRoot);
-
         const buildTask = await subject.buildTask(wsRoot);
         assert.notEqual(buildTask, undefined);
         assertBuildTask(buildTask, wsRoot);
@@ -429,7 +411,7 @@ describe("Task provider", () => {
 
         it("is initalized with all tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
-            assert.equal(providedTasks.length, 32);
+            assert.equal(providedTasks.length, 30);
         });
         it("is initalized with all workspace tasks", async () => {
             await subject.provideTasks(null);
@@ -462,8 +444,8 @@ describe("Task provider", () => {
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            // 2 mandatory tasks per workspace + 1 mandatory task per package
-            await assert.equal(providedTasks.length, 2 * 2 + 1 * 3);
+            // 1 mandatory tasks per workspace + 1 mandatory task per package
+            await assert.equal(providedTasks.length, 2 * 1 + 1 * 3);
         });
         it("gets the package names from installation manifest", async () => {
             helpers.createInstallationManifest([PKG_IODRIVERS_BASE], "one");
@@ -492,7 +474,7 @@ describe("Task provider", () => {
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            await assert.equal(providedTasks.length, 13);
+            await assert.equal(providedTasks.length, 12);
             await assertAllWorkspaceTasks(helpers.fullPath());
             await assertAllPackageTasks(a, root);
         });
@@ -506,7 +488,6 @@ describe("Task provider", () => {
         });
         it("task getters throws if there are no tasks", async () => {
             await helpers.assertThrowsAsync(subject.buildTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.watchTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.forceBuildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.rebuildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.nodepsBuildTask("/not/found"), /no entry/);
