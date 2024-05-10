@@ -29,7 +29,7 @@ export class Commands {
         function addChoice(workspace: autoproj.Workspace) {
             const choice = {
                 description: basename(dirname(workspace.root)),
-                label: basename(workspace.root),
+                label: `$(root-folder) ${workspace.name}`,
                 ws: workspace,
             };
             choices.push(choice);
@@ -84,7 +84,7 @@ export class Commands {
                     const name = `autoproj`;
                     choices.push({
                         description: `${ws.name} (buildconf)`,
-                        label: name,
+                        label: `$(root-folder) ${name}`,
                         pkg: { name: `autoproj (${ws.name})`, srcdir: buildconfPath },
                     });
                 }
@@ -92,7 +92,7 @@ export class Commands {
                     if (!fsPathsObj.hasOwnProperty(pkgSet[1].user_local_dir)) {
                         choices.push({
                             description: `${ws.name} (package set)`,
-                            label: pkgSet[1].name,
+                            label: `$(folder-library) ${pkgSet[1].name}`,
                             pkg: { name: `${pkgSet[1].name} (package set)`, srcdir: pkgSet[1].user_local_dir },
                         });
                     }
@@ -101,7 +101,7 @@ export class Commands {
                     if (!fsPathsObj.hasOwnProperty(aPkg[1].srcdir)) {
                         choices.push({
                             description: ws.name,
-                            label: aPkg[1].name,
+                            label: `$(folder) ${aPkg[1].name}`,
                             pkg: aPkg[1],
                         });
                     }

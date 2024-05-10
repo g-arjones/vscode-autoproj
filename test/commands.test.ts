@@ -69,8 +69,8 @@ describe("Commands", () => {
         function makeChoice(ws: autoproj.Workspace) {
             return {
                 description: basename(dirname(ws.root)),
-                label: basename(ws.root),
-                ws,
+                label: `$(root-folder) ${basename(ws.root)}`,
+                ws: ws,
             };
         }
         beforeEach(() => {
@@ -129,17 +129,17 @@ describe("Commands", () => {
             assert.equal(choices.length, 4);
             assert.deepStrictEqual(choices[0].pkg,
                 { name: "autoproj (to)", srcdir: "/path/to/autoproj" });
-            assert.strictEqual(choices[0].label, "autoproj");
+            assert.strictEqual(choices[0].label, "$(root-folder) autoproj");
             assert.strictEqual(choices[0].description, "to (buildconf)");
             assert.strictEqual(choices[1].pkg, packageOne);
-            assert.strictEqual(choices[1].label, "one");
+            assert.strictEqual(choices[1].label, "$(folder) one");
             assert.strictEqual(choices[1].description, "to");
             assert.deepStrictEqual(choices[2].pkg,
                 { name: "set.one (package set)", srcdir: "/path/to/autoproj/remotes/set.one" });
-            assert.strictEqual(choices[2].label, "set.one");
+            assert.strictEqual(choices[2].label, "$(folder-library) set.one");
             assert.strictEqual(choices[2].description, "to (package set)");
             assert.strictEqual(choices[3].pkg, packageTwo);
-            assert.strictEqual(choices[3].label, "two");
+            assert.strictEqual(choices[3].label, "$(folder) two");
             assert.strictEqual(choices[3].description, "to");
         });
         it("returns packages that are not in the current workspace", async () => {
@@ -163,7 +163,7 @@ describe("Commands", () => {
             const choices = await subject.packagePickerChoices();
             assert.equal(choices.length, 1);
             assert.strictEqual(choices[0].pkg, packageTwo);
-            assert.strictEqual(choices[0].label, "two");
+            assert.strictEqual(choices[0].label, "$(folder) two");
             assert.strictEqual(choices[0].description, "to");
         });
     });
@@ -181,12 +181,12 @@ describe("Commands", () => {
             packageTwo = mockWorkspaces.addPackageToWorkspace("/path/to/tools/two", "/path/to").object;
             choices = [{
                 description: "to",
-                label: "one",
+                label: "$(folder) one",
                 pkg: packageOne,
             },
             {
                 description: "to",
-                label: "two",
+                label: "$(folder) two",
                 pkg: packageTwo,
             }];
             mockSubject = Mock.ofInstance(subject);
