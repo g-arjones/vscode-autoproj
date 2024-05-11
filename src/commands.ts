@@ -1,11 +1,11 @@
 import { basename, dirname, join as pathjoin } from "path";
 import * as yaml from "js-yaml";
 import {
-    CancellationTokenSource,
     QuickPickOptions,
     Uri,
     WorkspaceFolder,
-    DebugConfiguration
+    DebugConfiguration,
+    QuickPickItem
 } from "vscode";
 import { fs } from "./cmt/pr";
 import * as shlex from "./cmt/shlex";
@@ -14,6 +14,21 @@ import * as tasks from "./tasks";
 import * as wrappers from "./wrappers";
 import * as path from "path";
 import { ShimsWriter } from "./shimsWriter";
+
+interface IWorkspaceItem extends QuickPickItem {
+    description: string,
+    label: string,
+    workspace: autoproj.Workspace,
+}
+
+interface IFolderItem extends QuickPickItem {
+    description: string,
+    label: string,
+    folder: {
+        name: string,
+        uri: Uri
+    }
+}
 
 export class Commands {
     private _lastDebuggingSession: { ws: WorkspaceFolder | undefined, config: DebugConfiguration } | undefined;
@@ -25,28 +40,18 @@ export class Commands {
         if (this._workspaces.workspaces.size === 0) {
             throw new Error("No Autoproj workspace found");
         }
-        const choices: Array<{ label, description, ws }> = [];
-        function addChoice(workspace: autoproj.Workspace) {
-            const choice = {
-                description: basename(dirname(workspace.root)),
-                label: `$(root-folder) ${workspace.name}`,
-                ws: workspace,
-            };
-            choices.push(choice);
-        }
         if (this._workspaces.workspaces.size === 1) {
             return this._workspaces.workspaces.values().next().value;
         }
-        this._workspaces.forEachWorkspace((workspace: autoproj.Workspace) => {
-            addChoice(workspace);
+        const choices: IWorkspaceItem[] = [...this._workspaces.workspaces.values()].map((workspace) => {
+            return {
+                description: basename(dirname(workspace.root)),
+                label: `$(root-folder) ${workspace.name}`,
+                workspace: workspace,
+            }
         });
-        const options: QuickPickOptions = {
-            placeHolder: "Select a workspace",
-        };
-        const ws = await this._vscode.showQuickPick(choices, options);
-        if (ws) {
-            return ws.ws;
-        }
+        const ws = await this._vscode.showQuickPick(choices, { placeHolder: "Select a workspace" });
+        return ws?.workspace;
     }
 
     public async updatePackageInfo() {
@@ -65,44 +70,36 @@ export class Commands {
         }
     }
 
-    public async packagePickerChoices(): Promise<Array<{ label, description, pkg }>> {
-        const choices: Array<{ label, description, pkg }> = [];
-        const fsPathsObj = {};
-        const wsInfos: Array<[autoproj.Workspace, Promise<autoproj.WorkspaceInfo>]> = [];
-
-        this._workspaces.forEachWorkspace((ws) => wsInfos.push([ws, ws.info()]));
-        if (this._vscode.workspaceFolders) {
-            for (const folder of this._vscode.workspaceFolders) {
-                fsPathsObj[folder.uri.fsPath] = true;
-            }
-        }
-        for (const [ws, wsInfoP] of wsInfos) {
+    public async packagePickerChoices(): Promise<IFolderItem[]> {
+        let choices: IFolderItem[] = [];
+        let currentFsPaths = this._vscode.workspaceFolders?.map((folder) => folder.uri.fsPath) || [];
+        for (const ws of this._workspaces.workspaces.values()) {
             try {
-                const wsInfo = await wsInfoP;
+                const wsInfo = await ws.info();
                 const buildconfPath = pathjoin(ws.root, "autoproj");
-                if (!fsPathsObj.hasOwnProperty(buildconfPath)) {
+                if (!currentFsPaths.includes(buildconfPath)) {
                     const name = `autoproj`;
                     choices.push({
                         description: `${ws.name} (buildconf)`,
                         label: `$(root-folder) ${name}`,
-                        pkg: { name: `autoproj (${ws.name})`, srcdir: buildconfPath },
+                        folder: { name: `autoproj (${ws.name})`, uri: Uri.file(buildconfPath) },
                     });
                 }
-                for (const pkgSet of wsInfo.packageSets) {
-                    if (!fsPathsObj.hasOwnProperty(pkgSet[1].user_local_dir)) {
+                for (const pkgSet of wsInfo.packageSets.values()) {
+                    if (!currentFsPaths.includes(pkgSet.user_local_dir)) {
                         choices.push({
                             description: `${ws.name} (package set)`,
-                            label: `$(folder-library) ${pkgSet[1].name}`,
-                            pkg: { name: `${pkgSet[1].name} (package set)`, srcdir: pkgSet[1].user_local_dir },
+                            label: `$(folder-library) ${pkgSet.name}`,
+                            folder: { name: `${pkgSet.name} (package set)`, uri: Uri.file(pkgSet.user_local_dir) }
                         });
                     }
                 }
-                for (const aPkg of wsInfo.packages) {
-                    if (!fsPathsObj.hasOwnProperty(aPkg[1].srcdir)) {
+                for (const pkg of wsInfo.packages.values()) {
+                    if (!currentFsPaths.includes(pkg.srcdir)) {
                         choices.push({
                             description: ws.name,
-                            label: `$(folder) ${aPkg[1].name}`,
-                            pkg: aPkg[1],
+                            label: `$(folder) ${pkg.name}`,
+                            folder: { name: pkg.name, uri: Uri.file(pkg.srcdir) },
                         });
                     }
                 }
@@ -111,32 +108,24 @@ export class Commands {
             }
         }
         choices.sort((a, b) =>
-            a.pkg.name < b.pkg.name ? -1 : a.pkg.name > b.pkg.name ? 1 : 0);
+            a.folder.name < b.folder.name ? -1 : a.folder.name > b.folder.name ? 1 : 0);
+
         return choices;
     }
 
     public async addPackageToWorkspace() {
-        const tokenSource = new CancellationTokenSource();
         const options: QuickPickOptions = {
             matchOnDescription: true,
             placeHolder: "Select a package to add to this workspace",
         };
-        const choices = this.packagePickerChoices();
-        choices.catch((err) => {
-            this._vscode.showErrorMessage(err.message);
-            tokenSource.cancel();
-        });
 
-        const selectedOption = await this._vscode.showQuickPick(choices, options, tokenSource.token);
+        const choices = await this.packagePickerChoices();
+        const selectedOption = await this._vscode.showQuickPick(choices, options);
 
-        tokenSource.dispose();
         if (selectedOption) {
             const wsFolders = this._vscode.workspaceFolders;
             let folders = wsFolders?.map((folder) => { return { name: folder.name, uri: folder.uri }; }) || [];
-            folders = folders.concat({
-                name: selectedOption.pkg.name,
-                uri: Uri.file(selectedOption.pkg.srcdir),
-            });
+            folders = folders.concat(selectedOption.folder);
 
             const buildconfPaths = [...this._workspaces.workspaces.values()]
                 .map((folder) => path.join(folder.root, "autoproj"));
@@ -151,7 +140,7 @@ export class Commands {
             });
 
             if (!this._vscode.updateWorkspaceFolders(0, wsFolders?.length || null, ...buildconfs, ...pkgSets, ...pkgs)) {
-                this._vscode.showErrorMessage(`Could not add folder: ${selectedOption.pkg.srcdir}`);
+                throw (`Could not add folder: ${selectedOption.folder.uri.fsPath}`);
             }
         }
     }
@@ -382,7 +371,7 @@ export class Commands {
 
     public register() {
         this._vscode.registerAndSubscribeCommand("autoproj.addPackageToWorkspace", () => {
-            this.addPackageToWorkspace();
+            this.handleError(() => this.addPackageToWorkspace());
         });
         this._vscode.registerAndSubscribeCommand("autoproj.updatePackageInfo", () => { this.updatePackageInfo(); });
         this._vscode.registerAndSubscribeCommand("autoproj.setupRubyExtension", () => {
