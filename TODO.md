@@ -1,11 +1,10 @@
-- Add command to enable debug symbols (by creating rb file in overrides.d)
-- Combine autoproj-package and autoproj-workspace in a single task provider
+- Replace "Update package info" task with a child process
 - Support adding parent folders (i.e. `drivers/`) in task provider
+- Combine autoproj-package and autoproj-workspace in a single task provider
 - Refactor `extension.test.ts` and `commands.test.ts` to use a real workspace instead of mocks (see `cpptools.test.ts`)
 - Add linter
 - Consider vscode-rdbg integration
 - Set "python.experiments.optOutFrom": ["pythonTestAdapter"]
-- Replace "Update package info" task with a child process
 - Install `ruby-lsp` automatically
   - Create a Gemfile in `.autoproj/vscode-autoproj` that does `eval_gemfile` on `install/gems/Gemfile` and adds `ruby-lsp` and `debug`
   - Do a `bundler install` after that

@@ -587,6 +587,87 @@ describe("Commands", () => {
             });
         });
     });
+    describe("enableCmakeDebuggingSymbols()", () => {
+        it("shows an error message if workspace is empty", async () => {
+            await assert.rejects(subject.enableCmakeDebuggingSymbols(),
+                /Cannot enable CMake debugging symbols on an empty workspace/);
+        });
+        describe("in a real workspace", () => {
+            let mockSubject: IMock<commands.Commands>;
+            let mockWorkspaceConfig: IMock<vscode.WorkspaceConfiguration>;
+            let root: string;
+            let supression: boolean;
+            beforeEach(() => {
+                root = helpers.init();
+                new helpers.WorkspaceBuilder(root);
+                const workspaces = new autoproj.Workspaces();
+
+                workspaces.addFolder(root);
+                mockWorkspaceConfig = Mock.ofType<vscode.WorkspaceConfiguration>();
+
+                mockWrapper.setup((x) => x.getConfiguration("autoproj")).returns(() => mockWorkspaceConfig.object);
+                mockWorkspaceConfig.setup((x) => x.get<boolean>("supressCmakeBuildTypeOverrideNotice"))
+                    .returns(() => supression);
+
+                supression = false;
+                subject = new commands.Commands(workspaces, mockWrapper.object);
+            });
+            afterEach(() => {
+                helpers.clear();
+            });
+            function assertNotice(show: boolean) {
+                const times = show ? Times.once() : Times.never();
+                mockWrapper.verify((x) => x.showInformationMessage(
+                    It.isAny(), It.isAny(), It.isAny(), It.isAny()), times);
+            }
+            function assertSetSupression(update: boolean) {
+                const times = update ? Times.once() : Times.never();
+                mockWorkspaceConfig.verify((x) => x.update("supressCmakeBuildTypeOverrideNotice", true), times);
+            }
+            it("does nothing if user cancels", async () => {
+                mockSubject = Mock.ofInstance(subject);
+                mockSubject.callBase = true;
+                mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(undefined));
+
+                await mockSubject.object.enableCmakeDebuggingSymbols();
+                assertNotice(false);
+            });
+            it("throws if script cannot be created", async () => {
+                helpers.mkfile("", "autoproj");
+                await assert.rejects(subject.enableCmakeDebuggingSymbols(), /Could not create overrides script/);
+                assertNotice(false);
+            });
+            describe("the overrides script is created", () => {
+                let filePath: string;
+                beforeEach(() => {
+                    helpers.registerDir("autoproj")
+                    helpers.registerDir("autoproj", "overrides.d");
+                    helpers.registerFile("autoproj", "overrides.d", "vscode-autoproj-cmake-build-type.rb");
+                    filePath = path.join(root, "autoproj", "overrides.d", "vscode-autoproj-cmake-build-type.rb");
+                });
+                it("creates the overrides script", async () => {
+                    await subject.enableCmakeDebuggingSymbols();
+                    assert(await fs.exists(filePath));
+                    assertNotice(true);
+                    assertSetSupression(false);
+                });
+                it("does not show notice if supressed", async () => {
+                    supression = true;
+                    await subject.enableCmakeDebuggingSymbols();
+                    assertNotice(false);
+                    assertSetSupression(false);
+                });
+                it("supresses future notices", async () => {
+                    const doNotShowAgainClicked = Promise.resolve({ isCloseAffordance: false });
+                    mockWrapper.setup((x) => x.showInformationMessage(
+                        It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => doNotShowAgainClicked);
+
+                    await subject.enableCmakeDebuggingSymbols();
+                    assertSetSupression(true);
+                });
+            });
+        });
+    });
     describe("handleError()", () => {
         it("runs and handles errors on functions and async functions", async () => {
             const fn = Mock.ofInstance(() => {});
@@ -620,10 +701,8 @@ describe("Commands", () => {
                 setupMocks("startDebugging", "autoproj.startDebugging"),
                 setupMocks("saveLastDebuggingSession", "autoproj.saveLastDebuggingSession"),
                 setupMocks("restartDebugging", "autoproj.restartDebugging"),
-                setupMocks(
-                    "setupPythonDefaultInterpreter",
-                    "autoproj.setupPythonDefaultInterpreter"
-                )
+                setupMocks("enableCmakeDebuggingSymbols", "autoproj.enableCmakeDebuggingSymbols"),
+                setupMocks("setupPythonDefaultInterpreter","autoproj.setupPythonDefaultInterpreter")
             ];
 
             subject.register();

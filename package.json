@@ -50,6 +50,11 @@
                 "command": "autoproj.addPackageToWorkspace"
             },
             {
+                "title": "Enable debugging symbols (CMake)",
+                "category": "Autoproj",
+                "command": "autoproj.enableCmakeDebuggingSymbols"
+            },
+            {
                 "title": "Setup Python default interpreter",
                 "category": "Autoproj",
                 "command": "autoproj.setupPythonDefaultInterpreter"
@@ -313,6 +318,11 @@
         "configuration": {
             "title": "Autoproj extension configuration",
             "properties": {
+                "autoproj.supressCmakeBuildTypeOverrideNotice": {
+                    "type": "boolean",
+                    "description": "Supress notice shown when CMake build type is overriden",
+                    "default": false
+                },
                 "autoproj.optionalTasks.package.rebuild": {
                     "type": "boolean",
                     "description": "Provide \"Rebuild\" tasks",
