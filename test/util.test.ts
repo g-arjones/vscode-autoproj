@@ -1,5 +1,5 @@
 import { LogOutputChannel } from "vscode";
-import { getLogger } from "../src/logging"
+import { asyncSpawn, getLogger, IAsyncExecution } from "../src/util"
 import { IMock, Mock, Times } from "typemoq";
 import * as assert from "assert";
 
@@ -33,5 +33,34 @@ describe("getLogger()", () => {
         const logger = getLogger(mockChannel.object, "ws");
         mockChannel.setup((x) => x.name).returns(() => "foobar");
         assert.equal(logger.name, "foobar");
+    });
+});
+
+describe("asyncSpawn()", () => {
+    let mockChannel: IMock<LogOutputChannel>;
+    beforeEach(() => {
+        mockChannel = Mock.ofType<LogOutputChannel>();
+    });
+    it("throws if execution fails", async () => {
+        const execution = asyncSpawn(mockChannel.object, "/foo/bar");
+        await assert.rejects(execution.returnCode, /ENOENT/)
+    });
+    it("resolves to process return code", async () => {
+        let execution = asyncSpawn(mockChannel.object, "/bin/sh", ["-c", "exit 0"]);
+        assert.equal(await execution.returnCode, 0);
+
+        execution = asyncSpawn(mockChannel.object, "/bin/sh", ["-c", "exit 10"]);
+        assert.equal(await execution.returnCode, 10);
+    });
+    it("trims and splits output", async () => {
+        let execution = asyncSpawn(mockChannel.object, "/bin/sh", ["-c",
+            'printf "one\ntwo\n" >&2 && printf "three\nfour\n"'
+        ]);
+
+        await execution.returnCode;
+        mockChannel.verify((x) => x.error("one"), Times.once());
+        mockChannel.verify((x) => x.error("two"), Times.once());
+        mockChannel.verify((x) => x.info("three"), Times.once());
+        mockChannel.verify((x) => x.info("four"), Times.once());
     });
 });

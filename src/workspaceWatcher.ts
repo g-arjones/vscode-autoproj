@@ -7,7 +7,7 @@ import * as watcher from "./fileWatcher";
 import * as child_process from "child_process";
 import { VSCode } from "./wrappers";
 import * as path from "path";
-import { getLogger } from "./logging";
+import { asyncSpawn, getLogger, IAsyncExecution } from "./util";
 import { ShimsWriter } from "./shimsWriter";
 
 export class WatchManager implements vscode.Disposable {
@@ -195,30 +195,14 @@ export class WatchProcess implements vscode.Disposable {
     }
 
     private async _spawn(): Promise<number | null> {
-        return new Promise((resolve, reject) => {
-            const rubyopts = `-r${path.join(this._workspace.root, ShimsWriter.RELATIVE_OPTS_PATH, "rubyopt.rb")}`;
-            const env = { ...process.env, RUBYOPT: rubyopts };
-            const proc = child_process.spawn(
+        const rubyopts = `-r${path.join(this._workspace.root, ShimsWriter.RELATIVE_OPTS_PATH, "rubyopt.rb")}`;
+        const env = { ...process.env, RUBYOPT: rubyopts };
+        const execution = asyncSpawn(
+                this._logger,
                 this._workspace.autoprojExePath(),
                 ["watch", "--show-events"], { env: env });
 
-            proc.stdout.on('data', (data) => {
-                for (const line of data.toString().trim().split("\n")) { this._logger.info(line); }
-            });
-
-            proc.stderr.on('data', (data) => {
-                for (const line of data.toString().trim().split("\n")) { this._logger.error(line); }
-            });
-
-            proc.on('error', (error) => {
-                reject(error)
-            });
-
-            proc.on('exit', (code, signal) => {
-                resolve(code);
-            });
-
-            this._childProc = proc;
-        });
+        this._childProc = execution.childProcess;
+        return execution.returnCode;
     }
 }
