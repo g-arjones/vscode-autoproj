@@ -2,66 +2,117 @@
 import * as assert from "assert";
 import * as path from "path";
 import { basename, dirname } from "path";
-import { IMock, It, Mock, Times } from "typemoq";
+import { GlobalMock, IGlobalMock, IMock, It, Mock, Times } from "typemoq";
 import * as _ from "lodash";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as commands from "../src/commands";
+import * as progress from "../src/progress";
 import { ShimsWriter } from "../src/shimsWriter";
-import * as tasks from "../src/tasks";
+import * as util from "../src/util";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
 import * as mocks from "./mocks";
 import { fs } from "../src/cmt/pr";
+import { UsingResult, using } from "./using";
 
 describe("Commands", () => {
+    let mockChannel: IMock<vscode.LogOutputChannel>;
     let mockWorkspaces: mocks.MockWorkspaces;
     let mockWrapper: IMock<wrappers.VSCode>;
     let subject: commands.Commands;
 
     beforeEach(() => {
+        mockChannel = Mock.ofType<vscode.LogOutputChannel>();
         mockWorkspaces = new mocks.MockWorkspaces();
         mockWrapper = Mock.ofType<wrappers.VSCode>();
-        subject = new commands.Commands(mockWorkspaces.object, mockWrapper.object);
+        subject = new commands.Commands(mockWorkspaces.object, mockWrapper.object, mockChannel.object);
     });
-    describe("updatePackageInfo()", () => {
+    describe("updateWorkspaceEnvironment()", () => {
+        let usingResult: UsingResult;
+        let execution: util.IAsyncExecution;
+        let mockCreateProgress: IGlobalMock<typeof progress.createProgressView>;
+        let mockProgressView: IMock<progress.ProgressView>;
+        let mockAsyncSpawn: IGlobalMock<typeof util.asyncSpawn>;
         let mockSubject: IMock<commands.Commands>;
-        let workspace: autoproj.Workspace;
-        let task: vscode.Task;
-        const taskDefinition: vscode.TaskDefinition = {
-            mode: tasks.WorkspaceTaskMode.UpdateEnvironment,
-            type: tasks.TaskType.Workspace,
-            workspace: "/path/to/workspace",
-        };
+        let workspace: autoproj.Workspace;0
         beforeEach(() => {
-            task = mocks.createTask(taskDefinition).object;
+            mockProgressView = Mock.ofType<progress.ProgressView>();
+            mockAsyncSpawn = GlobalMock.ofInstance(util.asyncSpawn, "asyncSpawn", util);
+            mockCreateProgress = GlobalMock.ofInstance(progress.createProgressView, "createProgressView", progress);
             workspace = mockWorkspaces.addWorkspace("/path/to/workspace").object;
-            mockWrapper.setup((x) => x.fetchTasks(tasks.WORKSPACE_TASK_FILTER)).returns(() => Promise.resolve([task]));
             mockSubject = Mock.ofInstance(subject);
             subject = mockSubject.target;
+            usingResult = using(mockAsyncSpawn, mockCreateProgress);
+            usingResult.commit();
+
+            mockCreateProgress.setup((x) => x(It.isAny(), It.isAny())).returns(() => mockProgressView.object);
+            mockAsyncSpawn.setup((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => execution);
         });
+        afterEach(() => {
+            usingResult.rollback();
+        })
         it("does nothing if canceled", async () => {
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(undefined));
-            await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
+            await subject.updateWorkspaceEnvironment();
+            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.never());
         });
-        it("handles an exception while updating workspace info", async () => {
+        it("throws if spawn fails while updating workspace environment", async () => {
             mockWrapper.reset();
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
-            await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
-            mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
+
+            execution = {
+                childProcess: undefined as any,
+                returnCode: Promise.reject(new Error("ENOENT"))
+            };
+            await assert.rejects(subject.updateWorkspaceEnvironment(), /Could not update/);
+            await assert.rejects(subject.updateWorkspaceEnvironment(), /Could not update/);
+            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
         });
-        it("handles an exception if workspace is empty", async () => {
-            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.reject(new Error("test")));
-            await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
-            mockWrapper.verify((x) => x.executeTask(It.isAny()), Times.never());
-        });
-        it("updates workspace info", async () => {
+        it("throws if workspace environment update fails", async () => {
+            mockWrapper.reset();
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
-            await subject.updatePackageInfo();
-            mockWrapper.verify((x) => x.executeTask(task), Times.once());
+
+            execution = {
+                childProcess: undefined as any,
+                returnCode: Promise.resolve(2)
+            };
+            await assert.rejects(subject.updateWorkspaceEnvironment(), /Failed while updating/);
+            await assert.rejects(subject.updateWorkspaceEnvironment(), /Failed while updating/);
+            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
+        });
+        it("does not run envsh if another update is pending", async () => {
+            mockWrapper.reset();
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
+
+            let resolveReturnCode: (returnCode: number | null) => void;
+            const returnCode = new Promise<number | null>((resolve) => resolveReturnCode = resolve);
+            execution = {
+                childProcess: undefined as any,
+                returnCode: returnCode
+            };
+
+            const promises = [
+                subject.updateWorkspaceEnvironment(),
+                subject.updateWorkspaceEnvironment()
+            ]
+
+            resolveReturnCode!(0);
+            await Promise.all(promises);
+            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.once());
+        });
+        it("updates workspace environment", async () => {
+            mockWrapper.reset();
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
+
+            execution = {
+                childProcess: undefined as any,
+                returnCode: Promise.resolve(0)
+            };
+
+            await subject.updateWorkspaceEnvironment();
+            await subject.updateWorkspaceEnvironment();
+            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
         });
     });
     describe("showWorkspacePicker()", () => {
@@ -390,7 +441,7 @@ describe("Commands", () => {
             root = helpers.init();
             builder = new helpers.WorkspaceBuilder(root);
             workspaces = new autoproj.Workspaces();
-            subject = new commands.Commands(workspaces, mockWrapper.object);
+            subject = new commands.Commands(workspaces, mockWrapper.object, mockChannel.object);
 
             pkg = builder.addPackage("foobar");
             workspaces.addFolder(pkg.srcdir);
@@ -435,7 +486,7 @@ describe("Commands", () => {
             root = helpers.init();
             builder = new helpers.WorkspaceBuilder(root);
             workspaces = new autoproj.Workspaces();
-            subject = new commands.Commands(workspaces, mockWrapper.object);
+            subject = new commands.Commands(workspaces, mockWrapper.object, mockChannel.object);
 
             pkg = builder.addPackage("foobar");
             workspaces.addFolder(pkg.srcdir);
@@ -564,7 +615,7 @@ describe("Commands", () => {
                 root = helpers.init();
                 builder = new helpers.WorkspaceBuilder(root);
                 workspaces = new autoproj.Workspaces();
-                subject = new commands.Commands(workspaces, mockWrapper.object);
+                subject = new commands.Commands(workspaces, mockWrapper.object, mockChannel.object);
                 mockWorkspaceConfig = Mock.ofType<vscode.WorkspaceConfiguration>();
 
                 pkg = builder.addPackage("foobar");
@@ -614,7 +665,7 @@ describe("Commands", () => {
                     .returns(() => supression);
 
                 supression = false;
-                subject = new commands.Commands(workspaces, mockWrapper.object);
+                subject = new commands.Commands(workspaces, mockWrapper.object, mockChannel.object);
             });
             afterEach(() => {
                 helpers.clear();
@@ -699,7 +750,7 @@ describe("Commands", () => {
         }
         it("registers all commands", async () => {
             const mocks = [
-                setupMocks("updatePackageInfo", "autoproj.updatePackageInfo"),
+                setupMocks("updateWorkspaceEnvironment", "autoproj.updateWorkspaceEnvironment"),
                 setupMocks("addPackageToWorkspace", "autoproj.addPackageToWorkspace"),
                 setupMocks("setupRubyExtension", "autoproj.setupRubyExtension"),
                 setupMocks("startDebugging", "autoproj.startDebugging"),

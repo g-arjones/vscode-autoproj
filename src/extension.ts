@@ -114,9 +114,9 @@ export async function setupExtension(subscriptions: vscode.Disposable[], vscodeW
     const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces, vscodeWrapper);
     const autoprojPackageTaskProvider = new tasks.AutoprojPackageTaskProvider(autoprojTaskProvider);
     const autoprojWorkspaceTaskProvider = new tasks.AutoprojWorkspaceTaskProvider(autoprojTaskProvider);
-    const autoprojCommands = new commands.Commands(workspaces, vscodeWrapper);
     const cppConfigurationProvider = new cpptools.CppConfigurationProvider(workspaces);
     const outputChannel = vscode.window.createOutputChannel("Autoproj", { log: true });
+    const autoprojCommands = new commands.Commands(workspaces, vscodeWrapper, outputChannel);
     const watchManager = new WatchManager(outputChannel, vscodeWrapper);
     const tasksHandler = new tasks.Handler(vscodeWrapper, workspaces);
     const eventHandler = new EventHandler(vscodeWrapper, workspaces, cppConfigurationProvider, watchManager);

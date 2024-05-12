@@ -7,14 +7,16 @@ import {
     DebugConfiguration,
     QuickPickItem,
     MessageItem,
-    ConfigurationTarget
+    ConfigurationTarget,
+    LogOutputChannel
 } from "vscode";
 import { fs } from "./cmt/pr";
+import * as progress from "./progress";
 import * as shlex from "./cmt/shlex";
 import * as autoproj from "./autoproj";
-import * as tasks from "./tasks";
 import * as wrappers from "./wrappers";
 import * as path from "path";
+import { asyncSpawn, getLogger, IAsyncExecution } from "./util";
 import { ShimsWriter } from "./shimsWriter";
 
 interface IWorkspaceItem extends QuickPickItem {
@@ -34,8 +36,12 @@ interface IFolderItem extends QuickPickItem {
 
 export class Commands {
     private _lastDebuggingSession: { ws: WorkspaceFolder | undefined, config: DebugConfiguration } | undefined;
+    private _updateEnvExecutions: Map<string, IAsyncExecution>;
     constructor(private readonly _workspaces: autoproj.Workspaces,
-                private readonly _vscode: wrappers.VSCode) {
+                private readonly _vscode: wrappers.VSCode,
+                private readonly _channel: LogOutputChannel)
+    {
+        this._updateEnvExecutions = new Map();
     }
 
     public async showWorkspacePicker(): Promise<autoproj.Workspace | undefined> {
@@ -56,19 +62,33 @@ export class Commands {
         return ws?.workspace;
     }
 
-    public async updatePackageInfo() {
-        try {
-            const ws = await this.showWorkspacePicker();
-            if (ws) {
-                const allTasks = await this._vscode.fetchTasks(tasks.WORKSPACE_TASK_FILTER);
-                const updateEnvironmentTask = allTasks.find((task) =>
-                    task.definition.mode === tasks.WorkspaceTaskMode.UpdateEnvironment &&
-                    task.definition.workspace === ws.root);
+    public async updateWorkspaceEnvironment() {
+        let returnCode: number | null;
+        const ws = await this.showWorkspacePicker();
 
-                this._vscode.executeTask(updateEnvironmentTask!);
+        if (ws && !this._updateEnvExecutions.has(ws.root)) {
+            const rubyopts = `-r${path.join(ws.root, ShimsWriter.RELATIVE_OPTS_PATH, "rubyopt.rb")}`;
+            const env = { ...process.env, RUBYOPT: rubyopts };
+            const logger = getLogger(this._channel, ws.name);
+            const execution = asyncSpawn(logger, ws.autoprojExePath(), ["envsh"], { env: env });
+            const view = progress.createProgressView(this._vscode, `Updating '${ws.name}' workspace environment`);
+
+            this._updateEnvExecutions.set(ws.root, execution);
+            view.show();
+
+            try {
+                returnCode = await execution.returnCode;
+            } catch (err) {
+                throw new Error(`Could not update '${ws.name}' workspace environment: ${err.message}`);
+            } finally {
+                view.close();
+                this._updateEnvExecutions.delete(ws.root);
             }
-        } catch (err) {
-            this._vscode.showErrorMessage(err.message);
+
+            if (returnCode !== 0) {
+                this._channel.show();
+                throw new Error(`Failed while updating '${ws.name}' workspace`);
+            }
         }
     }
 
@@ -427,7 +447,9 @@ export class Commands {
         this._vscode.registerAndSubscribeCommand("autoproj.addPackageToWorkspace", () => {
             this.handleError(() => this.addPackageToWorkspace());
         });
-        this._vscode.registerAndSubscribeCommand("autoproj.updatePackageInfo", () => { this.updatePackageInfo(); });
+        this._vscode.registerAndSubscribeCommand("autoproj.updateWorkspaceEnvironment", () => {
+            this.handleError(() => this.updateWorkspaceEnvironment())
+        });
         this._vscode.registerAndSubscribeCommand("autoproj.setupRubyExtension", () => {
             this.handleError(() => this.setupRubyExtension());
         });

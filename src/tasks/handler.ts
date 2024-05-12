@@ -59,9 +59,6 @@ export class Handler implements vscode.Disposable {
             case WorkspaceTaskMode.UpdateConfig:
                 this._createAndShowView(`${ws}: Updating build configuration...`, event.execution.task.definition);
                 break;
-            case WorkspaceTaskMode.UpdateEnvironment:
-                this._createAndShowView(`${ws}: Updating environment...`, event.execution.task.definition);
-                break;
             }
         }
     }

@@ -65,7 +65,6 @@ describe("tasks Handler", () => {
                 { mode: tasks.WorkspaceTaskMode.Osdeps, title: "workspace: Installing OS dependencies..." },
                 { mode: tasks.WorkspaceTaskMode.Update, title: "workspace: Updating all packages..." },
                 { mode: tasks.WorkspaceTaskMode.UpdateConfig, title: "workspace: Updating build configuration..." },
-                { mode: tasks.WorkspaceTaskMode.UpdateEnvironment, title: "workspace: Updating environment..." },
             ];
 
             mockWorkspaces.addWorkspace("/path/to/workspace");

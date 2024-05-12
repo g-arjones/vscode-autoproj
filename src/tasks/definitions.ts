@@ -9,7 +9,6 @@ export enum WorkspaceTaskMode {
     Osdeps = "osdeps",
     Build = "build",
     UpdateConfig = "update-config",
-    UpdateEnvironment = "update-environment",
     Update = "update",
     Checkout = "checkout",
 }

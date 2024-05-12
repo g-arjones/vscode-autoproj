@@ -301,20 +301,6 @@ describe("Task provider", () => {
 
         assertTask(task, process, args, name, scope, defs);
     }
-    function assertUpdateEnvironmentTask(task: vscode.Task, wsRoot: string) {
-        const process = autoprojExePath(wsRoot);
-        const args = ["envsh", "--progress=f", "--color"];
-        const name = `${pathBasename(wsRoot)}: Update Environment`;
-        const scope = workspaceFolders[0];
-        const defs: tasks.IWorkspaceTaskDefinition = {
-            mode: tasks.WorkspaceTaskMode.UpdateEnvironment,
-            type: tasks.TaskType.Workspace,
-            workspace: wsRoot,
-        };
-
-        assertTask(task, process, args, name, scope, defs);
-        assert.equal(task.presentationOptions.reveal, vscode.TaskRevealKind.Silent);
-    }
     function packageName(pkgPath: string, wsRoot: string, installManifest: autoproj.IPackage[]): string {
         const pkgInfo = installManifest.find((pkg) => pkg.srcdir === pkgPath);
         if (pkgInfo) {
@@ -366,10 +352,6 @@ describe("Task provider", () => {
         assert.notEqual(updateConfigTask, undefined);
         assertUpdateConfigTask(updateConfigTask, wsRoot);
 
-        const updateEnvironmentTask = await subject.updateEnvironmentTask(wsRoot);
-        assert.notEqual(updateEnvironmentTask, undefined);
-        assertUpdateEnvironmentTask(updateEnvironmentTask, wsRoot);
-
         const updateTask = await subject.updateTask(wsRoot);
         assert.notEqual(updateTask, undefined);
         assertUpdateTask(updateTask, wsRoot);
@@ -411,7 +393,7 @@ describe("Task provider", () => {
 
         it("is initalized with all tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
-            assert.equal(providedTasks.length, 30);
+            assert.equal(providedTasks.length, 28);
         });
         it("is initalized with all workspace tasks", async () => {
             await subject.provideTasks(null);
@@ -444,8 +426,8 @@ describe("Task provider", () => {
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            // 1 mandatory tasks per workspace + 1 mandatory task per package
-            await assert.equal(providedTasks.length, 2 * 1 + 1 * 3);
+            // 0 mandatory tasks per workspace + 1 mandatory task per package
+            await assert.equal(providedTasks.length, 2 * 0 + 1 * 3);
         });
         it("gets the package names from installation manifest", async () => {
             helpers.createInstallationManifest([PKG_IODRIVERS_BASE], "one");
@@ -474,7 +456,7 @@ describe("Task provider", () => {
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            await assert.equal(providedTasks.length, 12);
+            await assert.equal(providedTasks.length, 11);
             await assertAllWorkspaceTasks(helpers.fullPath());
             await assertAllPackageTasks(a, root);
         });
@@ -492,7 +474,6 @@ describe("Task provider", () => {
             await helpers.assertThrowsAsync(subject.rebuildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.nodepsBuildTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.updateConfigTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.updateEnvironmentTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.updateTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.checkoutTask("/not/found"), /no entry/);
             await helpers.assertThrowsAsync(subject.osdepsTask("/not/found"), /no entry/);

@@ -80,9 +80,9 @@
                 "command": "autoproj.restartDebugging"
             },
             {
-                "title": "Update package info",
+                "title": "Update workspace environment",
                 "category": "Autoproj",
-                "command": "autoproj.updatePackageInfo"
+                "command": "autoproj.updateWorkspaceEnvironment"
             }
         ],
         "languages": [
@@ -306,7 +306,6 @@
                             "build",
                             "osdeps",
                             "update-config",
-                            "update-environment",
                             "update",
                             "checkout"
                         ],
