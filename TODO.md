@@ -3,8 +3,6 @@
 - Combine autoproj-package and autoproj-workspace in a single task provider
 - Refactor `extension.test.ts` and `commands.test.ts` to use a real workspace instead of mocks (see `cpptools.test.ts`)
 - Add linter
-- Consider vscode-rdbg integration
-- Set "python.experiments.optOutFrom": ["pythonTestAdapter"]
 - Install `ruby-lsp` automatically
   - Create a Gemfile in `.autoproj/vscode-autoproj` that does `eval_gemfile` on `install/gems/Gemfile` and adds `ruby-lsp` and `debug`
   - Do a `bundler install` after that

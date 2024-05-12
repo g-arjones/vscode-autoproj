@@ -287,10 +287,14 @@ describe("Commands", () => {
             mockWorkspaces.addWorkspace("/ws/one");
             const mockConfiguration = Mock.ofType<vscode.WorkspaceConfiguration>();
             mockWrapper.setup((x) => x.getConfiguration()).returns(() => mockConfiguration.object);
+            mockWrapper.setup((x) => x.getConfiguration("python.experiments")).returns(() => mockConfiguration.object);
+            mockConfiguration.setup((x) => x.get<string[]>("optOutFrom")).returns(() => ["foobar"]);
             await subject.setupPythonDefaultInterpreter();
 
             const pythonShimPath = path.join("/ws/one", ShimsWriter.RELATIVE_SHIMS_PATH, "python");
             mockConfiguration.verify((x) => x.update("python.defaultInterpreterPath", pythonShimPath), Times.once());
+            mockConfiguration.verify((x) => x.update("optOutFrom",
+                ["foobar", "pythonTestAdapter"], vscode.ConfigurationTarget.Global), Times.once());
         })
     });
     describe("setupRubyExtension()", () => {

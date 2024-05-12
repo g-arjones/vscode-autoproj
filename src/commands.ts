@@ -6,7 +6,8 @@ import {
     WorkspaceFolder,
     DebugConfiguration,
     QuickPickItem,
-    MessageItem
+    MessageItem,
+    ConfigurationTarget
 } from "vscode";
 import { fs } from "./cmt/pr";
 import * as shlex from "./cmt/shlex";
@@ -170,6 +171,10 @@ export class Commands {
         const workspaces = [...this._workspaces.workspaces.values()];
         const pythonShimPath = path.join(workspaces[0].root, ShimsWriter.RELATIVE_SHIMS_PATH, "python");
         this._vscode.getConfiguration().update("python.defaultInterpreterPath", pythonShimPath);
+
+        const experiments = this._vscode.getConfiguration("python.experiments");
+        const optOutFrom = experiments.get<string[]>("optOutFrom") || [];
+        experiments.update("optOutFrom", [...new Set([...optOutFrom, "pythonTestAdapter"])], ConfigurationTarget.Global);
     }
 
     private async _writeWorkspaceGemfile(ws: autoproj.Workspace) {
