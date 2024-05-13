@@ -1,7 +1,4 @@
-- Support adding parent folders (i.e. `drivers/`) in task provider
 - Combine autoproj-package and autoproj-workspace in a single task provider
-- Refactor `extension.test.ts` and `commands.test.ts` to use a real workspace instead of mocks (see `cpptools.test.ts`)
-- Add linter
 - Install `ruby-lsp` automatically
   - Create a Gemfile in `.autoproj/vscode-autoproj` that does `eval_gemfile` on `install/gems/Gemfile` and adds `ruby-lsp` and `debug`
   - Do a `bundler install` after that
@@ -21,3 +18,8 @@
       - If current state != previous (saved as a json) state, run `bundler install`
       - If current state == previous state, does nothing
   - Consider doing `eval_gemfile` on `.autoproj/Gemfile` as well (and monitoring the respective lock)
+
+- Make output channel a singleton and use it in getLogger()
+- Stop passing output channel and vscode wrapper as arguments
+- Refactor `extension.test.ts` and `commands.test.ts` to use a real workspace instead of mocks (see `cpptools.test.ts`)
+- Add linter

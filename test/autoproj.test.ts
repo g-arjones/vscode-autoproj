@@ -5,6 +5,7 @@ import * as TypeMoq from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as helpers from "./helpers";
+import { using } from "./using";
 
 const MANIFEST_TEST_FILE = `
 - package_set: orocos.toolchain
@@ -549,6 +550,46 @@ describe("Autoproj helpers tests", () => {
                 const ws = workspaces.folderToWorkspace.get(root)!;
                 await assert.rejects(
                     workspaces.getWorkspaceAndPackage(vscode.Uri.file(path.join(pkg.srcdir, "CMakeLists.txt"))),
+                    new RegExp(`Could not load '${ws.name}' installation manifest`));
+            });
+        });
+        describe("getPackagesInCodeWorkspace", () => {
+            let foo: autoproj.IPackage;
+            let bar: autoproj.IPackage;
+            let dummy: autoproj.IPackage;
+            let builder: helpers.WorkspaceBuilder;
+            beforeEach(() => {
+                builder = new helpers.WorkspaceBuilder(root);
+                foo = builder.addPackage("foo");
+                bar = builder.addPackage("bar");
+                dummy = builder.addPackage("dummy");
+                workspaces.addFolder(root);
+            });
+            it("returns the packages and their autoproj workspaces currently in the vscode workspace", async () => {
+                const mockGetWorkspaceFolder = TypeMoq.GlobalMock.ofInstance(
+                    vscode.workspace.getWorkspaceFolder,
+                    "getWorkspaceFolder",
+                    vscode.workspace);
+
+                let fooFolder: vscode.WorkspaceFolder = { name: "foo", uri: vscode.Uri.file(foo.srcdir), index: 0 };
+                let barFolder: vscode.WorkspaceFolder = { name: "bar", uri: vscode.Uri.file(bar.srcdir), index: 1 };
+                mockGetWorkspaceFolder.setup((x) => x(vscode.Uri.file(foo.srcdir))).returns(() => fooFolder);
+                mockGetWorkspaceFolder.setup((x) => x(vscode.Uri.file(bar.srcdir))).returns(() => barFolder);
+
+                await using(mockGetWorkspaceFolder).do(async () => {
+                    const r = await workspaces.getPackagesInCodeWorkspace();
+                    assert.deepStrictEqual(r, [
+                        { workspace: workspaces.getWorkspaceFromFolder(root), package: foo },
+                        { workspace: workspaces.getWorkspaceFromFolder(root), package: bar },
+                    ]);
+                });
+            });
+            it("throws if manifest cannot be read", async () => {
+                helpers.mkfile("- bla: [", ".autoproj", "installation-manifest");
+
+                const ws = workspaces.getWorkspaceFromFolder(root)!;
+                await assert.rejects(
+                    workspaces.getPackagesInCodeWorkspace(),
                     new RegExp(`Could not load '${ws.name}' installation manifest`));
             });
         });

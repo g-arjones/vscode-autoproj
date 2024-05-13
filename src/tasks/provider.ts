@@ -159,16 +159,18 @@ export class AutoprojProvider implements vscode.TaskProvider {
             }
         });
 
-        for (const [folder, ws] of this.workspaces.folderToWorkspace) {
-            if (folder === ws.root) { continue; }
-            if (this.workspaces.isConfig(folder)) { continue; }
+        let allPackages: { workspace: autoproj.Workspace, package: autoproj.IPackage }[];
+        try {
+            allPackages = await this.workspaces.getPackagesInCodeWorkspace();
+        } catch (error) {
+            this._vscode.showErrorMessage(`Could not generate package tasks: ${error.message}`);
+            return this._allTasks;
+        }
 
-            let relative: string;
-            try {
-                relative = (await ws.info()).findPackage(folder)!.name;
-            } catch (error) {
-                relative = pathRelative(ws.root, folder);
-            }
+        for (const pkg of allPackages) {
+            const ws = pkg.workspace;
+            const folder = pkg.package.srcdir;
+            const name = pkg.package.name;
 
             const rebuild = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Rebuild);
             const forceBuild = this.isTaskEnabled(TaskType.Package, PackageTaskMode.ForceBuild);
@@ -176,31 +178,31 @@ export class AutoprojProvider implements vscode.TaskProvider {
             const checkout = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Checkout);
             const update = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Update);
 
-            this._addTask(folder, this._createPackageBuildTask(`${ws.name}: Build ${relative}`, ws, folder),
+            this._addTask(folder, this._createPackageBuildTask(`${ws.name}: Build ${name}`, ws, folder),
                 this._buildTasks);
 
             if (checkout) {
-                this._addTask(folder, this._createPackageCheckoutTask(`${ws.name}: Checkout ${relative}`, ws, folder),
+                this._addTask(folder, this._createPackageCheckoutTask(`${ws.name}: Checkout ${name}`, ws, folder),
                     this._checkoutTasks);
             }
 
             if (rebuild) {
-                this._addTask(folder, this._createPackageRebuildTask(`${ws.name}: Rebuild ${relative} (nodeps)`,
+                this._addTask(folder, this._createPackageRebuildTask(`${ws.name}: Rebuild ${name} (nodeps)`,
                     ws, folder), this._rebuildTasks);
             }
 
             if (forceBuild) {
-                this._addTask(folder, this._createPackageForceBuildTask(`${ws.name}: Force Build ${relative} (nodeps)`,
+                this._addTask(folder, this._createPackageForceBuildTask(`${ws.name}: Force Build ${name} (nodeps)`,
                     ws, folder), this._forceBuildTasks);
             }
 
             if (buildNoDeps) {
-                this._addTask(folder, this._createPackageNodepsBuildTask(`${ws.name}: Build ${relative} (nodeps)`, ws,
+                this._addTask(folder, this._createPackageNodepsBuildTask(`${ws.name}: Build ${name} (nodeps)`, ws,
                     folder), this._nodepsBuildTasks);
             }
 
             if (update) {
-                this._addTask(folder, this._createPackageUpdateTask(`${ws.name}: Update ${relative}`, ws, folder),
+                this._addTask(folder, this._createPackageUpdateTask(`${ws.name}: Update ${name}`, ws, folder),
                     this._updateTasks);
             }
         }

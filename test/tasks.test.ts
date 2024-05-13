@@ -1,27 +1,13 @@
 "use strict";
 import * as assert from "assert";
-import { basename as pathBasename, join as pathJoin, relative as pathRelative } from "path";
+import { basename as pathBasename, relative as pathRelative } from "path";
 import * as TypeMoq from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as tasks from "../src/tasks";
 import * as wrappers from "../src/wrappers";
 import * as helpers from "./helpers";
-
-const PKG_IODRIVERS_BASE: autoproj.IPackage = {
-    builddir: "/path/to/drivers/iodrivers_base/build",
-    dependencies: ["cmake"],
-    logdir: "/path/to/install/log",
-    name: "iodrivers_base",
-    prefix: "/path/to/install",
-    srcdir: "/path/to/drivers/iodrivers_base",
-    type: "Autobuild::CMake",
-    vcs: {
-        repository_id: "github:/rock-core/drivers-iodrivers_base.git",
-        type: "git",
-        url: "https://github.com/rock-core/drivers-iodrivers_base.git",
-    },
-};
+import { UsingResult, using } from "./using";
 
 describe("definitionsEqual()", () => {
     it("returns false if first definition is not autoproj", () => {
@@ -81,8 +67,10 @@ describe("Task provider", () => {
     let workspaces: autoproj.Workspaces;
     let subject: tasks.AutoprojProvider;
     let mockWrapper: TypeMoq.IMock<wrappers.VSCode>;
+    let mockGetWorkspaceFolder: TypeMoq.IGlobalMock<typeof vscode.workspace.getWorkspaceFolder>;
     let mockConfiguration: TypeMoq.IMock<vscode.WorkspaceConfiguration>;
     let workspaceFolders: vscode.WorkspaceFolder[];
+    let usingResult: UsingResult;
     let packageTasks: {
         buildNoDeps: boolean,
         checkout: boolean,
@@ -125,8 +113,16 @@ describe("Task provider", () => {
         workspaces = new autoproj.Workspaces();
         workspaceFolders = [];
         mockWrapper.setup((x) => x.workspaceFolders).returns(() => workspaceFolders);
+
+        mockGetWorkspaceFolder = TypeMoq.GlobalMock.ofInstance(
+            vscode.workspace.getWorkspaceFolder,
+            "getWorkspaceFolder",
+            vscode.workspace);
+        usingResult = using(mockGetWorkspaceFolder);
+        usingResult.commit();
     });
     afterEach(() => {
+        usingResult.rollback();
         helpers.clear();
     });
 
@@ -140,6 +136,7 @@ describe("Task provider", () => {
         workspaces.addFolder(folderPath);
         workspaceFolders.push(folder);
         mockWrapper.setup((x) => x.getWorkspaceFolder(folderPath)).returns(() => folder);
+        mockGetWorkspaceFolder.setup((x) => x(vscode.Uri.file(folderPath))).returns(() => folder);
     }
     function assertTask(task: vscode.Task, process: string, args: string[],
                         name: string, scope: vscode.TaskScope | vscode.WorkspaceFolder, defs: tasks.ITaskDefinition) {
@@ -365,6 +362,9 @@ describe("Task provider", () => {
         let c: string;
         let d: string;
         let e: string;
+        let oneManifest: autoproj.IPackage[];
+        let twoManifest: autoproj.IPackage[];
+
         beforeEach(() => {
             wsOneRoot = helpers.mkdir("one");
             wsTwoRoot = helpers.mkdir("two");
@@ -373,13 +373,61 @@ describe("Task provider", () => {
             d = helpers.mkdir("one", "autoproj");
             e = helpers.mkdir("two", "autoproj");
 
-            helpers.createInstallationManifest([], "one");
-            helpers.createInstallationManifest([], "two");
             helpers.mkdir("one", "drivers");
             helpers.mkdir("two", "firmware");
             a = helpers.mkdir("one", "drivers", "iodrivers_base");
             b = helpers.mkdir("one", "drivers", "auv_messaging");
             c = helpers.mkdir("two", "firmware", "chibios");
+
+            oneManifest = [
+                {
+                    name: "drivers/iodrivers_base",
+                    type: "Autobuild::CMake",
+                    vcs: {
+                        type: "",
+                        url: "",
+                        repository_id: ""
+                    },
+                    srcdir: a,
+                    builddir: "",
+                    logdir: "",
+                    prefix: "",
+                    dependencies: []
+                },
+                {
+                    name: "drivers/auv_messaging",
+                    type: "Autobuild::CMake",
+                    vcs: {
+                        type: "",
+                        url: "",
+                        repository_id: ""
+                    },
+                    srcdir: b,
+                    builddir: "",
+                    logdir: "",
+                    prefix: "",
+                    dependencies: []
+                }
+            ];
+            twoManifest = [
+                {
+                    name: "firmware/chibios",
+                    type: "Autobuild::CMake",
+                    vcs: {
+                        type: "",
+                        url: "",
+                        repository_id: ""
+                    },
+                    srcdir: c,
+                    builddir: "",
+                    logdir: "",
+                    prefix: "",
+                    dependencies: []
+                }
+            ];
+
+            helpers.createInstallationManifest(oneManifest, "one");
+            helpers.createInstallationManifest(twoManifest, "two");
 
             addFolder(a);
             addFolder(b);
@@ -429,12 +477,24 @@ describe("Task provider", () => {
             // 0 mandatory tasks per workspace + 1 mandatory task per package
             await assert.equal(providedTasks.length, 2 * 0 + 1 * 3);
         });
+        it("handles exception if installation manifest is invalid", async () => {
+            helpers.mkfile("- bla: [", "one", ".autoproj", "installation-manifest");
+            helpers.mkfile("- bla: [", "two", ".autoproj", "installation-manifest");
+
+            subject.reloadTasks();
+            const providedTasks = await subject.provideTasks(null);
+            await assertAllWorkspaceTasks(wsOneRoot);
+            await assertAllWorkspaceTasks(wsTwoRoot);
+            await assert.equal(providedTasks.length, 10);
+
+            const msg = (message: string) => new RegExp("Could not generate package tasks").test(message);
+            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.is(msg)), TypeMoq.Times.exactly(2));
+        });
         it("gets the package names from installation manifest", async () => {
-            helpers.createInstallationManifest([PKG_IODRIVERS_BASE], "one");
             await subject.provideTasks(null);
-            await assertAllPackageTasks(a, wsOneRoot, [PKG_IODRIVERS_BASE]);
-            await assertAllPackageTasks(b, wsOneRoot, [PKG_IODRIVERS_BASE]);
-            await assertAllPackageTasks(c, wsTwoRoot, [PKG_IODRIVERS_BASE]);
+            await assertAllPackageTasks(a, wsOneRoot, oneManifest);
+            await assertAllPackageTasks(b, wsOneRoot, oneManifest);
+            await assertAllPackageTasks(c, wsTwoRoot, twoManifest);
         });
     });
 
@@ -448,10 +508,26 @@ describe("Task provider", () => {
         });
         it("creates tasks when folders/workspaces are added", async () => {
             helpers.mkdir(".autoproj");
-            helpers.createInstallationManifest([]);
             helpers.mkdir("drivers");
 
             const a = helpers.mkdir("drivers", "iodrivers_base");
+            helpers.createInstallationManifest([
+                {
+                    name: "drivers/iodrivers_base",
+                    type: "Autobuild::CMake",
+                    vcs: {
+                        type: "",
+                        url: "",
+                        repository_id: ""
+                    },
+                    srcdir: a,
+                    builddir: "",
+                    logdir: "",
+                    prefix: "",
+                    dependencies: []
+                }
+            ]);
+
             addFolder(a);
             subject.reloadTasks();
 
