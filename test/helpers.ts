@@ -21,6 +21,7 @@ export class WorkspaceBuilder {
         this.packages = [];
         this.packageSets = [];
         this.writeManifest();
+        this.writeEnvYml();
     }
 
     public packageSrcDir(name: string, ...move: string[]): string[] {
@@ -62,6 +63,17 @@ export class WorkspaceBuilder {
     public writeManifest() {
         const info = [...this.packages, ...this.packageSets];
         mkfile(YAML.dump(info), ".autoproj", "installation-manifest");
+    }
+    public writeEnvYml() {
+        const env = {
+            set: {
+                BUNDLE_GEMFILE: [
+                    Path.join(root, "install", "gems", "Gemfile")
+                ]
+            }
+        };
+
+        mkfile(YAML.dump(env), ".autoproj", "env.yml");
     }
 }
 

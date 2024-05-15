@@ -7,7 +7,7 @@ import * as watcher from "./fileWatcher";
 import * as child_process from "child_process";
 import { VSCode } from "./wrappers";
 import * as path from "path";
-import { asyncSpawn, getLogger, IAsyncExecution } from "./util";
+import { asyncSpawn, getLogger } from "./util";
 import { ShimsWriter } from "./shimsWriter";
 
 export class WatchManager implements vscode.Disposable {

@@ -15,18 +15,22 @@ import * as helpers from "./helpers";
 import * as mocks from "./mocks";
 import { fs } from "../src/cmt/pr";
 import { UsingResult, using } from "./using";
+import { BundleManager, BundleWatcher } from "../src/bundleWatcher";
 
 describe("Commands", () => {
     let mockChannel: IMock<vscode.LogOutputChannel>;
     let mockWorkspaces: mocks.MockWorkspaces;
     let mockWrapper: IMock<wrappers.VSCode>;
+    let mockBundleManager: IMock<BundleManager>
     let subject: commands.Commands;
 
     beforeEach(() => {
         mockChannel = Mock.ofType<vscode.LogOutputChannel>();
         mockWorkspaces = new mocks.MockWorkspaces();
         mockWrapper = Mock.ofType<wrappers.VSCode>();
-        subject = new commands.Commands(mockWorkspaces.object, mockWrapper.object, mockChannel.object);
+        mockBundleManager = Mock.ofType<BundleManager>();
+        subject = new commands.Commands(
+            mockWorkspaces.object, mockWrapper.object, mockChannel.object, mockBundleManager.object);
     });
     describe("updateWorkspaceEnvironment()", () => {
         let usingResult: UsingResult;
@@ -361,73 +365,44 @@ describe("Commands", () => {
         });
         describe("in a real workspace", () => {
             let root: string;
+            let mockWorkspace: IMock<autoproj.Workspace>;
+            let mockBundleWatcher: IMock<BundleWatcher>;
             beforeEach(() => {
                 root = helpers.init();
-                mockWorkspaces.addWorkspace(root);
+                mockBundleWatcher = Mock.ofType<BundleWatcher>();
+                mockWorkspace = mockWorkspaces.addWorkspace(root);
             });
             afterEach(() => {
                 helpers.clear();
             });
-            it("shows an error if Gemfile cannot be created", async () => {
+            it("does nothing if dependencies cannot be installed", async () => {
                 // create a file instead of a directory to force error
-                helpers.registerFile("autoproj");
-                await fs.writeFile(path.join(root, "autoproj"), "");
+                mockBundleWatcher.setup((x) => x.queueInstall()).returns(() => Promise.resolve(1));
+                mockBundleManager.setup((x) => x.getWatcher(mockWorkspace.object))
+                    .returns(() => mockBundleWatcher.object);
 
-                await assert.rejects(subject.setupRubyExtension(),
-                    /Could not create the extension's Gemfile/);
+                await subject.setupRubyExtension();
+                mockWrapper.verify((x) => x.getConfiguration(It.isAny()), Times.never());
             });
-            describe("the Gemfile is created", () => {
+            describe("the dependencies are installed", () => {
+                let extensionGemfile: string;
                 beforeEach(() => {
-                    helpers.registerDir("autoproj");
-                    helpers.registerDir("autoproj", "overrides.d");
-                    helpers.registerFile("autoproj", "overrides.d", "vscode-autoproj.gemfile");
+                    extensionGemfile = path.join(root, ".autoproj", "vscode-autoproj", "Gemfile");
+                    mockBundleWatcher.setup((x) => x.extensionGemfile).returns(() => extensionGemfile);
+                    mockBundleWatcher.setup((x) => x.queueInstall()).returns(() => Promise.resolve(0));
+                    mockBundleManager.setup((x) => x.getWatcher(mockWorkspace.object))
+                        .returns(() => mockBundleWatcher.object);
                 });
-                it("shows an error if environment cannot be read", async () => {
-                    await assert.rejects(subject.setupRubyExtension(),
-                        /Unable to read the workspaces's environment/);
-                });
-                it("shows an error if environment is invalid", async () => {
-                    helpers.registerDir(".autoproj");
-                    helpers.registerFile(".autoproj", "env.yml");
-
-                    // write an invalid yaml to trigger an error
-                    await fs.mkdir(path.join(root, ".autoproj"));
-                    await fs.writeFile(path.join(root, ".autoproj", "env.yml"), "- :");
-
-                    await assert.rejects(subject.setupRubyExtension(),
-                        /Unable to read the workspaces's environment/);
-                });
-                it("creates Gemfile and sets ruby extension configuration", async () => {
-                    helpers.registerDir(".autoproj");
-                    helpers.registerFile(".autoproj", "env.yml");
-
-                    const envContents = [
-                        "set:",
-                        "  BUNDLE_GEMFILE:",
-                        "    - /path/to/Gemfile",
-                        ""
-                    ];
-
-                    await fs.mkdir(path.join(root, ".autoproj"));
-                    await fs.writeFile(path.join(root, ".autoproj", "env.yml"), envContents.join("\n"));
-
+                it("sets ruby extension configuration", async () => {
                     const mockConfiguration = Mock.ofType<vscode.WorkspaceConfiguration>();
                     mockWrapper.setup((x) => x.getConfiguration("rubyLsp")).returns(() => mockConfiguration.object);
 
                     await subject.setupRubyExtension();
 
                     const shimsPath = path.join(root, ".autoproj", "vscode-autoproj", "bin");
-                    const wsGemfile = "/path/to/Gemfile";
-                    const gemFileContents: string = await fs.readFile(
-                        path.join(root, "autoproj", "overrides.d", "vscode-autoproj.gemfile"));
-
-                    assert(gemFileContents.includes('gem "ruby-lsp"'));
-                    assert(gemFileContents.includes('gem "debug"'));
-
                     mockConfiguration.verify((x) => x.update("rubyVersionManager.identifier", "custom"), Times.once());
                     mockConfiguration.verify((x) => x.update("customRubyCommand", `PATH=${shimsPath}:$PATH`), Times.once());
-                    mockConfiguration.verify((x) => x.update("bundleGemfile", wsGemfile), Times.once());
-                            mockWrapper.verify((x) => x.showInformationMessage(It.isAny(), { modal: true }), Times.once());
+                    mockConfiguration.verify((x) => x.update("bundleGemfile", extensionGemfile), Times.once());
                 });
             });
         });
@@ -441,7 +416,8 @@ describe("Commands", () => {
             root = helpers.init();
             builder = new helpers.WorkspaceBuilder(root);
             workspaces = new autoproj.Workspaces();
-            subject = new commands.Commands(workspaces, mockWrapper.object, mockChannel.object);
+            subject = new commands.Commands(
+                workspaces, mockWrapper.object, mockChannel.object, mockBundleManager.object);
 
             pkg = builder.addPackage("foobar");
             workspaces.addFolder(pkg.srcdir);
@@ -486,7 +462,8 @@ describe("Commands", () => {
             root = helpers.init();
             builder = new helpers.WorkspaceBuilder(root);
             workspaces = new autoproj.Workspaces();
-            subject = new commands.Commands(workspaces, mockWrapper.object, mockChannel.object);
+            subject = new commands.Commands(
+                workspaces, mockWrapper.object, mockChannel.object, mockBundleManager.object);
 
             pkg = builder.addPackage("foobar");
             workspaces.addFolder(pkg.srcdir);
@@ -615,7 +592,8 @@ describe("Commands", () => {
                 root = helpers.init();
                 builder = new helpers.WorkspaceBuilder(root);
                 workspaces = new autoproj.Workspaces();
-                subject = new commands.Commands(workspaces, mockWrapper.object, mockChannel.object);
+                subject = new commands.Commands(
+                    workspaces, mockWrapper.object, mockChannel.object, mockBundleManager.object);
                 mockWorkspaceConfig = Mock.ofType<vscode.WorkspaceConfiguration>();
 
                 pkg = builder.addPackage("foobar");
@@ -665,7 +643,8 @@ describe("Commands", () => {
                     .returns(() => supression);
 
                 supression = false;
-                subject = new commands.Commands(workspaces, mockWrapper.object, mockChannel.object);
+                subject = new commands.Commands(
+                    workspaces, mockWrapper.object, mockChannel.object, mockBundleManager.object);
             });
             afterEach(() => {
                 helpers.clear();

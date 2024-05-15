@@ -257,7 +257,7 @@ describe("WatchProcess", () => {
             await subject.stop();
             mockChild.verify((x) => x.kill(), Times.once());
         });
-        it("does nothing if a process is not runningg", async () => {
+        it("does nothing if a process is not running", async () => {
             await subject.stop();
             mockChild.verify((x) => x.kill(), Times.never());
         });

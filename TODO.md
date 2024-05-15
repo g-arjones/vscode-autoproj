@@ -1,25 +1,15 @@
-- Combine autoproj-package and autoproj-workspace in a single task provider
-- Install `ruby-lsp` automatically
-  - Create a Gemfile in `.autoproj/vscode-autoproj` that does `eval_gemfile` on `install/gems/Gemfile` and adds `ruby-lsp` and `debug`
-  - Do a `bundler install` after that
-  - See `tasks.Handler` how to create a progress view
-  - On startup:
-    - If `.autoproj/vscode-autoproj/Gemfile.lock` does not exist
-      - Does nothing
-    - If `.autoproj/vscode-autoproj/Gemfile.lock` exists
-      - If previous state is unknown, run `bundler install`
-      - If current state != previous (saved as a json, file contents hash) state, run `bundler install`
-      - If current state == previous state, does nothing
-  - Monitor `install/gems/Gemfile.lock` for changes:
-    - If `.autoproj/vscode-autoproj/Gemfile.lock` does not exist
-      - Does nothing
-    - If `.autoproj/vscode-autoproj/Gemfile.lock` exists
-      - If previous state is unknown, run `bundler install`
-      - If current state != previous (saved as a json) state, run `bundler install`
-      - If current state == previous state, does nothing
-  - Consider doing `eval_gemfile` on `.autoproj/Gemfile` as well (and monitoring the respective lock)
+## TODO
 
+- Fix launch configuration name (sample_driver_node showing as sample_driver) (implement isSubDirOf and replace startsWith)
+- Rename `optionalTasks` configuration to `tasks` (and make package build task optional too)
+- Implement command to setup TestMate C++ (the debug config template)
+- Implement command to add a test executable do TestMate C++ (using the advanced test executable config option)
+- Implement command to open autoproj workspace (add buildconf folder)
+- Implement command to add all packages to workspace
+
+- Refactor tests to use a real workspace instead of mocks (see `cpptools.test.ts`)
 - Make output channel a singleton and use it in getLogger()
-- Stop passing output channel and vscode wrapper as arguments
-- Refactor `extension.test.ts` and `commands.test.ts` to use a real workspace instead of mocks (see `cpptools.test.ts`)
+- Don't pass output channel anymore (getLogger() can be used anywhere)
 - Add linter
+
+See also [project issues](https://github.com/g-arjones/vscode-autoproj/issues).
