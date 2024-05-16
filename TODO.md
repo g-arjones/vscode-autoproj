@@ -1,6 +1,5 @@
 ## TODO
 
-- Implement command to setup TestMate C++ (the debug config template)
 - Implement command to add a test executable do TestMate C++ (using the advanced test executable config option)
 - Implement command to open autoproj workspace (add buildconf folder)
 - Implement command to add all packages to workspace

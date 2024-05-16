@@ -352,6 +352,33 @@ describe("Commands", () => {
                 ["foobar", "pythonTestAdapter"], vscode.ConfigurationTarget.Global), Times.once());
         })
     });
+    describe("setupTestMateDebugConfig()", () => {
+        it("shows an error message if workspace is empty", async () => {
+            await assert.rejects(subject.setupTestMateDebugConfig(), /Cannot setup TestMate/);
+        });
+        it("shows an error message when working with multiple autoproj workspaces", async () => {
+            mockWorkspaces.addWorkspace("/ws/one");
+            mockWorkspaces.addWorkspace("/ws/two");
+            await assert.rejects(subject.setupTestMateDebugConfig(), /Cannot setup TestMate/);
+        })
+        it("sets the default python interpreter", async () => {
+            mockWorkspaces.addWorkspace("/ws/one");
+            const mockConfiguration = Mock.ofType<vscode.WorkspaceConfiguration>();
+            mockWrapper.setup((x) => x.getConfiguration("testMate.cpp.debug")).returns(() => mockConfiguration.object);
+            await subject.setupTestMateDebugConfig();
+
+            const gdbShimPath = path.join("/ws/one", ShimsWriter.RELATIVE_SHIMS_PATH, "gdb");
+            const configTemplate = {
+                "type": "cppdbg",
+                "MIMode": "gdb",
+                "program": "${exec}",
+                "args": "${argsArray}",
+                "cwd": "${cwd}",
+                "miDebuggerPath": gdbShimPath
+            }
+            mockConfiguration.verify((x) => x.update("configTemplate", configTemplate), Times.once());
+        })
+    });
     describe("setupRubyExtension()", () => {
         it("shows an error message if workspace is empty", async () => {
             await assert.rejects(subject.setupRubyExtension(),
@@ -736,6 +763,7 @@ describe("Commands", () => {
                 setupMocks("saveLastDebuggingSession", "autoproj.saveLastDebuggingSession"),
                 setupMocks("restartDebugging", "autoproj.restartDebugging"),
                 setupMocks("enableCmakeDebuggingSymbols", "autoproj.enableCmakeDebuggingSymbols"),
+                setupMocks("setupTestMateDebugConfig","autoproj.setupTestMateDebugConfig"),
                 setupMocks("setupPythonDefaultInterpreter","autoproj.setupPythonDefaultInterpreter")
             ];
 

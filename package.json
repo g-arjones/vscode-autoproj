@@ -65,6 +65,11 @@
                 "command": "autoproj.setupRubyExtension"
             },
             {
+                "title": "Setup TestMate C++ debug configuration",
+                "category": "Autoproj",
+                "command": "autoproj.setupTestMateDebugConfig"
+            },
+            {
                 "title": "Save last debugging session",
                 "category": "Autoproj",
                 "command": "autoproj.saveLastDebuggingSession"
@@ -390,8 +395,9 @@
         "coverage": "c8 --reporter=html --exclude='*/test/*' --exclude='*/src/wrappers.js' npm run test"
     },
     "extensionDependencies": [
-        "ms-vscode.cpptools",
+        "matepek.vscode-catch2-test-adapter",
         "ms-python.python",
+        "ms-vscode.cpptools",
         "shopify.ruby-lsp"
     ],
     "dependencies": {

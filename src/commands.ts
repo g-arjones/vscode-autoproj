@@ -194,6 +194,25 @@ export class Commands {
         experiments.update("optOutFrom", [...new Set([...optOutFrom, "pythonTestAdapter"])], ConfigurationTarget.Global);
     }
 
+    public async setupTestMateDebugConfig() {
+        this._assertSingleAutoprojWorkspace(
+            "Cannot setup TestMate C++ debug configuration for an empty workspace",
+            "Cannot setup TestMate C++ debug configuration for multiple Autoproj workspaces");
+
+        const workspaces = [...this._workspaces.workspaces.values()];
+        const gdbShimPath = path.join(workspaces[0].root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb");
+        const configTemplate = {
+            "type": "cppdbg",
+            "MIMode": "gdb",
+            "program": "${exec}",
+            "args": "${argsArray}",
+            "cwd": "${cwd}",
+            "miDebuggerPath": gdbShimPath
+        }
+
+        this._vscode.getConfiguration("testMate.cpp.debug").update("configTemplate", configTemplate);
+    }
+
     public async enableCmakeDebuggingSymbols() {
         this._assertWorkspaceNotEmpty("Cannot enable CMake debugging symbols on an empty workspace");
         const ws = await this.showWorkspacePicker();
@@ -430,6 +449,9 @@ export class Commands {
         });
         this._vscode.registerAndSubscribeCommand("autoproj.enableCmakeDebuggingSymbols", () => {
             this.handleError(() => this.enableCmakeDebuggingSymbols());
+        });
+        this._vscode.registerAndSubscribeCommand("autoproj.setupTestMateDebugConfig", () => {
+            this.handleError(() => this.setupTestMateDebugConfig());
         });
     }
 }
