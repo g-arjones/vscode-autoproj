@@ -15,7 +15,7 @@ import * as shlex from "./cmt/shlex";
 import * as autoproj from "./autoproj";
 import * as wrappers from "./wrappers";
 import * as path from "path";
-import { asyncSpawn, getLogger, IAsyncExecution } from "./util";
+import { asyncSpawn, getLogger, IAsyncExecution, isSubdirOf } from "./util";
 import { ShimsWriter } from "./shimsWriter";
 import { BundleManager } from "./bundleWatcher";
 
@@ -151,7 +151,7 @@ export class Commands {
             const buildconfs = folders.filter((folder) => buildconfPaths.includes(folder.uri.fsPath));
             folders = folders.filter((folder) => !buildconfs.includes(folder));
             const pkgSets = folders.filter(
-                (folder) => buildconfPaths.some((configPath) => folder.uri.fsPath.startsWith(configPath)));
+                (folder) => buildconfPaths.some((configPath) => isSubdirOf(folder.uri.fsPath, configPath)));
             const pkgs = folders.filter((folder) => !pkgSets.includes(folder));
 
             [buildconfs, pkgSets, pkgs].forEach(group => {
@@ -333,12 +333,12 @@ export class Commands {
             for (const ws of workspaceList) {
                 const wsInfo = await ws.info();
                 for (const pkg of [...wsInfo.packages.values()]) {
-                    if (pkg.builddir && programPath.startsWith(pkg.builddir)) {
+                    if (pkg.builddir && isSubdirOf(programPath, pkg.builddir)) {
                         packageSrcDir = pkg.srcdir;
                         name = `${pkg.name}/${name}`;
                         break;
                     }
-                    if (pkg.srcdir && programPath.startsWith(pkg.srcdir)) {
+                    if (pkg.srcdir && isSubdirOf(programPath, pkg.srcdir)) {
                         packageSrcDir = pkg.srcdir;
                         name = `${pkg.name}/${name}`;
                         break;

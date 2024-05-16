@@ -1,4 +1,5 @@
 import * as util from '../cmt/util';
+import { isSubdirOf } from '../util';
 import { IPackage, IPackageSet } from "./interface";
 
 export class WorkspaceInfo {
@@ -23,7 +24,7 @@ export class WorkspaceInfo {
         filePath = util.platformNormalizePath(filePath);
         const parentPkgs = (pkg: IPackage) => {
             if (pkg.srcdir) {
-                return filePath.startsWith(util.platformNormalizePath(pkg.srcdir));
+                return isSubdirOf(filePath, pkg.srcdir);
             } else {
                 return false;
             }

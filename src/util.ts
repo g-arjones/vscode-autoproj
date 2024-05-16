@@ -1,5 +1,14 @@
 import * as child_process from "child_process";
+import * as path from "path";
 import * as vscode from "vscode";
+
+export function isSubdirOf(child: string, parent: string) {
+    // for absolute paths, resolve() normalizes and removes trailing separator
+    child = path.resolve(child);
+    parent = path.resolve(parent);
+
+    return child.startsWith(parent + path.sep) || (child === parent);
+}
 
 export interface IAsyncExecution {
     childProcess: child_process.ChildProcessWithoutNullStreams,

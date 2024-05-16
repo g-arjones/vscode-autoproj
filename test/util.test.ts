@@ -1,5 +1,5 @@
 import { LogOutputChannel } from "vscode";
-import { asyncSpawn, getLogger, IAsyncExecution } from "../src/util"
+import { asyncSpawn, getLogger, isSubdirOf } from "../src/util"
 import { IMock, Mock, Times } from "typemoq";
 import * as assert from "assert";
 
@@ -63,4 +63,17 @@ describe("asyncSpawn()", () => {
         mockChannel.verify((x) => x.info("three"), Times.once());
         mockChannel.verify((x) => x.info("four"), Times.once());
     });
+});
+
+describe("isSubdirOf()", () => {
+    it("returns true if dir is a subpath or equal to another", () => {
+        assert(isSubdirOf("/path/to/file", "/path/to////"));
+        assert(isSubdirOf("/path/to/dir", "/path/to////"));
+        assert(isSubdirOf("/path/to/dir", "/path/to"));
+        assert(isSubdirOf("/path/to", "/path/to///"));
+        assert(isSubdirOf("/path/to//", "/path/to"));
+
+        assert(!isSubdirOf("/path/to_", "/path/to"));
+        assert(!isSubdirOf("/path/t", "/path/to"));
+    })
 });

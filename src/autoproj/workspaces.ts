@@ -4,6 +4,7 @@ import { findWorkspaceRoot } from "./helpers";
 import { WorkspaceInfo } from "./info";
 import { IPackage, IPackageSet } from "./interface";
 import { Workspace } from "./workspace";
+import { isSubdirOf } from "../util";
 
 /** Dynamic management of a set of workspaces
  *
@@ -198,7 +199,7 @@ export class Workspaces {
     public async getWorkspaceAndPackage(uri: vscode.Uri): Promise<{ workspace: Workspace, package: IPackage | undefined } | undefined> {
         if (uri.scheme == "file") {
             for (const ws of this.workspaces.values()) {
-                if (!uri.fsPath.startsWith(ws.root)) {
+                if (!isSubdirOf(uri.fsPath, ws.root)) {
                     continue;
                 }
 

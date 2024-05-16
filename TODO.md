@@ -1,6 +1,5 @@
 ## TODO
 
-- Fix launch configuration name (sample_driver_node showing as sample_driver) (implement isSubDirOf and replace startsWith)
 - Rename `optionalTasks` configuration to `tasks` (and make package build task optional too)
 - Implement command to setup TestMate C++ (the debug config template)
 - Implement command to add a test executable do TestMate C++ (using the advanced test executable config option)
