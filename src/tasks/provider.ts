@@ -92,10 +92,12 @@ export class AutoprojProvider implements vscode.TaskProvider {
     }
 
     public isTaskEnabled(type: TaskType, mode: PackageTaskMode | WorkspaceTaskMode): boolean {
-        const optionalTasks = this._vscode.getConfiguration("autoproj.optionalTasks");
+        const tasksConfig = this._vscode.getConfiguration("autoproj.tasks");
         if (type === TaskType.Package) {
-            const packageTasks = optionalTasks.get<{ [name: string]: boolean }>("package")!;
+            const packageTasks = tasksConfig.get<{ [name: string]: boolean }>("package")!;
             switch (mode as PackageTaskMode) {
+            case PackageTaskMode.Build:
+                return packageTasks.build;
             case PackageTaskMode.Rebuild:
                 return packageTasks.rebuild;
             case PackageTaskMode.BuildNoDeps:
@@ -108,7 +110,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
                 return packageTasks.update;
             }
         } else if (type === TaskType.Workspace) {
-            const workspaceTasks = optionalTasks.get<{ [name: string]: boolean }>("workspace")!;
+            const workspaceTasks = tasksConfig.get<{ [name: string]: boolean }>("workspace")!;
             switch (mode as WorkspaceTaskMode) {
             case WorkspaceTaskMode.Build:
                 return workspaceTasks.build;
@@ -172,14 +174,17 @@ export class AutoprojProvider implements vscode.TaskProvider {
             const folder = pkg.package.srcdir;
             const name = pkg.package.name;
 
+            const build = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Build);
             const rebuild = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Rebuild);
             const forceBuild = this.isTaskEnabled(TaskType.Package, PackageTaskMode.ForceBuild);
             const buildNoDeps = this.isTaskEnabled(TaskType.Package, PackageTaskMode.BuildNoDeps);
             const checkout = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Checkout);
             const update = this.isTaskEnabled(TaskType.Package, PackageTaskMode.Update);
 
-            this._addTask(folder, this._createPackageBuildTask(`${ws.name}: Build ${name}`, ws, folder),
-                this._buildTasks);
+            if (build) {
+                this._addTask(folder, this._createPackageBuildTask(`${ws.name}: Build ${name}`, ws, folder),
+                    this._buildTasks);
+            }
 
             if (checkout) {
                 this._addTask(folder, this._createPackageCheckoutTask(`${ws.name}: Checkout ${name}`, ws, folder),

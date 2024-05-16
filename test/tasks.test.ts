@@ -72,6 +72,7 @@ describe("Task provider", () => {
     let workspaceFolders: vscode.WorkspaceFolder[];
     let usingResult: UsingResult;
     let packageTasks: {
+        build: boolean,
         buildNoDeps: boolean,
         checkout: boolean,
         forceBuild: boolean,
@@ -87,6 +88,7 @@ describe("Task provider", () => {
     };
     beforeEach(() => {
         packageTasks = {
+            build: true,
             buildNoDeps: true,
             checkout: true,
             forceBuild: true,
@@ -106,7 +108,7 @@ describe("Task provider", () => {
         mockConfiguration = TypeMoq.Mock.ofType<vscode.WorkspaceConfiguration>();
         mockConfiguration.setup((x) => x.get("package")).returns(() => packageTasks);
         mockConfiguration.setup((x) => x.get("workspace")).returns(() => workspaceTasks);
-        mockWrapper.setup((x) => x.getConfiguration("autoproj.optionalTasks")).
+        mockWrapper.setup((x) => x.getConfiguration("autoproj.tasks")).
             returns(() => mockConfiguration.object);
 
         root = helpers.init();
@@ -438,7 +440,6 @@ describe("Task provider", () => {
             addFolder(wsTwoRoot);
             subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
         });
-
         it("is initalized with all tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
             assert.equal(providedTasks.length, 28);
@@ -456,6 +457,7 @@ describe("Task provider", () => {
         });
         it("does not create disabled tasks", async () => {
             packageTasks = {
+                build: false,
                 buildNoDeps: false,
                 checkout: false,
                 forceBuild: false,
@@ -474,8 +476,7 @@ describe("Task provider", () => {
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            // 0 mandatory tasks per workspace + 1 mandatory task per package
-            await assert.equal(providedTasks.length, 2 * 0 + 1 * 3);
+            assert.equal(providedTasks.length, 0);
         });
         it("handles exception if installation manifest is invalid", async () => {
             helpers.mkfile("- bla: [", "one", ".autoproj", "installation-manifest");
@@ -496,6 +497,30 @@ describe("Task provider", () => {
             await assertAllPackageTasks(b, wsOneRoot, oneManifest);
             await assertAllPackageTasks(c, wsTwoRoot, twoManifest);
         });
+        describe("AutoprojWorkspaceTaskProvider", () => {
+            it("returns workspace tasks only", async () => {
+                const workspaceProvider = new tasks.AutoprojWorkspaceTaskProvider(subject);
+                const providedTasks = await workspaceProvider.provideTasks(null as any);
+                const filteredTasks = providedTasks.filter((task) => task.definition.type === "autoproj-workspace");
+                assert.equal(providedTasks.length, filteredTasks.length);
+            });
+            it("resolveTask() always returns null", async () => {
+                const workspaceProvider = new tasks.AutoprojWorkspaceTaskProvider(subject);
+                assert.equal(workspaceProvider.resolveTask(null as any, null as any), null);
+            })
+        })
+        describe("AutoprojPackageTaskProvider", () => {
+            it("returns package tasks only", async () => {
+                const packageProvider = new tasks.AutoprojPackageTaskProvider(subject);
+                const providedTasks = await packageProvider.provideTasks(null as any);
+                const filteredTasks = providedTasks.filter((task) => task.definition.type === "autoproj-package");
+                assert.equal(providedTasks.length, filteredTasks.length);
+            });
+            it("resolveTask() always returns null", async () => {
+                const packageProvider = new tasks.AutoprojPackageTaskProvider(subject);
+                assert.equal(packageProvider.resolveTask(null as any, null as any), null);
+            })
+        })
     });
 
     describe("in an empty workspace", () => {
@@ -572,6 +597,7 @@ describe("Task provider", () => {
             });
             it("returns false for disabled tasks", () => {
                 packageTasks = {
+                    build: false,
                     buildNoDeps: false,
                     checkout: false,
                     forceBuild: false,
@@ -588,6 +614,7 @@ describe("Task provider", () => {
                 };
 
                 let type = tasks.TaskType.Package;
+                assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Build), false);
                 assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.BuildNoDeps), false);
                 assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.ForceBuild), false);
                 assert.equal(subject.isTaskEnabled(type, tasks.PackageTaskMode.Rebuild), false);
@@ -603,7 +630,7 @@ describe("Task provider", () => {
             });
             it("throws if task type is invalid", () => {
                 assert.throws(() => subject.isTaskEnabled("foo" as tasks.TaskType,
-                    tasks.PackageTaskMode.Build), /Invalid/);
+                    "invalid" as tasks.PackageTaskMode), /Invalid/);
             });
         });
     });
