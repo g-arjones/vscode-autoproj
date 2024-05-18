@@ -227,7 +227,7 @@ describe("Task provider", () => {
     }
     function assertUpdateTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
-        const args = ["update", "--progress=f", "-k", "--color"];
+        const args = ["update", "-k", "--color"];
         let scope = workspaceFolders[0];
         let name = `${pathBasename(wsRoot)}: Update all packages`;
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
@@ -251,7 +251,7 @@ describe("Task provider", () => {
     }
     function assertCheckoutTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
-        const args = ["update", "--progress=f", "-k", "--color", "--checkout-only"];
+        const args = ["update", "-k", "--color", "--checkout-only"];
         let name = `${pathBasename(wsRoot)}: Checkout all packages`;
         let scope = workspaceFolders[0];
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
@@ -289,7 +289,7 @@ describe("Task provider", () => {
     }
     function assertUpdateConfigTask(task: vscode.Task, wsRoot: string) {
         const process = autoprojExePath(wsRoot);
-        const args = ["update", "--progress=f", "-k", "--color", "--config"];
+        const args = ["update", "-k", "--color", "--config"];
         const name = `${pathBasename(wsRoot)}: Update Configuration`;
         const scope = workspaceFolders[0];
         const defs: tasks.IWorkspaceTaskDefinition = {

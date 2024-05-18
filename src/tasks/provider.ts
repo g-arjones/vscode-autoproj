@@ -260,14 +260,14 @@ export class AutoprojProvider implements vscode.TaskProvider {
     private _createUpdateTask(name, ws, type, defs = {}, args: string[] = [],
                               scope = this._vscode.workspaceFolders![0]) {
         const task = this._createTask(name, ws, type,
-            { mode: "update", ...defs }, ["update", "--progress=f", "-k", "--color", ...args], scope);
+            { mode: "update", ...defs }, ["update", "-k", "--color", ...args], scope);
         task.problemMatchers = ["$autoproj"];
         return task;
     }
 
     private _createUpdateConfigTask(name, ws, defs = {}, args: string[] = []) {
         const task = this._createWorkspaceTask(name, ws, "update-config",
-            defs, ["update", "--progress=f", "-k", "--color", "--config", ...args]);
+            defs, ["update", "-k", "--color", "--config", ...args]);
         task.problemMatchers = ["$autoproj"];
         return task;
     }
