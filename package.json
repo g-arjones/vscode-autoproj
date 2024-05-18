@@ -60,6 +60,11 @@
                 "command": "autoproj.enableCmakeDebuggingSymbols"
             },
             {
+                "title": "Open workspace",
+                "category": "Autoproj",
+                "command": "autoproj.openWorkspace"
+            },
+            {
                 "title": "Setup Python default interpreter",
                 "category": "Autoproj",
                 "command": "autoproj.setupPythonDefaultInterpreter"

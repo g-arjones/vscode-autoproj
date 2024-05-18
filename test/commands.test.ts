@@ -737,6 +737,7 @@ describe("Commands", () => {
                 setupMocks("restartDebugging", "autoproj.restartDebugging"),
                 setupMocks("enableCmakeDebuggingSymbols", "autoproj.enableCmakeDebuggingSymbols"),
                 setupMocks("addPackageToTestMate", "autoproj.addPackageToTestMate"),
+                setupMocks("openWorkspace", "autoproj.openWorkspace"),
                 setupMocks("setupPythonDefaultInterpreter","autoproj.setupPythonDefaultInterpreter")
             ];
 

@@ -363,6 +363,34 @@ export class Commands {
         wsConfig.update("configurations", newConfigurations)
     }
 
+    public async openWorkspace() {
+        if (this._workspaces.workspaces.size > 0) {
+            throw new Error("Opening multiple Autoproj workspaces is not supported");
+        }
+
+        const uri = await this._vscode.showOpenDialog({
+            canSelectFolders: true,
+            canSelectFiles: false,
+            canSelectMany: false,
+            openLabel: "Open",
+            title: "Select an an Autoproj workspace folder"
+        });
+
+        if (!uri) {
+            return;
+        }
+
+        const root = autoproj.findWorkspaceRoot(uri[0].fsPath);
+        if (!root) {
+            throw new Error("The selected folder is not in an Autoproj workspace");
+        }
+
+        const name = path.basename(root);
+        const ws = { name: `autoproj (${name})`, uri: Uri.file(path.join(root, "autoproj")) };
+        const folders = this._vscode.workspaceFolders || [];
+        this._vscode.updateWorkspaceFolders(0, folders.length, ws, ...folders);
+    }
+
     public async showTestExecutablePicker(workspaceList: autoproj.Workspace[]): Promise<ITestExecuable | undefined> {
         let name: string;
         const program = await this._vscode.showOpenDialog({
@@ -541,6 +569,9 @@ export class Commands {
         });
         this._vscode.registerAndSubscribeCommand("autoproj.addPackageToTestMate", () => {
             this.handleError(() => this.addPackageToTestMate());
+        });
+        this._vscode.registerAndSubscribeCommand("autoproj.openWorkspace", () => {
+            this.handleError(() => this.openWorkspace());
         });
     }
 }
