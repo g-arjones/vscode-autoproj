@@ -327,86 +327,6 @@ describe("Commands", () => {
             await assert.rejects(subject.addPackageToWorkspace(), /Could not add folder: \/path\/to\/tools\/two/);
         });
     });
-    describe("setupPythonDefaultInterpreter()", () => {
-        it("shows an error message if workspace is empty", async () => {
-            await assert.rejects(subject.setupPythonDefaultInterpreter(),
-                /Cannot setup Python default interpreter for an empty workspace/);
-        });
-        it("shows an error message when working with multiple autoproj workspaces", async () => {
-            mockWorkspaces.addWorkspace("/ws/one");
-            mockWorkspaces.addWorkspace("/ws/two");
-            await assert.rejects(subject.setupPythonDefaultInterpreter(),
-                /Cannot setup Python default interpreter for multiple Autoproj workspaces/);
-        })
-        it("sets the default python interpreter", async () => {
-            mockWorkspaces.addWorkspace("/ws/one");
-            const mockConfiguration = Mock.ofType<vscode.WorkspaceConfiguration>();
-            mockWrapper.setup((x) => x.getConfiguration()).returns(() => mockConfiguration.object);
-            mockWrapper.setup((x) => x.getConfiguration("python.experiments")).returns(() => mockConfiguration.object);
-            mockConfiguration.setup((x) => x.get<string[]>("optOutFrom")).returns(() => ["foobar"]);
-            await subject.setupPythonDefaultInterpreter();
-
-            const pythonShimPath = path.join("/ws/one", ShimsWriter.RELATIVE_SHIMS_PATH, "python");
-            mockConfiguration.verify((x) => x.update("python.defaultInterpreterPath", pythonShimPath), Times.once());
-            mockConfiguration.verify((x) => x.update("optOutFrom",
-                ["foobar", "pythonTestAdapter"], vscode.ConfigurationTarget.Global), Times.once());
-        })
-    });
-    describe("setupRubyExtension()", () => {
-        it("shows an error message if workspace is empty", async () => {
-            await assert.rejects(subject.setupRubyExtension(),
-                /Cannot setup Ruby extension for an empty workspace/);
-        });
-        it("shows an error message when working with multiple autoproj workspaces", async () => {
-            mockWorkspaces.addWorkspace("/ws/one");
-            mockWorkspaces.addWorkspace("/ws/two");
-            await assert.rejects(subject.setupRubyExtension(),
-                /Cannot setup Ruby extension for multiple Autoproj workspaces/);
-        });
-        describe("in a real workspace", () => {
-            let root: string;
-            let mockWorkspace: IMock<autoproj.Workspace>;
-            let mockBundleWatcher: IMock<BundleWatcher>;
-            beforeEach(() => {
-                root = helpers.init();
-                mockBundleWatcher = Mock.ofType<BundleWatcher>();
-                mockWorkspace = mockWorkspaces.addWorkspace(root);
-            });
-            afterEach(() => {
-                helpers.clear();
-            });
-            it("does nothing if dependencies cannot be installed", async () => {
-                // create a file instead of a directory to force error
-                mockBundleWatcher.setup((x) => x.queueInstall()).returns(() => Promise.resolve(1));
-                mockBundleManager.setup((x) => x.getWatcher(mockWorkspace.object))
-                    .returns(() => mockBundleWatcher.object);
-
-                await subject.setupRubyExtension();
-                mockWrapper.verify((x) => x.getConfiguration(It.isAny()), Times.never());
-            });
-            describe("the dependencies are installed", () => {
-                let extensionGemfile: string;
-                beforeEach(() => {
-                    extensionGemfile = path.join(root, ".autoproj", "vscode-autoproj", "Gemfile");
-                    mockBundleWatcher.setup((x) => x.extensionGemfile).returns(() => extensionGemfile);
-                    mockBundleWatcher.setup((x) => x.queueInstall()).returns(() => Promise.resolve(0));
-                    mockBundleManager.setup((x) => x.getWatcher(mockWorkspace.object))
-                        .returns(() => mockBundleWatcher.object);
-                });
-                it("sets ruby extension configuration", async () => {
-                    const mockConfiguration = Mock.ofType<vscode.WorkspaceConfiguration>();
-                    mockWrapper.setup((x) => x.getConfiguration("rubyLsp")).returns(() => mockConfiguration.object);
-
-                    await subject.setupRubyExtension();
-
-                    const shimsPath = path.join(root, ".autoproj", "vscode-autoproj", "bin");
-                    mockConfiguration.verify((x) => x.update("rubyVersionManager.identifier", "custom"), Times.once());
-                    mockConfiguration.verify((x) => x.update("customRubyCommand", `PATH=${shimsPath}:$PATH`), Times.once());
-                    mockConfiguration.verify((x) => x.update("bundleGemfile", extensionGemfile), Times.once());
-                });
-            });
-        });
-    });
     describe("guessCurrentTestBinaryDir()", () => {
         let root: string;
         let builder: helpers.WorkspaceBuilder;
@@ -731,14 +651,12 @@ describe("Commands", () => {
             const mocks = [
                 setupMocks("updateWorkspaceEnvironment", "autoproj.updateWorkspaceEnvironment"),
                 setupMocks("addPackageToWorkspace", "autoproj.addPackageToWorkspace"),
-                setupMocks("setupRubyExtension", "autoproj.setupRubyExtension"),
                 setupMocks("startDebugging", "autoproj.startDebugging"),
                 setupMocks("saveLastDebuggingSession", "autoproj.saveLastDebuggingSession"),
                 setupMocks("restartDebugging", "autoproj.restartDebugging"),
                 setupMocks("enableCmakeDebuggingSymbols", "autoproj.enableCmakeDebuggingSymbols"),
                 setupMocks("addPackageToTestMate", "autoproj.addPackageToTestMate"),
-                setupMocks("openWorkspace", "autoproj.openWorkspace"),
-                setupMocks("setupPythonDefaultInterpreter","autoproj.setupPythonDefaultInterpreter")
+                setupMocks("openWorkspace", "autoproj.openWorkspace")
             ];
 
             subject.register();

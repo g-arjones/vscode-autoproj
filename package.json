@@ -65,16 +65,6 @@
                 "command": "autoproj.openWorkspace"
             },
             {
-                "title": "Setup Python default interpreter",
-                "category": "Autoproj",
-                "command": "autoproj.setupPythonDefaultInterpreter"
-            },
-            {
-                "title": "Setup Ruby LSP extension",
-                "category": "Autoproj",
-                "command": "autoproj.setupRubyExtension"
-            },
-            {
                 "title": "Save last debugging session",
                 "category": "Autoproj",
                 "command": "autoproj.saveLastDebuggingSession"

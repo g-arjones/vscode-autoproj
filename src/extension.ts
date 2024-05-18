@@ -9,9 +9,8 @@ import * as tasks from "./tasks";
 import * as watcher from "./fileWatcher";
 import * as wrappers from "./wrappers";
 import * as cpptools from "./cpptools";
-import * as testMate from "./testMate";
 import { BundleManager } from "./bundleWatcher";
-import { ShimsWriter } from "./shimsWriter";
+import { ConfigManager } from "./configManager";
 import { WatchManager } from "./workspaceWatcher";
 
 export class EventHandler implements vscode.Disposable {
@@ -19,20 +18,18 @@ export class EventHandler implements vscode.Disposable {
     private _fileWatcher: watcher.FileWatcher;
     private _workspaces: autoproj.Workspaces;
     private _cppConfigurationProvider: cpptools.CppConfigurationProvider;
-    private _shimsWriter: ShimsWriter;
     private _watchManager: WatchManager;
-    private _bundleManager: BundleManager;
+    private _configManager: ConfigManager;
 
     constructor(wrapper: wrappers.VSCode, workspaces: autoproj.Workspaces,
                 cppConfigurationProvider: cpptools.CppConfigurationProvider, watchManager: WatchManager,
-                bundleManager: BundleManager) {
+                configManager: ConfigManager) {
         this._wrapper = wrapper;
         this._fileWatcher = new watcher.FileWatcher();
         this._workspaces = workspaces;
         this._cppConfigurationProvider = cppConfigurationProvider;
-        this._shimsWriter = new ShimsWriter();
         this._watchManager = watchManager;
-        this._bundleManager = bundleManager;
+        this._configManager = configManager;
     }
 
     public dispose() {
@@ -61,17 +58,6 @@ export class EventHandler implements vscode.Disposable {
         this._cppConfigurationProvider.notifyChanges();
     }
 
-    public async writeShims(workspace: autoproj.Workspace) {
-        try {
-            await this._shimsWriter.writeOpts(workspace);
-            await this._shimsWriter.writePython(workspace);
-            await this._shimsWriter.writeGdb(workspace);
-            await this._shimsWriter.writeRuby(workspace);
-        } catch (err) {
-            await this._wrapper.showErrorMessage(`Could not create file: ${err.message}`);
-        }
-    }
-
     public async onWorkspaceFolderAdded(folder: vscode.WorkspaceFolder): Promise<void> {
         const { added, workspace } = this._workspaces.addFolder(folder.uri.fsPath);
         if (added && workspace) {
@@ -80,10 +66,9 @@ export class EventHandler implements vscode.Disposable {
             } catch (err) {
                 this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
+            await this._configManager.setupExtension();
             this._cppConfigurationProvider.notifyChanges();
             this.watchManifest(workspace);
-            await this._bundleManager.check(workspace);
-            await this.writeShims(workspace);
             this._watchManager.start(workspace);
         }
     }
@@ -93,7 +78,7 @@ export class EventHandler implements vscode.Disposable {
         const deletedWs = this._workspaces.deleteFolder(folder.uri.fsPath);
         if (deletedWs) {
             this.unwatchManifest(deletedWs);
-            this._bundleManager.unwatch(deletedWs);
+            this._configManager.onWorkspaceRemoved(deletedWs);
             await this._watchManager.stop(deletedWs);
         }
     }
@@ -127,8 +112,9 @@ export async function setupExtension(subscriptions: vscode.Disposable[], vscodeW
     const autoprojCommands = new commands.Commands(workspaces, vscodeWrapper, outputChannel, bundleManager);
     const watchManager = new WatchManager(outputChannel, vscodeWrapper);
     const tasksHandler = new tasks.Handler(vscodeWrapper, workspaces);
+    const configManager = new ConfigManager(bundleManager, workspaces);
     const eventHandler = new EventHandler(
-        vscodeWrapper, workspaces, cppConfigurationProvider, watchManager, bundleManager);
+        vscodeWrapper, workspaces, cppConfigurationProvider, watchManager, configManager);
 
     subscriptions.push(vscode.tasks.registerTaskProvider("autoproj-workspace", autoprojWorkspaceTaskProvider));
     subscriptions.push(vscode.tasks.registerTaskProvider("autoproj-package", autoprojPackageTaskProvider));
@@ -157,7 +143,6 @@ export async function setupExtension(subscriptions: vscode.Disposable[], vscodeW
     subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
         event.added.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
         event.removed.forEach((folder) => eventHandler.onWorkspaceFolderRemoved(folder));
-        testMate.cleanupExecutables(workspaces);
         autoprojTaskProvider.reloadTasks();
     }));
 }

@@ -6,7 +6,6 @@ import {
     DebugConfiguration,
     QuickPickItem,
     MessageItem,
-    ConfigurationTarget,
     LogOutputChannel
 } from "vscode";
 import { fs } from "./cmt/pr";
@@ -193,20 +192,6 @@ export class Commands {
         }
     }
 
-    public async setupPythonDefaultInterpreter() {
-        this._assertSingleAutoprojWorkspace(
-            "Cannot setup Python default interpreter for an empty workspace",
-            "Cannot setup Python default interpreter for multiple Autoproj workspaces");
-
-        const workspaces = [...this._workspaces.workspaces.values()];
-        const pythonShimPath = path.join(workspaces[0].root, ShimsWriter.RELATIVE_SHIMS_PATH, "python");
-        this._vscode.getConfiguration().update("python.defaultInterpreterPath", pythonShimPath);
-
-        const experiments = this._vscode.getConfiguration("python.experiments");
-        const optOutFrom = experiments.get<string[]>("optOutFrom") || [];
-        experiments.update("optOutFrom", [...new Set([...optOutFrom, "pythonTestAdapter"])], ConfigurationTarget.Global);
-    }
-
     public async addPackageToTestMate() {
         let packages: IPackageItem[] = (await this._workspaces.getPackagesInCodeWorkspace()).map((item) => {
             const ws = item.workspace;
@@ -333,13 +318,6 @@ export class Commands {
         } catch (error) {
             throw new Error(`Could not create overrides script: ${error.message}`);
         }
-    }
-
-    private async _updateRubyLspConfiguration(ws: autoproj.Workspace, extensionGemfile: string) {
-        const shimsPath = path.join(ws.root, ShimsWriter.RELATIVE_SHIMS_PATH);
-        this._vscode.getConfiguration("rubyLsp").update("rubyVersionManager.identifier", "custom");
-        this._vscode.getConfiguration("rubyLsp").update("customRubyCommand", `PATH=${shimsPath}:$PATH`);
-        this._vscode.getConfiguration("rubyLsp").update("bundleGemfile", extensionGemfile);
     }
 
     public async saveLastDebuggingSession() {
@@ -522,18 +500,6 @@ export class Commands {
         await this._vscode.startDebugging(parentWs, config);
     }
 
-    public async setupRubyExtension() {
-        this._assertSingleAutoprojWorkspace(
-            "Cannot setup Ruby extension for an empty workspace",
-            "Cannot setup Ruby extension for multiple Autoproj workspaces");
-
-        const ws = [...this._workspaces.workspaces.values()][0];
-        const bundle = this._bundleManager.getWatcher(ws);
-        if (await bundle.queueInstall() === 0) {
-            await this._updateRubyLspConfiguration(ws, bundle.extensionGemfile);
-        }
-    }
-
     public async handleError(f: () => void | Promise<void>) {
         try {
             await f();
@@ -548,12 +514,6 @@ export class Commands {
         });
         this._vscode.registerAndSubscribeCommand("autoproj.updateWorkspaceEnvironment", () => {
             this.handleError(() => this.updateWorkspaceEnvironment())
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.setupRubyExtension", () => {
-            this.handleError(() => this.setupRubyExtension());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.setupPythonDefaultInterpreter", () => {
-            this.handleError(() => this.setupPythonDefaultInterpreter());
         });
         this._vscode.registerAndSubscribeCommand("autoproj.startDebugging", () => {
             this.handleError(() => this.startDebugging());

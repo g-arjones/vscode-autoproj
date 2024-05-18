@@ -1,15 +1,12 @@
 ## TODO
 
-- When a folder is added/removed:
-  - Warn if working on a single folder (ask to save workspace)
-  - Show error if multiple autoproj workspaces are open
-  - Set "test.executables" to an empty string
-  - Run all integration setup (if necessary and if workspace is saved and a single autoproj workspace is open)
+- Add command to remove testmate entry
+- Add command to remove debug entry
 
 - Add missing tests:
+  - ConfigManager...
   - Commands.addPackageToTestMate
   - Commands.openWorkspace
-  - testMate.cleanupExecutables
 - Refactor tests to use a real workspace instead of mocks (see `cpptools.test.ts`)
 - Make output channel a singleton and use it in getLogger()
 - Don't pass output channel anymore (getLogger() can be used anywhere)

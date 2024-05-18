@@ -5,11 +5,10 @@ import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as cpptools from "../src/cpptools";
 import * as extension from "../src/extension";
-import * as shims from "../src/shimsWriter";
 import * as watcher from "../src/fileWatcher";
 import * as wrappers from "../src/wrappers";
 import * as mocks from "./mocks";
-import { BundleManager } from "../src/bundleWatcher";
+import { ConfigManager } from "../src/configManager";
 import { WatchManager } from "../src/workspaceWatcher";
 
 describe("EventHandler", () => {
@@ -17,9 +16,8 @@ describe("EventHandler", () => {
     let mockWrapper: IMock<wrappers.VSCode>;
     let mockFileWatcher: IGlobalMock<watcher.FileWatcher>;
     let mockCppConfigurationProvider: IMock<cpptools.CppConfigurationProvider>;
-    let mockShimsWriter: IGlobalMock<shims.ShimsWriter>;
     let mockWatchManager: IMock<WatchManager>;
-    let mockBundleManager: IMock<BundleManager>;
+    let mockConfigManager: IMock<ConfigManager>;
     let subject: extension.EventHandler;
 
     beforeEach(() => {
@@ -27,16 +25,15 @@ describe("EventHandler", () => {
         mockWrapper = Mock.ofType<wrappers.VSCode>();
         mockFileWatcher = GlobalMock.ofType(watcher.FileWatcher, watcher);
         mockCppConfigurationProvider = Mock.ofType<cpptools.CppConfigurationProvider>();
-        mockShimsWriter = GlobalMock.ofType(shims.ShimsWriter, shims);
         mockWatchManager = Mock.ofType<WatchManager>();
-        mockBundleManager = Mock.ofType<BundleManager>();
-        GlobalScope.using(mockShimsWriter, mockFileWatcher).with(() => {
+        mockConfigManager = Mock.ofType<ConfigManager>();
+        GlobalScope.using(mockFileWatcher).with(() => {
             subject = new extension.EventHandler(
                 mockWrapper.object,
                 mockWorkspaces.object,
                 mockCppConfigurationProvider.object,
                 mockWatchManager.object,
-                mockBundleManager.object
+                mockConfigManager.object
             );
         });
     });
@@ -97,21 +94,8 @@ describe("EventHandler", () => {
                 mockWatchFunc.verify((x) => x(mockWorkspace.object), Times.once());
                 mockCppConfigurationProvider.verify((x) => x.notifyChanges(), Times.once());
                 mockWatchManager.verify((x) => x.start(mockWorkspace.object), Times.once());
-                mockBundleManager.verify((x) => x.check(mockWorkspace.object), Times.once());
-                mockShimsWriter.verify((x) => x.writePython(mockWorkspace.object), Times.once());
-                mockShimsWriter.verify((x) => x.writeGdb(mockWorkspace.object), Times.once());
-                mockShimsWriter.verify((x) => x.writeRuby(mockWorkspace.object), Times.once());
+                mockConfigManager.verify((x) => x.setupExtension(), Times.once());
                 mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
-            });
-            it("shows error if cannot write shims", async () => {
-                mockShimsWriter.setup((x) => x.writeOpts(It.isAny())).returns(() => Promise.reject(new Error("foo")));
-                await subject.onWorkspaceFolderAdded(folder);
-                mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.exactly(1));
-                mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
-                mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
-                mockShimsWriter.verify((x) => x.writeRuby(It.isAny()), Times.never());
-                mockBundleManager.verify((x) => x.check(mockWorkspace.object), Times.once());
-                mockWatchManager.verify((x) => x.start(It.isAny()), Times.once());
             });
         });
         it("loads manifest and shows error if failure", async () => {
@@ -124,12 +108,8 @@ describe("EventHandler", () => {
             mockWatchFunc.verify((x) => x(mockWorkspace.object), Times.once());
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.once());
             mockCppConfigurationProvider.verify((x) => x.notifyChanges(), Times.once());
-            mockBundleManager.verify((x) => x.check(mockWorkspace.object), Times.once());
+            mockConfigManager.verify((x) => x.setupExtension(), Times.once());
             mockWatchManager.verify((x) => x.start(mockWorkspace.object), Times.once());
-            mockShimsWriter.verify((x) => x.writeOpts(mockWorkspace.object), Times.once());
-            mockShimsWriter.verify((x) => x.writePython(mockWorkspace.object), Times.once());
-            mockShimsWriter.verify((x) => x.writeGdb(mockWorkspace.object), Times.once());
-            mockShimsWriter.verify((x) => x.writeRuby(mockWorkspace.object), Times.once());
         });
         it("does nothing if folder already in workspace", async () => {
             mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
@@ -141,11 +121,7 @@ describe("EventHandler", () => {
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
             mockCppConfigurationProvider.verify((x) => x.notifyChanges(), Times.never());
             mockWatchManager.verify((x) => x.start(It.isAny()), Times.never());
-            mockBundleManager.verify((x) => x.check(It.isAny()), Times.never());
-            mockShimsWriter.verify((x) => x.writeOpts(It.isAny()), Times.never());
-            mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
-            mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
-            mockShimsWriter.verify((x) => x.writeRuby(It.isAny()), Times.never());
+            mockConfigManager.verify((x) => x.setupExtension(), Times.never());
         });
         it("does nothing if folder not added", async () => {
             mockWorkspaces.mock.setup((x) => x.addFolder(folder.uri.fsPath)).
@@ -156,11 +132,8 @@ describe("EventHandler", () => {
             mockWatchFunc.verify((x) => x(It.isAny()), Times.never());
             mockCppConfigurationProvider.verify((x) => x.notifyChanges(), Times.never());
             mockWatchManager.verify((x) => x.start(It.isAny()), Times.never());
-            mockBundleManager.verify((x) => x.check(It.isAny()), Times.never());
+            mockConfigManager.verify((x) => x.setupExtension(), Times.never());
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
-            mockShimsWriter.verify((x) => x.writePython(It.isAny()), Times.never());
-            mockShimsWriter.verify((x) => x.writeGdb(It.isAny()), Times.never());
-            mockShimsWriter.verify((x) => x.writeRuby(It.isAny()), Times.never());
         });
     });
     describe("onWorkspaceFolderRemoved()", () => {
@@ -184,7 +157,7 @@ describe("EventHandler", () => {
             mockUnwatchFunc.verify((x) => x(mockWorkspace.object), Times.never());
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
             mockWatchManager.verify((x) => x.stop(mockWorkspace.object), Times.never());
-            mockBundleManager.verify((x) => x.unwatch(mockWorkspace.object), Times.never());
+            mockConfigManager.verify((x) => x.onWorkspaceRemoved(mockWorkspace.object), Times.never());
         });
         it("de-registers the folder and stops the watcher", async () => {
             mockWorkspaces.mock.setup((x) => x.deleteFolder(folder.uri.fsPath)).returns(() => mockWorkspace.object);
@@ -193,7 +166,7 @@ describe("EventHandler", () => {
             mockUnwatchFunc.verify((x) => x(mockWorkspace.object), Times.once());
             mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), Times.never());
             mockWatchManager.verify((x) => x.stop(mockWorkspace.object), Times.once());
-            mockBundleManager.verify((x) => x.unwatch(mockWorkspace.object), Times.once());
+            mockConfigManager.verify((x) => x.onWorkspaceRemoved(mockWorkspace.object), Times.once());
         });
     });
     describe("watchManifest()", () => {
