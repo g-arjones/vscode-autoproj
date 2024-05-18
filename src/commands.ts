@@ -142,6 +142,36 @@ export class Commands {
         testMateConfig.update("advancedExecutables", advancedExecutables);
     }
 
+    public async removeDebugConfiguration() {
+        const launch = this._vscode.getConfiguration("launch");
+        let configurations = (launch.configurations || []) as DebugConfiguration[];
+
+        const choices: IEntryItem<DebugConfiguration>[] = configurations.map((configuration) => {
+            return {
+                description: configuration.type,
+                entry: configuration,
+                label: `$(debug) ${configuration.name}`,
+            }
+        });
+        if (choices.length == 0) {
+            this._vscode.showErrorMessage("There are no launch configurations to remove");
+        }
+
+        choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
+        const options: QuickPickOptions = {
+            matchOnDescription: true,
+            placeHolder: "Select a launch configuration to remove",
+        };
+        const entry = await this._vscode.showQuickPick(choices, options);
+        if (!entry) {
+            return;
+        }
+        configurations = configurations.filter((configuration) => {
+            return JSON.stringify(configuration) !== JSON.stringify(entry.entry);
+        });
+        launch.update("configurations", configurations);
+    }
+
     public async packagePickerChoices(): Promise<IFolderItem[]> {
         let choices: IFolderItem[] = [];
         let currentFsPaths = this._vscode.workspaceFolders?.map((folder) => folder.uri.fsPath) || [];
@@ -576,6 +606,9 @@ export class Commands {
         });
         this._vscode.registerAndSubscribeCommand("autoproj.removeTestMateEntry", () => {
             this.handleError(() => this.removeTestMateEntry());
+        });
+        this._vscode.registerAndSubscribeCommand("autoproj.removeDebugConfiguration", () => {
+            this.handleError(() => this.removeDebugConfiguration());
         });
     }
 }
