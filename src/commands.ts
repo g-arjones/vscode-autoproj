@@ -41,6 +41,10 @@ interface IPackageItem extends QuickPickItem {
     package: autoproj.IPackage
 }
 
+interface IEntryItem<T> extends QuickPickItem {
+    entry: T
+}
+
 export class Commands {
     private _lastDebuggingSession: { ws: WorkspaceFolder | undefined, config: DebugConfiguration } | undefined;
     private _updateEnvExecutions: Map<string, IAsyncExecution>;
@@ -99,6 +103,43 @@ export class Commands {
                 throw new Error(`Failed while updating '${ws.name}' workspace`);
             }
         }
+    }
+
+    public async removeTestMateEntry() {
+        const testMateConfig = this._vscode.getConfiguration("testMate.cpp.test");
+        let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
+
+        interface Executable {
+            name?: string,
+            groupByLabel?: {
+                label?: string
+                description?: string
+            };
+        }
+        const choices: IEntryItem<Executable>[] = advancedExecutables.map((executable: Executable) => {
+            return {
+                description: executable.groupByLabel?.description,
+                entry: executable,
+                label: `$(debug-console) ${executable.groupByLabel?.label || executable.name}`,
+            }
+        });
+        if (choices.length == 0) {
+            this._vscode.showErrorMessage("There are no TestMate C++ entries to remove");
+        }
+
+        choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
+        const options: QuickPickOptions = {
+            matchOnDescription: true,
+            placeHolder: "Select an entry to remove from TestMate C++",
+        };
+        const entry = await this._vscode.showQuickPick(choices, options);
+        if (!entry) {
+            return;
+        }
+        advancedExecutables = advancedExecutables.filter((executable) => {
+            return JSON.stringify(executable) !== JSON.stringify(entry.entry);
+        });
+        testMateConfig.update("advancedExecutables", advancedExecutables);
     }
 
     public async packagePickerChoices(): Promise<IFolderItem[]> {
@@ -532,6 +573,9 @@ export class Commands {
         });
         this._vscode.registerAndSubscribeCommand("autoproj.openWorkspace", () => {
             this.handleError(() => this.openWorkspace());
+        });
+        this._vscode.registerAndSubscribeCommand("autoproj.removeTestMateEntry", () => {
+            this.handleError(() => this.removeTestMateEntry());
         });
     }
 }

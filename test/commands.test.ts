@@ -656,6 +656,7 @@ describe("Commands", () => {
                 setupMocks("restartDebugging", "autoproj.restartDebugging"),
                 setupMocks("enableCmakeDebuggingSymbols", "autoproj.enableCmakeDebuggingSymbols"),
                 setupMocks("addPackageToTestMate", "autoproj.addPackageToTestMate"),
+                setupMocks("removeTestMateEntry", "autoproj.removeTestMateEntry"),
                 setupMocks("openWorkspace", "autoproj.openWorkspace")
             ];
 
