@@ -9,6 +9,7 @@ import * as tasks from "./tasks";
 import * as watcher from "./fileWatcher";
 import * as wrappers from "./wrappers";
 import * as cpptools from "./cpptools";
+import * as testMate from "./testMate";
 import { BundleManager } from "./bundleWatcher";
 import { ShimsWriter } from "./shimsWriter";
 import { WatchManager } from "./workspaceWatcher";
@@ -156,6 +157,7 @@ export async function setupExtension(subscriptions: vscode.Disposable[], vscodeW
     subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
         event.added.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
         event.removed.forEach((folder) => eventHandler.onWorkspaceFolderRemoved(folder));
+        testMate.cleanupExecutables(workspaces);
         autoprojTaskProvider.reloadTasks();
     }));
 }

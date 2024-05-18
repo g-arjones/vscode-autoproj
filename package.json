@@ -50,6 +50,11 @@
                 "command": "autoproj.addPackageToWorkspace"
             },
             {
+                "title": "Add package to TestMate C++",
+                "category": "Autoproj",
+                "command": "autoproj.addPackageToTestMate"
+            },
+            {
                 "title": "Enable debugging symbols (CMake)",
                 "category": "Autoproj",
                 "command": "autoproj.enableCmakeDebuggingSymbols"
@@ -63,11 +68,6 @@
                 "title": "Setup Ruby LSP extension",
                 "category": "Autoproj",
                 "command": "autoproj.setupRubyExtension"
-            },
-            {
-                "title": "Setup TestMate C++ debug configuration",
-                "category": "Autoproj",
-                "command": "autoproj.setupTestMateDebugConfig"
             },
             {
                 "title": "Save last debugging session",

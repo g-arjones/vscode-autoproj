@@ -29,6 +29,19 @@ interface IFolderItem extends QuickPickItem {
         uri: Uri
     }
 }
+
+interface ITestExecuable {
+    name: string,
+    workspace: autoproj.Workspace,
+    path: string,
+    package?: autoproj.IPackage
+}
+
+interface IPackageItem extends QuickPickItem {
+    workspace: autoproj.Workspace,
+    package: autoproj.IPackage
+}
+
 export class Commands {
     private _lastDebuggingSession: { ws: WorkspaceFolder | undefined, config: DebugConfiguration } | undefined;
     private _updateEnvExecutions: Map<string, IAsyncExecution>;
@@ -194,23 +207,84 @@ export class Commands {
         experiments.update("optOutFrom", [...new Set([...optOutFrom, "pythonTestAdapter"])], ConfigurationTarget.Global);
     }
 
-    public async setupTestMateDebugConfig() {
-        this._assertSingleAutoprojWorkspace(
-            "Cannot setup TestMate C++ debug configuration for an empty workspace",
-            "Cannot setup TestMate C++ debug configuration for multiple Autoproj workspaces");
+    public async addPackageToTestMate() {
+        let packages: IPackageItem[] = (await this._workspaces.getPackagesInCodeWorkspace()).map((item) => {
+            const ws = item.workspace;
+            const pkg = item.package;
 
-        const workspaces = [...this._workspaces.workspaces.values()];
-        const gdbShimPath = path.join(workspaces[0].root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb");
-        const configTemplate = {
-            "type": "cppdbg",
-            "MIMode": "gdb",
-            "program": "${exec}",
-            "args": "${argsArray}",
-            "cwd": "${cwd}",
-            "miDebuggerPath": gdbShimPath
+            return {
+                description: ws.name,
+                label: `$(folder) ${pkg.name}`,
+                package: pkg,
+                workspace: ws
+            }
+        });
+
+        if (packages.length == 0) {
+            this._vscode.showErrorMessage("No packages to add");
+            return;
         }
 
-        this._vscode.getConfiguration("testMate.cpp.debug").update("configTemplate", configTemplate);
+        packages = packages.filter((pkg) => pkg.package.builddir);
+        packages = packages.sort((a, b) =>
+            a.package.name < b.package.name ? -1 : a.package.name > b.package.name ? 1 : 0);
+
+        const options: QuickPickOptions = {
+            matchOnDescription: true,
+            placeHolder: "Select a package to add to TestMate C++",
+        };
+
+        const selectedPackage = await this._vscode.showQuickPick(packages, options);
+        if (!selectedPackage) {
+            return;
+        }
+
+        const ws = selectedPackage.workspace;
+        const pkg = selectedPackage.package;
+        const advancedExecutable = {
+            "name": pkg.name,
+            "pattern": path.join(pkg.builddir, "**", "*{test,Test,TEST}*"),
+            "cwd": "${absDirpath}",
+            "testGrouping": {
+                "groupByLabel": {
+                    "label": pkg.name,
+                    "description": ws.name,
+                    "groupByTags": {
+                        "description": "${baseFilename}",
+                        "tags": [], "tagFormat": "${tag}"
+                    }
+                },
+            },
+            "gtest": {
+                "debug.enableOutputColouring": true,
+            },
+            "executionWrapper": {
+                "path": ws.autoprojExePath(),
+                "args": ["exec", "--use-cache", "${cmd}", "${argsFlat}"]
+            },
+            "debug.configTemplate": {
+                "type": "cppdbg",
+                "MIMode": "gdb",
+                "program": "${exec}",
+                "args": "${argsArray}",
+                "cwd": "${cwd}",
+                "miDebuggerPath": path.join(ws.root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb")
+            }
+        }
+
+        const testMateConfig = this._vscode.getConfiguration("testMate.cpp.test");
+        let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
+
+        const jsonEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+        if (advancedExecutables.some((config) => jsonEqual(config, advancedExecutable))) {
+            return;
+        }
+
+        advancedExecutables.push(advancedExecutable);
+        advancedExecutables = advancedExecutables.sort((a, b) =>
+            a["name"] < b["name"] ? -1 : a["name"] > b["name"] ? 1 : 0);
+
+        testMateConfig.update("advancedExecutables", advancedExecutables)
     }
 
     public async enableCmakeDebuggingSymbols() {
@@ -289,6 +363,54 @@ export class Commands {
         wsConfig.update("configurations", newConfigurations)
     }
 
+    public async showTestExecutablePicker(workspaceList: autoproj.Workspace[]): Promise<ITestExecuable | undefined> {
+        let name: string;
+        const program = await this._vscode.showOpenDialog({
+            canSelectFolders: false,
+            canSelectMany: false,
+            openLabel: "Debug",
+            defaultUri: await this.guessCurrentTestBinaryDir(),
+            title: "Select an executable to debug"
+        });
+
+        if (!program) {
+            return;
+        }
+
+        let parentPackage: autoproj.IPackage | undefined;
+        const programContext = await this._workspaces.getWorkspaceAndPackage(program[0]);
+        const programPath = program[0].fsPath;
+
+        if (programContext) {
+            name = path.basename(programPath);
+            for (const ws of workspaceList) {
+                const wsInfo = await ws.info();
+                for (const pkg of [...wsInfo.packages.values()]) {
+                    if (pkg.builddir && isSubdirOf(programPath, pkg.builddir)) {
+                        parentPackage = pkg;
+                        name = `${pkg.name}/${name}`;
+                        break;
+                    }
+                    if (pkg.srcdir && isSubdirOf(programPath, pkg.srcdir)) {
+                        parentPackage = pkg;
+                        name = `${pkg.name}/${name}`;
+                        break;
+                    }
+                }
+            }
+            name += ` (${programContext.workspace.name})`;
+        } else {
+            throw new Error("The selected program is not in any open Autoproj workspace");
+        }
+
+        return {
+            name: name,
+            workspace: programContext.workspace,
+            path: programPath,
+            package: parentPackage
+        }
+    }
+
     public async restartDebugging() {
         if (!this._lastDebuggingSession) {
             throw new Error("You have not started a debugging session yet");
@@ -330,43 +452,9 @@ export class Commands {
             throw new Error("Cannot debug an empty workspace");
         }
 
-        let name: string;
-        const program = await this._vscode.showOpenDialog({
-            canSelectFolders: false,
-            canSelectMany: false,
-            openLabel: "Debug",
-            defaultUri: await this.guessCurrentTestBinaryDir(),
-            title: "Select an executable to debug"
-        });
-
-        if (!program) {
+        const testExecutable = await this.showTestExecutablePicker(workspaceList);
+        if (!testExecutable) {
             return;
-        }
-
-        let packageSrcDir: string | undefined;
-        const programContext = await this._workspaces.getWorkspaceAndPackage(program[0]);
-        const programPath = program[0].fsPath;
-
-        if (programContext) {
-            name = path.basename(programPath);
-            for (const ws of workspaceList) {
-                const wsInfo = await ws.info();
-                for (const pkg of [...wsInfo.packages.values()]) {
-                    if (pkg.builddir && isSubdirOf(programPath, pkg.builddir)) {
-                        packageSrcDir = pkg.srcdir;
-                        name = `${pkg.name}/${name}`;
-                        break;
-                    }
-                    if (pkg.srcdir && isSubdirOf(programPath, pkg.srcdir)) {
-                        packageSrcDir = pkg.srcdir;
-                        name = `${pkg.name}/${name}`;
-                        break;
-                    }
-                }
-            }
-            name += ` (${programContext.workspace.name})`;
-        } else {
-            throw new Error("The selected program is not in any open Autoproj workspace");
         }
 
         const args = await this._vscode.showInputBox({
@@ -378,14 +466,15 @@ export class Commands {
             return;
         }
 
-        const debuggerPath = path.join(programContext.workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb");
-        const parentWs = this._vscode.getWorkspaceFolder(Uri.file(packageSrcDir || programContext.workspace.root));
+        const debuggerPath = path.join(testExecutable.workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb");
+        const srcdir = Uri.file(testExecutable.package?.srcdir || testExecutable.workspace.root);
+        const parentWs = this._vscode.getWorkspaceFolder(srcdir);
         const config = {
-            "name": name,
+            "name": testExecutable.name,
             "type": "cppdbg",
             "request": "launch",
-            "cwd": path.dirname(programPath),
-            "program": programPath,
+            "cwd": path.dirname(testExecutable.path),
+            "program": testExecutable.path,
             "args": [...shlex.split(args)],
             "stopAtEntry": false,
             "environment": [],
@@ -450,8 +539,8 @@ export class Commands {
         this._vscode.registerAndSubscribeCommand("autoproj.enableCmakeDebuggingSymbols", () => {
             this.handleError(() => this.enableCmakeDebuggingSymbols());
         });
-        this._vscode.registerAndSubscribeCommand("autoproj.setupTestMateDebugConfig", () => {
-            this.handleError(() => this.setupTestMateDebugConfig());
+        this._vscode.registerAndSubscribeCommand("autoproj.addPackageToTestMate", () => {
+            this.handleError(() => this.addPackageToTestMate());
         });
     }
 }
