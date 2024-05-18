@@ -32,14 +32,14 @@ export function loadWorkspaceInfo(workspacePath: string): Promise<WorkspaceInfo>
             }
         });
     }).then((data) => {
-        let manifest = yaml.safeLoad(data.toString()) as any[];
+        let manifest = yaml.load(data.toString()) as any[];
         if (manifest === undefined) {
             manifest = [];
         }
         const packageSets = new Map();
         const packages = new Map();
         manifest.forEach((entry) => {
-            if (entry.name) {
+            if (entry.name && !entry.package_set) {
                 packages.set(entry.srcdir, entry);
             } else {
                 entry.name = entry.package_set;

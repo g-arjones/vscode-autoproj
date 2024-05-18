@@ -1,14 +1,81 @@
 "use strict";
 
-import { EventEmitter } from "events";
 import * as FS from "fs";
-import * as Temp from "fs-temp";
 import * as YAML from "js-yaml";
+import * as os from "os";
 import * as Path from "path";
 import * as TypeMoq from "typemoq";
 import * as Autoproj from "../src/autoproj";
-import * as Tasks from "../src/tasks";
 import * as Wrappers from "../src/wrappers";
+
+export class WorkspaceBuilder {
+    public readonly packages: Array<Autoproj.IPackage>;
+    public readonly packageSets: Array<Autoproj.IPackageSet>;
+
+    constructor(
+        public root: string,
+        public builddir: { dir: string[], relative: boolean } = { dir: ["build"], relative: false },
+        public srcdir: string[] = ["src"]
+    ) {
+        mkdir(".autoproj");
+        this.packages = [];
+        this.packageSets = [];
+        this.writeManifest();
+        this.writeEnvYml();
+    }
+
+    public packageSrcDir(name: string, ...move: string[]): string[] {
+        return [...this.srcdir, ...move, ...name.split("/")];
+    }
+    public packageBuildDir(name: string): string[] {
+        if (this.builddir.relative) {
+            return [...this.packageSrcDir(name), ...this.builddir.dir];
+        } else {
+            return [...this.builddir.dir, ...name.split("/")];
+        }
+    }
+    public packagePrefix(name: string): string[] {
+        return ["install", ...name.split("/")];
+    }
+    public addPackage(name: string, ...move: string[]) {
+        const pkg: Autoproj.IPackage = {
+            builddir: Path.join(this.root, ...this.packageBuildDir(name)),
+            dependencies: [],
+            logdir: Path.join(this.root, ...this.packagePrefix(name), "log"),
+            name: name,
+            prefix: Path.join(this.root, ...this.packagePrefix(name)),
+            srcdir: Path.join(this.root, ...this.packageSrcDir(name, ...move)),
+            type: "Autobuild::CMake",
+            vcs: {
+                repository_id: `myserver:/${name}.git`,
+                type: "git",
+                url: `git@myserver.com:/${name}.git`,
+            },
+        };
+        mkdir(...this.packageSrcDir(name, ...move));
+        mkdir(...this.packageBuildDir(name));
+
+        this.packages.push(pkg);
+        this.writeManifest();
+
+        return pkg;
+    }
+    public writeManifest() {
+        const info = [...this.packages, ...this.packageSets];
+        mkfile(YAML.dump(info), ".autoproj", "installation-manifest");
+    }
+    public writeEnvYml() {
+        const env = {
+            set: {
+                BUNDLE_GEMFILE: [
+                    Path.join(root, "install", "gems", "Gemfile")
+                ]
+            }
+        };
+
+        mkfile(YAML.dump(env), ".autoproj", "env.yml");
+    }
+}
 
 export async function assertThrowsAsync(p, msg: RegExp): Promise<Error> {
     try {
@@ -26,7 +93,11 @@ let root;
 let createdFS: string[][] = [];
 
 export function init(): string {
-    root = Temp.mkdirSync();
+    if (root) {
+        throw new Error("Heleprs already initialized");
+    }
+
+    root = FS.mkdtempSync(Path.join(os.tmpdir(), "vscode-autoproj"));
     return root;
 }
 
@@ -66,7 +137,7 @@ export function createInstallationManifest(data: any, ...workspacePath): string 
     let joinedPath = fullPath(...workspacePath);
     joinedPath = Autoproj.installationManifestPath(joinedPath);
     mkdir(...workspacePath, ".autoproj");
-    FS.writeFileSync(joinedPath, YAML.safeDump(data));
+    FS.writeFileSync(joinedPath, YAML.dump(data));
     createdFS.push([joinedPath, "file"]);
     return joinedPath;
 }
@@ -108,9 +179,9 @@ export function addPackageToManifest(ws, path: string[], partialInfo: { [key: st
     };
 
     const manifestPath = Autoproj.installationManifestPath(ws.root);
-    const manifest = YAML.safeLoad(FS.readFileSync(manifestPath).toString()) as any[];
+    const manifest = YAML.load(FS.readFileSync(manifestPath).toString()) as any[];
     manifest.push(result);
-    FS.writeFileSync(manifestPath, YAML.safeDump(manifest));
+    FS.writeFileSync(manifestPath, YAML.dump(manifest));
     ws.reload();
     return result;
 }
@@ -126,16 +197,9 @@ export class TestSetup {
         return this.mockWorkspaces.target;
     }
 
-    public mockTaskProvider: TypeMoq.IMock<Tasks.AutoprojProvider>;
-    get taskProvider() {
-        return this.mockTaskProvider.target;
-    }
-
     constructor() {
         this.mockWrapper = TypeMoq.Mock.ofType<Wrappers.VSCode>();
-
         this.mockWorkspaces = TypeMoq.Mock.ofType2(Autoproj.Workspaces, [undefined]);
-        this.mockTaskProvider = TypeMoq.Mock.ofType2(Tasks.AutoprojProvider, [this.workspaces]);
     }
 
     public setupWrapper(fn) {

@@ -1,7 +1,7 @@
 import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
-import * as watcher from "../src/watcher";
+import * as watcher from "../src/fileWatcher";
 import * as helpers from "./helpers";
 
 async function sleep(ms: number): Promise<void> {

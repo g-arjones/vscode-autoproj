@@ -4,6 +4,7 @@ import { findWorkspaceRoot } from "./helpers";
 import { WorkspaceInfo } from "./info";
 import { IPackage, IPackageSet } from "./interface";
 import { Workspace } from "./workspace";
+import { isSubdirOf } from "../util";
 
 /** Dynamic management of a set of workspaces
  *
@@ -183,5 +184,43 @@ export class Workspaces {
      */
     public getWorkspaceFromFolder(folder: string): Workspace | undefined {
         return this.folderToWorkspace.get(folder);
+    }
+
+    private async _loadInstallationManifest(workspace: Workspace): Promise<WorkspaceInfo> {
+        try {
+            return await workspace.info();
+        } catch (error) {
+            throw new Error(`Could not load '${workspace.name}' installation manifest: ${error.message}`);
+        }
+    }
+
+    /** Returns the workspace and package a Uri belongs to
+    */
+    public async getWorkspaceAndPackage(uri: vscode.Uri): Promise<{ workspace: Workspace, package: IPackage | undefined } | undefined> {
+        if (uri.scheme == "file") {
+            for (const ws of this.workspaces.values()) {
+                if (!isSubdirOf(uri.fsPath, ws.root)) {
+                    continue;
+                }
+
+                const info: WorkspaceInfo = await this._loadInstallationManifest(ws);
+                return { workspace: ws, package: info.findPackageByPath(uri.fsPath) };
+            }
+        }
+    }
+
+    /** Returns all packages that are directly or indirectly part of the current vscode workspace
+    */
+    public async getPackagesInCodeWorkspace(): Promise<{ workspace: Workspace, package: IPackage }[]> {
+        const allPackages: { workspace: Workspace, package: IPackage }[] = [];
+        for (const ws of this.workspaces.values()) {
+            const info: WorkspaceInfo = await this._loadInstallationManifest(ws);
+            for (const pkg of info.packages.values()) {
+                if (vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkg.srcdir))) {
+                    allPackages.push({ workspace: ws, package: pkg });
+                }
+            }
+        }
+        return allPackages;
     }
 }

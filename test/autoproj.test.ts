@@ -2,8 +2,10 @@
 import * as assert from "assert";
 import * as path from "path";
 import * as TypeMoq from "typemoq";
+import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as helpers from "./helpers";
+import { using } from "./using";
 
 const MANIFEST_TEST_FILE = `
 - package_set: orocos.toolchain
@@ -13,6 +15,14 @@ const MANIFEST_TEST_FILE = `
     repository_id: github:/orocos-toolchain/autoproj.git
   raw_local_dir: raw/pkg/set/dir
   user_local_dir: user/pkg/set/dir
+- name: ros2.common
+  vcs:
+    type: git
+    url: https://github.com/g-arjones/ros2.common-package_set.git
+    repository_id: github:/g-arjones/ros2.common-package_set.git
+  raw_local_dir: raw/ros2/pkg/set/dir
+  user_local_dir: user/ros2/pkg/set/dir
+  package_set: ros2.common
 - name: tools/rest_api
   type: Autobuild::Ruby
   vcs:
@@ -26,6 +36,37 @@ const MANIFEST_TEST_FILE = `
   dependencies:
   - utilrb
   - tools/orocos.rb
+- name: ctrl_toolbox
+  type: Autobuild::ImporterPackage
+  vcs:
+    :type: git
+    :url: git@github.com:/ethz-adrl/control-toolbox.git
+    :push_to: git@github.com:/ethz-adrl/control-toolbox.git
+    :interactive: false
+    :retry_count: 10
+    :repository_id: github:/ethz-adrl/control-toolbox.git
+  srcdir: "/path/to/ctrl_toolbox"
+  importdir: "/path/to/ctrl_toolbox"
+  prefix: "/home/jammy/dev/tfxl/install/ctrl_toolbox"
+  builddir:
+  logdir: "/home/jammy/dev/tfxl/install/ctrl_toolbox/log"
+  dependencies:
+  - ct_core
+- name: ct_core
+  type: Autobuild::CMake
+  vcs:
+    :type: git
+    :url: git@github.com:/ethz-adrl/control-toolbox.git
+    :push_to: git@github.com:/ethz-adrl/control-toolbox.git
+    :interactive: false
+    :retry_count: 10
+    :repository_id: github:/ethz-adrl/control-toolbox.git
+  srcdir: "/path/to/ctrl_toolbox/ct_core"
+  importdir: "/path/to/ctrl_toolbox"
+  prefix: "/home/jammy/dev/tfxl/install/ct_core"
+  builddir: "/home/jammy/dev/tfxl/build/ct_core"
+  logdir: "/home/jammy/dev/tfxl/install/ct_core/log"
+  dependencies: []
 `;
 const PKG_SET_OROCOS_TOOLCHAIN = {
     name: "orocos.toolchain",
@@ -35,6 +76,17 @@ const PKG_SET_OROCOS_TOOLCHAIN = {
         repository_id: "github:/orocos-toolchain/autoproj.git",
         type: "git",
         url: "https://github.com/orocos-toolchain/autoproj.git",
+    },
+};
+
+const PKG_SET_ROS2_COMMON = {
+    name: "ros2.common",
+    raw_local_dir: "raw/ros2/pkg/set/dir",
+    user_local_dir: "user/ros2/pkg/set/dir",
+    vcs: {
+        repository_id: "github:/g-arjones/ros2.common-package_set.git",
+        type: "git",
+        url: "https://github.com/g-arjones/ros2.common-package_set.git",
     },
 };
 
@@ -88,6 +140,7 @@ describe("Autoproj helpers tests", () => {
             helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
             const manifest = await autoproj.loadWorkspaceInfo(root);
             assert.deepStrictEqual(manifest.packageSets.get("user/pkg/set/dir"), PKG_SET_OROCOS_TOOLCHAIN);
+            assert.deepStrictEqual(manifest.packageSets.get("user/ros2/pkg/set/dir"), PKG_SET_ROS2_COMMON);
             assert.deepStrictEqual(manifest.packages.get("/path/to/tools/rest_api"), PKG_TOOLS_REST_API);
         });
         it("parses an empty manifest", async () => {
@@ -103,7 +156,45 @@ describe("Autoproj helpers tests", () => {
             await helpers.assertThrowsAsync(autoproj.loadWorkspaceInfo(root), /ENOENT/);
         });
     });
-
+    describe("WorkspaceInfo", () => {
+        let wsInfo: autoproj.WorkspaceInfo;
+        beforeEach(async () => {
+            helpers.mkdir(".autoproj");
+            helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+            let ws = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
+            wsInfo = await ws.info();
+        });
+        describe("findPackageByPath", () => {
+            it("finds package that contain a given file", () => {
+                assert.deepStrictEqual(
+                    wsInfo.findPackageByPath("/path/to/tools/rest_api/src/api.cpp"),
+                    PKG_TOOLS_REST_API
+                );
+            });
+            it("supports nested packages", () => {
+                let pkg = wsInfo.findPackageByPath("/path/to/ctrl_toolbox/ct_core/src/core.cpp")
+                assert.equal(pkg!.name, "ct_core");
+            });
+            it("handles packages without srcdir", () => {
+                const pkg: autoproj.IPackage = {
+                    name: "foo",
+                    type: "Autobuild::CMake",
+                    vcs: {
+                        type: "git",
+                        url: "git@myserver.com:/foo.git",
+                        repository_id: "myserver:/foo.git"
+                    },
+                    srcdir: undefined!,
+                    builddir: "/path/to/ws/build/foo",
+                    logdir: "/path/to/ws/install/foo/log",
+                    prefix: "/path/to/ws/install/foo",
+                    dependencies: []
+                }
+                wsInfo.packages.set("/path/to/ws/src/foo", pkg);
+                assert.doesNotThrow(() => wsInfo.findPackageByPath("/path/to/ws/src/foo"));
+            });
+        });
+    });
     describe("Workspace", () => {
         describe("constructor", () => {
             it("starts the info loading by default", async () => {
@@ -229,6 +320,29 @@ describe("Autoproj helpers tests", () => {
                 ws.name = "test";
                 workspaces.add(ws);
                 assert.equal("a", ws.name);
+            });
+        });
+
+        describe("dispose", () => {
+            it("disposes of all internal resources", async () => {
+                const mockWs = TypeMoq.Mock.ofType<autoproj.Workspace>();
+                const mockDisposable = TypeMoq.Mock.ofType<vscode.Disposable>();
+                const mockEventEmitter = TypeMoq.Mock.ofType<vscode.EventEmitter<any>>();
+                const folderInfoDisposables = new Map<string, vscode.Disposable>();
+
+                folderInfoDisposables.set("/one", mockDisposable.object);
+                folderInfoDisposables.set("/two", mockDisposable.object);
+
+                workspaces.workspaces.set("/one", mockWs.object);
+                workspaces.workspaces.set("/two", mockWs.object);
+                workspaces["_workspaceInfoEvent"] = mockEventEmitter.object;
+                workspaces["_folderInfoEvent"] = mockEventEmitter.object;
+                workspaces["_folderInfoDisposables"] = folderInfoDisposables;
+
+                workspaces.dispose();
+                mockWs.verify((x) => x.dispose(), TypeMoq.Times.exactly(2));
+                mockDisposable.verify((x) => x.dispose(), TypeMoq.Times.exactly(2));
+                mockEventEmitter.verify((x) => x.dispose(), TypeMoq.Times.exactly(2));
             });
         });
 
@@ -414,6 +528,69 @@ describe("Autoproj helpers tests", () => {
 
                 const ws = s.workspaces.getWorkspaceFromFolder(path.join(ws1.ws.root, "pkg"));
                 assert.deepEqual(ws, ws1.ws);
+            });
+        });
+        describe("getWorkspaceAndPackage", () => {
+            let pkg: autoproj.IPackage;
+            beforeEach(() => {
+                pkg = new helpers.WorkspaceBuilder(root).addPackage("foobar");
+                workspaces.addFolder(root);
+            });
+            it("returns the workspace and package file belongs to", async () => {
+                const r = await workspaces.getWorkspaceAndPackage(
+                    vscode.Uri.file(path.join(pkg.srcdir, "CMakeLists.txt")));
+
+                assert(r);
+                assert.deepEqual(pkg, r.package);
+                assert.deepEqual(workspaces.folderToWorkspace.get(root), r.workspace);
+            });
+            it("throws if manifest cannot be read", async () => {
+                helpers.mkfile("- bla: [", ".autoproj", "installation-manifest");
+
+                const ws = workspaces.folderToWorkspace.get(root)!;
+                await assert.rejects(
+                    workspaces.getWorkspaceAndPackage(vscode.Uri.file(path.join(pkg.srcdir, "CMakeLists.txt"))),
+                    new RegExp(`Could not load '${ws.name}' installation manifest`));
+            });
+        });
+        describe("getPackagesInCodeWorkspace", () => {
+            let foo: autoproj.IPackage;
+            let bar: autoproj.IPackage;
+            let dummy: autoproj.IPackage;
+            let builder: helpers.WorkspaceBuilder;
+            beforeEach(() => {
+                builder = new helpers.WorkspaceBuilder(root);
+                foo = builder.addPackage("foo");
+                bar = builder.addPackage("bar");
+                dummy = builder.addPackage("dummy");
+                workspaces.addFolder(root);
+            });
+            it("returns the packages and their autoproj workspaces currently in the vscode workspace", async () => {
+                const mockGetWorkspaceFolder = TypeMoq.GlobalMock.ofInstance(
+                    vscode.workspace.getWorkspaceFolder,
+                    "getWorkspaceFolder",
+                    vscode.workspace);
+
+                let fooFolder: vscode.WorkspaceFolder = { name: "foo", uri: vscode.Uri.file(foo.srcdir), index: 0 };
+                let barFolder: vscode.WorkspaceFolder = { name: "bar", uri: vscode.Uri.file(bar.srcdir), index: 1 };
+                mockGetWorkspaceFolder.setup((x) => x(vscode.Uri.file(foo.srcdir))).returns(() => fooFolder);
+                mockGetWorkspaceFolder.setup((x) => x(vscode.Uri.file(bar.srcdir))).returns(() => barFolder);
+
+                await using(mockGetWorkspaceFolder).do(async () => {
+                    const r = await workspaces.getPackagesInCodeWorkspace();
+                    assert.deepStrictEqual(r, [
+                        { workspace: workspaces.getWorkspaceFromFolder(root), package: foo },
+                        { workspace: workspaces.getWorkspaceFromFolder(root), package: bar },
+                    ]);
+                });
+            });
+            it("throws if manifest cannot be read", async () => {
+                helpers.mkfile("- bla: [", ".autoproj", "installation-manifest");
+
+                const ws = workspaces.getWorkspaceFromFolder(root)!;
+                await assert.rejects(
+                    workspaces.getPackagesInCodeWorkspace(),
+                    new RegExp(`Could not load '${ws.name}' installation manifest`));
             });
         });
     });

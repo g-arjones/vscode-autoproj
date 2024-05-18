@@ -7,10 +7,8 @@ export enum TaskType {
 
 export enum WorkspaceTaskMode {
     Osdeps = "osdeps",
-    Watch = "watch",
     Build = "build",
     UpdateConfig = "update-config",
-    UpdateEnvironment = "update-environment",
     Update = "update",
     Checkout = "checkout",
 }

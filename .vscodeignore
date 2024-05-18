@@ -1,9 +1,11 @@
+.github/**
 .vscode/**
 .vscode-test/**
 out/test/**
 out/**/*.map
 src/**
 .gitignore
+.gitpod.yml
 tsconfig.json
 vsc-extension-quickstart.md
 coverconfig.json
