@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/g-arjones/vscode-autoproj.svg?branch=master)](https://travis-ci.org/g-arjones/vscode-autoproj)
+[![Build Status](https://github.com/g-arjones/vscode-autoproj/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/g-arjones/vscode-autoproj/actions/workflows/ci.yml)
 [![Coverage Status](https://coveralls.io/repos/github/g-arjones/vscode-autoproj/badge.svg?branch=master)](https://coveralls.io/github/g-arjones/vscode-autoproj?branch=master)
 
 # README
