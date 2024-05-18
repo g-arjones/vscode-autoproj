@@ -5,7 +5,6 @@
   - Show error if multiple autoproj workspaces are open
   - Set "test.executables" to an empty string
   - Run all integration setup (if necessary and if workspace is saved and a single autoproj workspace is open)
-- Implement command to add all packages to workspace
 
 - Add missing tests:
   - Commands.addPackageToTestMate
