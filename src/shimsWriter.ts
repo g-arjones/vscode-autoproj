@@ -62,15 +62,15 @@ export class ShimsWriter {
     }
 
     public async writePython(workspace: autoproj.Workspace): Promise<void> {
-        return this._writeShim(workspace, "python", pythonGenerator);
+        return await this._writeShim(workspace, "python", pythonGenerator);
     }
 
     public async writeGdb(workspace: autoproj.Workspace): Promise<void> {
-        return this._writeShim(workspace, "gdb", gdbGenerator);
+        return await this._writeShim(workspace, "gdb", gdbGenerator);
     }
 
     public async writeRuby(workspace: autoproj.Workspace): Promise<void> {
-        return this._writeShim(workspace, "ruby", rubyGenerator);
+        return await this._writeShim(workspace, "ruby", rubyGenerator);
     }
 
     public async writeOpts(workspace: autoproj.Workspace): Promise<void> {

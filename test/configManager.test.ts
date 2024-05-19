@@ -37,11 +37,20 @@ describe("configManager", () => {
         helpers.clear();
     });
     describe("setupPythonExtension()", () => {
-        it("sets the default python interpreter", () => {
+        it("does nothing if autoproj python shim does not exist", async () => {
+            await subject.setupPythonExtension();
+
+            mockConfiguration.verify((x) => x.update("python.defaultInterpreterPath", It.isAny()), Times.never());
+            mockConfiguration.verify((x) => x.update("optOutFrom", It.isAny(), It.isAny()), Times.never());
+        })
+        it("sets the default python interpreter", async () => {
+            helpers.mkdir(".autoproj", "bin");
+            helpers.mkfile("", ".autoproj", "bin", "python");
+
             mockGetConfiguration.setup((x) => x()).returns(() => mockConfiguration.object);
             mockGetConfiguration.setup((x) => x("python.experiments")).returns(() => mockConfiguration.object);
             mockConfiguration.setup((x) => x.get<string[]>("optOutFrom")).returns(() => ["foobar"]);
-            subject.setupPythonExtension();
+            await subject.setupPythonExtension();
 
             const pythonShimPath = path.join(root, ShimsWriter.RELATIVE_SHIMS_PATH, "python");
             mockConfiguration.verify((x) => x.update("python.defaultInterpreterPath", pythonShimPath), Times.once());

@@ -37,13 +37,17 @@ export class ConfigManager {
         await this.writeShims();
 
         this.setupTestMate();
-        this.setupPythonExtension();
+        await this.setupPythonExtension();
         await this.setupRubyExtension();
     }
 
-    public setupPythonExtension() {
-        const workspaces = [...this._workspaces.workspaces.values()];
-        const pythonShimPath = path.join(workspaces[0].root, ShimsWriter.RELATIVE_SHIMS_PATH, "python");
+    public async setupPythonExtension() {
+        const workspace = [...this._workspaces.workspaces.values()][0];
+        if (!await fs.exists(path.join(workspace.root, ".autoproj", "bin", "python"))) {
+            return;
+        }
+
+        const pythonShimPath = path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "python");
         vscode.workspace.getConfiguration().update("python.defaultInterpreterPath", pythonShimPath);
 
         const experiments = vscode.workspace.getConfiguration("python.experiments");
