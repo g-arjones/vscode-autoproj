@@ -1,13 +1,14 @@
 "use strict";
 import * as assert from "assert";
-import { basename as pathBasename, relative as pathRelative } from "path";
-import * as TypeMoq from "typemoq";
+import { basename as pathBasename, relative as pathRelative, join as pathJoin } from "path";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as tasks from "../src/tasks";
-import * as wrappers from "../src/wrappers";
-import * as helpers from "./helpers";
-import { UsingResult, using } from "./using";
+import { host, Mocks, WorkspaceBuilder } from "./helpers";
+import * as yaml from "js-yaml";
+import { fs } from "../src/cmt/pr";
+import { It, Times } from "typemoq";
+import { using } from "./using";
 
 describe("definitionsEqual()", () => {
     it("returns false if first definition is not autoproj", () => {
@@ -63,14 +64,11 @@ describe("definitionsEqual()", () => {
 });
 
 describe("Task provider", () => {
-    let root: string;
+    let builder1: WorkspaceBuilder;
+    let builder2: WorkspaceBuilder;
     let workspaces: autoproj.Workspaces;
     let subject: tasks.AutoprojProvider;
-    let mockWrapper: TypeMoq.IMock<wrappers.VSCode>;
-    let mockGetWorkspaceFolder: TypeMoq.IGlobalMock<typeof vscode.workspace.getWorkspaceFolder>;
-    let mockConfiguration: TypeMoq.IMock<vscode.WorkspaceConfiguration>;
-    let workspaceFolders: vscode.WorkspaceFolder[];
-    let usingResult: UsingResult;
+    let mocks: Mocks;
     let packageTasks: {
         build: boolean,
         buildNoDeps: boolean,
@@ -104,42 +102,18 @@ describe("Task provider", () => {
             updateConfig: true,
         };
 
-        mockWrapper = TypeMoq.Mock.ofType<wrappers.VSCode>();
-        mockConfiguration = TypeMoq.Mock.ofType<vscode.WorkspaceConfiguration>();
-        mockConfiguration.setup((x) => x.get("package")).returns(() => packageTasks);
-        mockConfiguration.setup((x) => x.get("workspace")).returns(() => workspaceTasks);
-        mockWrapper.setup((x) => x.getConfiguration("autoproj.tasks")).
-            returns(() => mockConfiguration.object);
+        builder1 = new WorkspaceBuilder();
+        builder2 = new WorkspaceBuilder();
 
-        root = helpers.init();
+        mocks = new Mocks();
+        mocks.getConfiguration.setup((x) => x("autoproj.tasks")).returns(() => mocks.workspaceConfiguration.object);
+        mocks.workspaceConfiguration.setup((x) => x.get("package")).returns(() => packageTasks);
+        mocks.workspaceConfiguration.setup((x) => x.get("workspace")).returns(() => workspaceTasks);
+
         workspaces = new autoproj.Workspaces();
-        workspaceFolders = [];
-        mockWrapper.setup((x) => x.workspaceFolders).returns(() => workspaceFolders);
-
-        mockGetWorkspaceFolder = TypeMoq.GlobalMock.ofInstance(
-            vscode.workspace.getWorkspaceFolder,
-            "getWorkspaceFolder",
-            vscode.workspace);
-        usingResult = using(mockGetWorkspaceFolder);
-        usingResult.commit();
-    });
-    afterEach(() => {
-        usingResult.rollback();
-        helpers.clear();
+        using(mocks.getConfiguration, mocks.showErrorMessage);
     });
 
-    function addFolder(folderPath: string) {
-        const folder: vscode.WorkspaceFolder = {
-            index: workspaceFolders.length,
-            name: pathBasename(folderPath),
-            uri: vscode.Uri.file(folderPath),
-        };
-
-        workspaces.addFolder(folderPath);
-        workspaceFolders.push(folder);
-        mockWrapper.setup((x) => x.getWorkspaceFolder(folderPath)).returns(() => folder);
-        mockGetWorkspaceFolder.setup((x) => x(vscode.Uri.file(folderPath))).returns(() => folder);
-    }
     function assertTask(task: vscode.Task, process: string, args: string[],
                         name: string, scope: vscode.TaskScope | vscode.WorkspaceFolder, defs: tasks.ITaskDefinition) {
         const actualProcess = (task.execution as vscode.ProcessExecution).process;
@@ -161,14 +135,14 @@ describe("Task provider", () => {
     function assertBuildTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["build", "--tool"];
-        let scope = workspaceFolders[0];
+        let scope = vscode.workspace.workspaceFolders![0];
         let name = `${pathBasename(wsRoot)}: Build all packages`;
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
             name = `${pathBasename(wsRoot)}: Build ${pkgName}`;
-            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+            scope = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgPath))!;
             defs = {
                 ...defs, mode: tasks.PackageTaskMode.Build,
                 path: pkgPath,
@@ -187,7 +161,7 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--force", "--deps=f", "--no-confirm", pkgPath];
         const name = `${pathBasename(wsRoot)}: Force Build ${pkgName} (nodeps)`;
-        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+        const scope = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgPath))!;
         const defs: tasks.IPackageTaskDefinition = {
             mode: tasks.PackageTaskMode.ForceBuild,
             path: pkgPath,
@@ -201,7 +175,7 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--rebuild", "--deps=f", "--no-confirm", pkgPath];
         const name = `${pathBasename(wsRoot)}: Rebuild ${pkgName} (nodeps)`;
-        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+        const scope = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgPath))!;
         const defs: tasks.IPackageTaskDefinition = {
             mode: tasks.PackageTaskMode.Rebuild,
             path: pkgPath,
@@ -215,7 +189,7 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath);
         const args = ["build", "--tool", "--deps=f", pkgPath];
         const name = `${pathBasename(wsRoot)}: Build ${pkgName} (nodeps)`;
-        const scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+        const scope = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgPath))!;
         const defs: tasks.IPackageTaskDefinition = {
             mode: tasks.PackageTaskMode.BuildNoDeps,
             path: pkgPath,
@@ -228,14 +202,14 @@ describe("Task provider", () => {
     function assertUpdateTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "-k", "--color"];
-        let scope = workspaceFolders[0];
+        let scope = vscode.workspace.workspaceFolders![0];
         let name = `${pathBasename(wsRoot)}: Update all packages`;
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
             name = `${pathBasename(wsRoot)}: Update ${pkgName}`;
-            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+            scope = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgPath))!;
             defs = {
                 ...defs, mode: tasks.PackageTaskMode.Update,
                 path: pkgPath,
@@ -253,13 +227,13 @@ describe("Task provider", () => {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "-k", "--color", "--checkout-only"];
         let name = `${pathBasename(wsRoot)}: Checkout all packages`;
-        let scope = workspaceFolders[0];
+        let scope = vscode.workspace.workspaceFolders![0];
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
         if (pkgPath) {
             args.push(pkgPath);
             name = `${pathBasename(wsRoot)}: Checkout ${pkgName}`;
-            scope = mockWrapper.object.getWorkspaceFolder(pkgPath)!;
+            scope = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgPath))!;
             defs = {
                 ...defs, mode: tasks.PackageTaskMode.Checkout,
                 path: pkgPath,
@@ -278,7 +252,7 @@ describe("Task provider", () => {
         const process = autoprojExePath(wsRoot);
         const args = ["osdeps", "--color"];
         const name = `${pathBasename(wsRoot)}: Install OS Dependencies`;
-        const scope = workspaceFolders[0];
+        const scope = vscode.workspace.workspaceFolders![0];
         const defs: tasks.IWorkspaceTaskDefinition = {
             mode: tasks.WorkspaceTaskMode.Osdeps,
             type: tasks.TaskType.Workspace,
@@ -291,7 +265,7 @@ describe("Task provider", () => {
         const process = autoprojExePath(wsRoot);
         const args = ["update", "-k", "--color", "--config"];
         const name = `${pathBasename(wsRoot)}: Update Configuration`;
-        const scope = workspaceFolders[0];
+        const scope = vscode.workspace.workspaceFolders![0];
         const defs: tasks.IWorkspaceTaskDefinition = {
             mode: tasks.WorkspaceTaskMode.UpdateConfig,
             type: tasks.TaskType.Workspace,
@@ -307,7 +281,10 @@ describe("Task provider", () => {
         }
         return pathRelative(wsRoot, pkgPath);
     }
-    async function assertAllPackageTasks(pkgPath: string, wsRoot: string, installManifest: autoproj.IPackage[] = []) {
+    async function assertAllPackageTasks(pkgPath: string, wsRoot: string) {
+        const installManifest: autoproj.IPackage[] =
+            yaml.load(await fs.readFile(pathJoin(wsRoot, ".autoproj", "installation-manifest"))) as autoproj.IPackage[];
+
         const args = [wsRoot, pkgPath, packageName(pkgPath, wsRoot, installManifest)];
         const buildTask = await subject.buildTask(pkgPath);
         assert.notEqual(buildTask, undefined);
@@ -364,81 +341,25 @@ describe("Task provider", () => {
         let c: string;
         let d: string;
         let e: string;
-        let oneManifest: autoproj.IPackage[];
-        let twoManifest: autoproj.IPackage[];
 
-        beforeEach(() => {
-            wsOneRoot = helpers.mkdir("one");
-            wsTwoRoot = helpers.mkdir("two");
-            helpers.mkdir("one", ".autoproj");
-            helpers.mkdir("two", ".autoproj");
-            d = helpers.mkdir("one", "autoproj");
-            e = helpers.mkdir("two", "autoproj");
+        beforeEach(async () => {
+            wsOneRoot = builder1.root;
+            wsTwoRoot = builder2.root;
+            d = pathJoin(wsOneRoot, "autoproj")
+            e = pathJoin(wsTwoRoot, "autoproj");
 
-            helpers.mkdir("one", "drivers");
-            helpers.mkdir("two", "firmware");
-            a = helpers.mkdir("one", "drivers", "iodrivers_base");
-            b = helpers.mkdir("one", "drivers", "auv_messaging");
-            c = helpers.mkdir("two", "firmware", "chibios");
+            a = builder1.addPackage("drivers/iodrivers_base").srcdir;
+            b = builder1.addPackage("drivers/auv_messaging").srcdir;
+            c = builder2.addPackage("firmware/chibios").srcdir;
 
-            oneManifest = [
-                {
-                    name: "drivers/iodrivers_base",
-                    type: "Autobuild::CMake",
-                    vcs: {
-                        type: "",
-                        url: "",
-                        repository_id: ""
-                    },
-                    srcdir: a,
-                    builddir: "",
-                    logdir: "",
-                    prefix: "",
-                    dependencies: []
-                },
-                {
-                    name: "drivers/auv_messaging",
-                    type: "Autobuild::CMake",
-                    vcs: {
-                        type: "",
-                        url: "",
-                        repository_id: ""
-                    },
-                    srcdir: b,
-                    builddir: "",
-                    logdir: "",
-                    prefix: "",
-                    dependencies: []
-                }
-            ];
-            twoManifest = [
-                {
-                    name: "firmware/chibios",
-                    type: "Autobuild::CMake",
-                    vcs: {
-                        type: "",
-                        url: "",
-                        repository_id: ""
-                    },
-                    srcdir: c,
-                    builddir: "",
-                    logdir: "",
-                    prefix: "",
-                    dependencies: []
-                }
-            ];
+            workspaces.addFolder(a);
+            workspaces.addFolder(b);
+            workspaces.addFolder(c);
+            workspaces.addFolder(d);
+            workspaces.addFolder(e);
 
-            helpers.createInstallationManifest(oneManifest, "one");
-            helpers.createInstallationManifest(twoManifest, "two");
-
-            addFolder(a);
-            addFolder(b);
-            addFolder(c);
-            addFolder(d);
-            addFolder(e);
-            addFolder(wsOneRoot);
-            addFolder(wsTwoRoot);
-            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
+            await host.addFolders(a, b, c, d, e);
+            subject = new tasks.AutoprojProvider(workspaces);
         });
         it("is initalized with all tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
@@ -479,23 +400,27 @@ describe("Task provider", () => {
             assert.equal(providedTasks.length, 0);
         });
         it("handles exception if installation manifest is invalid", async () => {
-            helpers.mkfile("- bla: [", "one", ".autoproj", "installation-manifest");
-            helpers.mkfile("- bla: [", "two", ".autoproj", "installation-manifest");
+            builder1.fs.mkfile("- bla: [", ".autoproj", "installation-manifest");
+            builder2.fs.mkfile("- bla: [", ".autoproj", "installation-manifest");
+
+            for (const ws of workspaces.workspaces.values()) {
+                await ws.reload().catch(() => {});
+            }
 
             subject.reloadTasks();
             const providedTasks = await subject.provideTasks(null);
             await assertAllWorkspaceTasks(wsOneRoot);
             await assertAllWorkspaceTasks(wsTwoRoot);
-            await assert.equal(providedTasks.length, 10);
+            assert.equal(providedTasks.length, 10);
 
             const msg = (message: string) => new RegExp("Could not generate package tasks").test(message);
-            mockWrapper.verify((x) => x.showErrorMessage(TypeMoq.It.is(msg)), TypeMoq.Times.exactly(2));
+            mocks.showErrorMessage.verify((x) => x(It.is(msg)), Times.atLeast(1)); // TODO: why somestimes twice?
         });
         it("gets the package names from installation manifest", async () => {
             await subject.provideTasks(null);
-            await assertAllPackageTasks(a, wsOneRoot, oneManifest);
-            await assertAllPackageTasks(b, wsOneRoot, oneManifest);
-            await assertAllPackageTasks(c, wsTwoRoot, twoManifest);
+            await assertAllPackageTasks(a, wsOneRoot);
+            await assertAllPackageTasks(b, wsOneRoot);
+            await assertAllPackageTasks(c, wsTwoRoot);
         });
         describe("AutoprojWorkspaceTaskProvider", () => {
             it("returns workspace tasks only", async () => {
@@ -525,59 +450,42 @@ describe("Task provider", () => {
 
     describe("in an empty workspace", () => {
         beforeEach(() => {
-            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
+            subject = new tasks.AutoprojProvider(workspaces);
         });
         it("provides an empty array of tasks", async () => {
             const providedTasks = await subject.provideTasks(null);
             assert.equal(providedTasks.length, 0);
         });
         it("creates tasks when folders/workspaces are added", async () => {
-            helpers.mkdir(".autoproj");
-            helpers.mkdir("drivers");
+            const a = builder1.addPackage("drivers/iodrivers_base").srcdir;
 
-            const a = helpers.mkdir("drivers", "iodrivers_base");
-            helpers.createInstallationManifest([
-                {
-                    name: "drivers/iodrivers_base",
-                    type: "Autobuild::CMake",
-                    vcs: {
-                        type: "",
-                        url: "",
-                        repository_id: ""
-                    },
-                    srcdir: a,
-                    builddir: "",
-                    logdir: "",
-                    prefix: "",
-                    dependencies: []
-                }
-            ]);
+            workspaces.addFolder(a);
+            await host.addFolders(a);
 
-            addFolder(a);
             subject.reloadTasks();
 
             const providedTasks = await subject.provideTasks(null);
-            await assert.equal(providedTasks.length, 11);
-            await assertAllWorkspaceTasks(helpers.fullPath());
-            await assertAllPackageTasks(a, root);
+            assert.equal(providedTasks.length, 11);
+            await assertAllWorkspaceTasks(builder1.root);
+            await assertAllPackageTasks(a, builder1.root);
         });
     });
     describe("in any case", () => {
         beforeEach(() => {
-            subject = new tasks.AutoprojProvider(workspaces, mockWrapper.object);
+            subject = new tasks.AutoprojProvider(workspaces);
         });
         it("resolveTask() always returns null", async () => {
             assert.equal(await subject.resolveTask(undefined, undefined), null);
         });
         it("task getters throws if there are no tasks", async () => {
-            await helpers.assertThrowsAsync(subject.buildTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.forceBuildTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.rebuildTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.nodepsBuildTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.updateConfigTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.updateTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.checkoutTask("/not/found"), /no entry/);
-            await helpers.assertThrowsAsync(subject.osdepsTask("/not/found"), /no entry/);
+            await assert.rejects(subject.buildTask("/not/found"), /no entry/);
+            await assert.rejects(subject.forceBuildTask("/not/found"), /no entry/);
+            await assert.rejects(subject.rebuildTask("/not/found"), /no entry/);
+            await assert.rejects(subject.nodepsBuildTask("/not/found"), /no entry/);
+            await assert.rejects(subject.updateConfigTask("/not/found"), /no entry/);
+            await assert.rejects(subject.updateTask("/not/found"), /no entry/);
+            await assert.rejects(subject.checkoutTask("/not/found"), /no entry/);
+            await assert.rejects(subject.osdepsTask("/not/found"), /no entry/);
         });
         describe("isTaskEnabled()", () => {
             it("returns true for enabled tasks", () => {

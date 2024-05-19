@@ -1,4 +1,5 @@
 {
     "recommendations": [
+        "ms-vscode.extension-test-runner"
     ]
 }

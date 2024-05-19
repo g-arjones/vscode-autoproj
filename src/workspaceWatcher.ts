@@ -5,7 +5,6 @@ import { setTimeout as sleep } from "timers/promises";
 import * as autoproj from "./autoproj"
 import * as watcher from "./fileWatcher";
 import * as child_process from "child_process";
-import { VSCode } from "./wrappers";
 import * as path from "path";
 import { asyncSpawn, getLogger } from "./util";
 import { ShimsWriter } from "./shimsWriter";
@@ -13,12 +12,12 @@ import { ShimsWriter } from "./shimsWriter";
 export class WatchManager implements vscode.Disposable {
     private _folderToProcess: Map<string, WatchProcess>;
 
-    constructor(private _outputChannel: vscode.LogOutputChannel, private _vscode: VSCode) {
+    constructor(private _outputChannel: vscode.LogOutputChannel) {
         this._folderToProcess = new Map<string, WatchProcess>();
     }
 
     public createProcess(workspace: autoproj.Workspace) {
-        return new WatchProcess(workspace, getLogger(this._outputChannel, workspace.name), this._vscode);
+        return new WatchProcess(workspace, getLogger(this._outputChannel, workspace.name));
     }
 
     public start(workspace: autoproj.Workspace) {
@@ -62,8 +61,7 @@ export class WatchProcess implements vscode.Disposable {
 
     constructor(
         private _workspace: autoproj.Workspace,
-        private _logger: vscode.LogOutputChannel,
-        private _vscode: VSCode)
+        private _logger: vscode.LogOutputChannel)
     {
         this._running = false;
         this._watcher = new watcher.FileWatcher();
@@ -79,7 +77,7 @@ export class WatchProcess implements vscode.Disposable {
         }
         this._running = true;
         this._finish = this._run().catch((error) => {
-            this._vscode.showErrorMessage(`${this._workspace.name}: Could not start watch process: ${error.message}`);
+            vscode.window.showErrorMessage(`${this._workspace.name}: Could not start watch process: ${error.message}`);
             return null;
         }).finally(() => this._running = false);
     }

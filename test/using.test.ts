@@ -1,6 +1,7 @@
 import * as assert from "assert";
-import { GlobalMock, It, Times } from "typemoq";
+import { GlobalMock, Times } from "typemoq";
 import { using } from "./using";
+import { usingResultRegistry } from "./hooks";
 
 namespace foo {
     export class Foo {
@@ -74,5 +75,17 @@ describe("using()", () => {
             console.log("foo");
         })
         n.verify((x) => x("foo"), Times.once());
+    });
+    it("auto removes result from registry", () => {
+        const m = GlobalMock.ofType(foo.Foo, foo);
+        using(m).do(() => {
+            assert.equal(usingResultRegistry.length, 1);
+        })
+        assert.equal(usingResultRegistry.length, 0);
+
+        const usingResult = using(m);
+        assert.equal(usingResultRegistry.length, 1);
+        usingResult.rollback();
+        assert.equal(usingResultRegistry.length, 0);
     });
 });

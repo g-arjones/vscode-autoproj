@@ -2,7 +2,7 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
 import * as watcher from "../src/fileWatcher";
-import * as helpers from "./helpers";
+import { TempFS } from "./helpers";
 
 async function sleep(ms: number): Promise<void> {
     return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -15,14 +15,16 @@ async function throttle(func: () => void, before: number = 10, after: number = 2
 }
 
 describe("FileWatcher", () => {
+    let tempfs: TempFS;
     let root: string;
     let subject: watcher.FileWatcher;
     let fileName: string;
     let hits: number;
     let fileHit: string;
     beforeEach(async () => {
-        root = helpers.init();
-        fileName = helpers.mkfile("", "file");
+        tempfs = new TempFS();
+        root = tempfs.init();
+        fileName = tempfs.mkfile("", "file");
         subject = new watcher.FileWatcher();
         hits = 0;
         await sleep(10);
@@ -37,7 +39,7 @@ describe("FileWatcher", () => {
         } catch (err) {
             // no-op
         }
-        helpers.clear();
+        tempfs.clear();
     });
     describe("startWatching()", () => {
         it("notifies of file changes", async () => {
@@ -57,7 +59,7 @@ describe("FileWatcher", () => {
         it("notifies of file renames", async () => {
             await throttle(() => {
                 fs.renameSync(fileName, path.join(root, "newname"));
-                helpers.registerFile("newname");
+                tempfs.registerFile("newname");
             });
             assert.equal(hits, 1);
             assert.equal(fileHit, fileName);
@@ -70,7 +72,7 @@ describe("FileWatcher", () => {
             });
             await throttle(() => {
                 fs.writeFileSync(newFile, "data", "utf8");
-                helpers.registerFile("newfile");
+                tempfs.registerFile("newfile");
             });
             subject.stopWatching(newFile);
             assert.equal(hits, 1);
@@ -129,7 +131,7 @@ describe("FileWatcher", () => {
             await throttle(() => {
                 fs.appendFileSync(fileName, "modified", "utf8");
                 fs.writeFileSync(newFile, "data", "utf8");
-                helpers.registerFile("newfile");
+                tempfs.registerFile("newfile");
             });
             assert.equal(hits, 0);
         });

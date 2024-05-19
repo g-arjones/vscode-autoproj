@@ -7,24 +7,21 @@ import * as autoproj from "./autoproj";
 import * as commands from "./commands";
 import * as tasks from "./tasks";
 import * as watcher from "./fileWatcher";
-import * as wrappers from "./wrappers";
 import * as cpptools from "./cpptools";
 import { BundleManager } from "./bundleWatcher";
 import { ConfigManager } from "./configManager";
 import { WatchManager } from "./workspaceWatcher";
 
 export class EventHandler implements vscode.Disposable {
-    private _wrapper: wrappers.VSCode;
     private _fileWatcher: watcher.FileWatcher;
     private _workspaces: autoproj.Workspaces;
     private _cppConfigurationProvider: cpptools.CppConfigurationProvider;
     private _watchManager: WatchManager;
     private _configManager: ConfigManager;
 
-    constructor(wrapper: wrappers.VSCode, workspaces: autoproj.Workspaces,
-                cppConfigurationProvider: cpptools.CppConfigurationProvider, watchManager: WatchManager,
-                configManager: ConfigManager) {
-        this._wrapper = wrapper;
+    constructor(workspaces: autoproj.Workspaces,
+                cppConfigurationProvider: cpptools.CppConfigurationProvider,
+                watchManager: WatchManager, configManager: ConfigManager) {
         this._fileWatcher = new watcher.FileWatcher();
         this._workspaces = workspaces;
         this._cppConfigurationProvider = cppConfigurationProvider;
@@ -36,13 +33,13 @@ export class EventHandler implements vscode.Disposable {
         this._fileWatcher.dispose();
     }
 
-    public onDidOpenTextDocument(event: vscode.TextDocument) {
+    public async onDidOpenTextDocument(event: vscode.TextDocument) {
         const docName = path.basename(event.uri.fsPath);
         const docDir = path.dirname(event.uri.fsPath);
 
         for (const [, ws] of this._workspaces.workspaces) {
             if ((docDir === path.join(ws.root, "autoproj")) && (docName.startsWith("manifest."))) {
-                this._wrapper.setTextDocumentLanguage(event, "yaml");
+                await vscode.languages.setTextDocumentLanguage(event, "yaml");
                 break;
             }
         }
@@ -52,7 +49,7 @@ export class EventHandler implements vscode.Disposable {
         try {
             await ws.reload();
         } catch (err) {
-            this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
+            vscode.window.showErrorMessage(`Could not load installation manifest: ${err.message}`);
         }
         this._watchManager.start(ws);
         this._cppConfigurationProvider.notifyChanges();
@@ -64,7 +61,7 @@ export class EventHandler implements vscode.Disposable {
             try {
                 await workspace.info();
             } catch (err) {
-                this._wrapper.showErrorMessage(`Could not load installation manifest: ${err.message}`);
+                vscode.window.showErrorMessage(`Could not load installation manifest: ${err.message}`);
             }
             await this._configManager.setupExtension();
             this._cppConfigurationProvider.notifyChanges();
@@ -88,7 +85,7 @@ export class EventHandler implements vscode.Disposable {
         try {
             this._fileWatcher.startWatching(manifestPath, () => this.onManifestChanged(ws));
         } catch (err) {
-            this._wrapper.showErrorMessage(err.message);
+            vscode.window.showErrorMessage(err.message);
         }
     }
 
@@ -96,25 +93,24 @@ export class EventHandler implements vscode.Disposable {
         try {
             this._fileWatcher.stopWatching(autoproj.installationManifestPath(ws.root));
         } catch (err) {
-            this._wrapper.showErrorMessage(err.message);
+            vscode.window.showErrorMessage(err.message);
         }
     }
 }
 
-export async function setupExtension(subscriptions: vscode.Disposable[], vscodeWrapper: wrappers.VSCode) {
-    const workspaces = new autoproj.Workspaces(null);
-    const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces, vscodeWrapper);
+export async function setupExtension(subscriptions: vscode.Disposable[]) {
+    const workspaces = new autoproj.Workspaces();
+    const autoprojTaskProvider = new tasks.AutoprojProvider(workspaces);
     const autoprojPackageTaskProvider = new tasks.AutoprojPackageTaskProvider(autoprojTaskProvider);
     const autoprojWorkspaceTaskProvider = new tasks.AutoprojWorkspaceTaskProvider(autoprojTaskProvider);
     const cppConfigurationProvider = new cpptools.CppConfigurationProvider(workspaces);
     const outputChannel = vscode.window.createOutputChannel("Autoproj", { log: true });
-    const bundleManager = new BundleManager(outputChannel, vscodeWrapper);
-    const autoprojCommands = new commands.Commands(workspaces, vscodeWrapper, outputChannel, bundleManager);
-    const watchManager = new WatchManager(outputChannel, vscodeWrapper);
-    const tasksHandler = new tasks.Handler(vscodeWrapper, workspaces);
+    const bundleManager = new BundleManager(outputChannel);
+    const autoprojCommands = new commands.Commands(workspaces, outputChannel);
+    const watchManager = new WatchManager(outputChannel);
+    const tasksHandler = new tasks.Handler(workspaces);
     const configManager = new ConfigManager(bundleManager, workspaces);
-    const eventHandler = new EventHandler(
-        vscodeWrapper, workspaces, cppConfigurationProvider, watchManager, configManager);
+    const eventHandler = new EventHandler(workspaces, cppConfigurationProvider, watchManager, configManager);
 
     subscriptions.push(vscode.tasks.registerTaskProvider("autoproj-workspace", autoprojWorkspaceTaskProvider));
     subscriptions.push(vscode.tasks.registerTaskProvider("autoproj-package", autoprojPackageTaskProvider));
@@ -124,7 +120,7 @@ export async function setupExtension(subscriptions: vscode.Disposable[], vscodeW
     }
 
     autoprojTaskProvider.reloadTasks();
-    autoprojCommands.register();
+    autoprojCommands.register(subscriptions);
     cppConfigurationProvider.register();
 
     subscriptions.push(bundleManager);
@@ -150,8 +146,7 @@ export async function setupExtension(subscriptions: vscode.Disposable[], vscodeW
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export async function activate(extensionContext: vscode.ExtensionContext) {
-    const vscodeWrapper = new wrappers.VSCode(extensionContext);
-    await setupExtension(extensionContext.subscriptions, vscodeWrapper);
+    await setupExtension(extensionContext.subscriptions);
 }
 
 // this method is called when your extension is deactivated

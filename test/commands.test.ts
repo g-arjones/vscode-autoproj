@@ -10,59 +10,45 @@ import * as commands from "../src/commands";
 import * as progress from "../src/progress";
 import { ShimsWriter } from "../src/shimsWriter";
 import * as util from "../src/util";
-import * as wrappers from "../src/wrappers";
-import * as helpers from "./helpers";
-import * as mocks from "./mocks";
 import { fs } from "../src/cmt/pr";
-import { UsingResult, using } from "./using";
-import { BundleManager, BundleWatcher } from "../src/bundleWatcher";
+import { using } from "./using";
+import { host, Mocks, TempFS, WorkspaceBuilder } from "./helpers";
 
 describe("Commands", () => {
-    let mockChannel: IMock<vscode.LogOutputChannel>;
-    let mockWorkspaces: mocks.MockWorkspaces;
-    let mockWrapper: IMock<wrappers.VSCode>;
-    let mockBundleManager: IMock<BundleManager>
+    let mocks: Mocks;
+    let builder1: WorkspaceBuilder;
+    let builder2: WorkspaceBuilder;
+    let workspaces: autoproj.Workspaces;
     let subject: commands.Commands;
 
     beforeEach(() => {
-        mockChannel = Mock.ofType<vscode.LogOutputChannel>();
-        mockWorkspaces = new mocks.MockWorkspaces();
-        mockWrapper = Mock.ofType<wrappers.VSCode>();
-        mockBundleManager = Mock.ofType<BundleManager>();
-        subject = new commands.Commands(
-            mockWorkspaces.object, mockWrapper.object, mockChannel.object, mockBundleManager.object);
+        builder1 = new WorkspaceBuilder();
+        builder2 = new WorkspaceBuilder();
+        mocks = new Mocks();
+        workspaces = new autoproj.Workspaces();
+        subject = new commands.Commands(workspaces, mocks.logOutputChannel.object);
     });
     describe("updateWorkspaceEnvironment()", () => {
-        let usingResult: UsingResult;
         let execution: util.IAsyncExecution;
-        let mockCreateProgress: IGlobalMock<typeof progress.createProgressView>;
         let mockProgressView: IMock<progress.ProgressView>;
-        let mockAsyncSpawn: IGlobalMock<typeof util.asyncSpawn>;
         let mockSubject: IMock<commands.Commands>;
         let workspace: autoproj.Workspace;0
         beforeEach(() => {
             mockProgressView = Mock.ofType<progress.ProgressView>();
-            mockAsyncSpawn = GlobalMock.ofInstance(util.asyncSpawn, "asyncSpawn", util);
-            mockCreateProgress = GlobalMock.ofInstance(progress.createProgressView, "createProgressView", progress);
-            workspace = mockWorkspaces.addWorkspace("/path/to/workspace").object;
+            workspace = builder1.workspace;
             mockSubject = Mock.ofInstance(subject);
             subject = mockSubject.target;
-            usingResult = using(mockAsyncSpawn, mockCreateProgress);
-            usingResult.commit();
+            using(mocks.asyncSpawn, mocks.createProgressView);
 
-            mockCreateProgress.setup((x) => x(It.isAny(), It.isAny())).returns(() => mockProgressView.object);
-            mockAsyncSpawn.setup((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => execution);
+            mocks.createProgressView.setup((x) => x(It.isAny())).returns(() => mockProgressView.object);
+            mocks.asyncSpawn.setup((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => execution);
         });
-        afterEach(() => {
-            usingResult.rollback();
-        })
         it("does nothing if canceled", async () => {
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(undefined));
             await subject.updateWorkspaceEnvironment();
-            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.never());
+            mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.never());
         });
         it("throws if spawn fails while updating workspace environment", async () => {
-            mockWrapper.reset();
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
 
             execution = {
@@ -71,10 +57,9 @@ describe("Commands", () => {
             };
             await assert.rejects(subject.updateWorkspaceEnvironment(), /Could not update/);
             await assert.rejects(subject.updateWorkspaceEnvironment(), /Could not update/);
-            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
+            mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
         });
         it("throws if workspace environment update fails", async () => {
-            mockWrapper.reset();
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
 
             execution = {
@@ -83,10 +68,9 @@ describe("Commands", () => {
             };
             await assert.rejects(subject.updateWorkspaceEnvironment(), /Failed while updating/);
             await assert.rejects(subject.updateWorkspaceEnvironment(), /Failed while updating/);
-            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
+            mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
         });
         it("does not run envsh if another update is pending", async () => {
-            mockWrapper.reset();
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
 
             let resolveReturnCode: (returnCode: number | null) => void;
@@ -103,10 +87,9 @@ describe("Commands", () => {
 
             resolveReturnCode!(0);
             await Promise.all(promises);
-            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.once());
+            mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.once());
         });
         it("updates workspace environment", async () => {
-            mockWrapper.reset();
             mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(workspace));
 
             execution = {
@@ -116,7 +99,7 @@ describe("Commands", () => {
 
             await subject.updateWorkspaceEnvironment();
             await subject.updateWorkspaceEnvironment();
-            mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
+            mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.exactly(2));
         });
     });
     describe("showWorkspacePicker()", () => {
@@ -130,68 +113,68 @@ describe("Commands", () => {
         }
         beforeEach(() => {
             choices = [];
+            using(mocks.showQuickPick);
         });
         it("throws if there are no autoproj workspaces", async () => {
-            await helpers.assertThrowsAsync(subject.showWorkspacePicker(),
-                /No Autoproj workspace/);
+            await assert.rejects(subject.showWorkspacePicker(), /No Autoproj workspace/);
         });
         it("skip picker if there is only one workspace", async () => {
-            const workspace = mockWorkspaces.addWorkspace("/ws/one").object;
+            workspaces.add(builder1.workspace);
             const ws = await subject.showWorkspacePicker();
-            mockWrapper.verify((x) => x.showQuickPick(It.isAny(), It.isAny()), Times.never());
-            assert.strictEqual(ws, workspace);
+            mocks.showQuickPick.verify((x) => x(It.isAny(), It.isAny()), Times.never());
+            assert.strictEqual(ws, builder1.workspace);
         });
         it("returns undefined if canceled", async () => {
-            const wsOne = mockWorkspaces.addWorkspace("/ws/one").object;
-            const wsTwo = mockWorkspaces.addWorkspace("/ws/two").object;
-            choices.push(makeChoice(wsOne));
-            choices.push(makeChoice(wsTwo));
+            workspaces.add(builder1.workspace);
+            workspaces.add(builder2.workspace);
+            choices.push(makeChoice(builder1.workspace));
+            choices.push(makeChoice(builder2.workspace));
 
-            mockWrapper.setup((x) => x.showQuickPick(choices, It.isAny())).returns(() => Promise.resolve(undefined));
+            mocks.showQuickPick.setup((x) => x(choices, It.isAny())).returns(() => Promise.resolve(undefined));
             const ws = await subject.showWorkspacePicker();
             assert(!ws);
         });
         it("returns the picked workspace", async () => {
-            const wsOne = mockWorkspaces.addWorkspace("/ws/one").object;
-            const wsTwo = mockWorkspaces.addWorkspace("/ws/two").object;
-            choices.push(makeChoice(wsOne));
-            choices.push(makeChoice(wsTwo));
+            workspaces.add(builder1.workspace);
+            workspaces.add(builder2.workspace);
+            choices.push(makeChoice(builder1.workspace));
+            choices.push(makeChoice(builder2.workspace));
 
-            mockWrapper.setup((x) => x.showQuickPick(choices, It.isAny())).returns(() => Promise.resolve(choices[0]));
+            mocks.showQuickPick.setup((x) => x(choices, It.isAny() as vscode.QuickPickOptions))
+                .returns(() => Promise.resolve(choices[0]));
+
             const ws = await subject.showWorkspacePicker();
-            mockWrapper.verify((x) => x.showQuickPick(choices, It.isAny()), Times.once());
+            mocks.showQuickPick.verify((x) => x(choices, It.isAny()), Times.once());
             assert.strictEqual(ws, choices[0].workspace);
         });
     });
     describe("packagePickerChoices()", () => {
         let packageOne: autoproj.IPackage;
         let packageTwo: autoproj.IPackage;
+        let packageSetOne: autoproj.IPackageSet;
         beforeEach(() => {
-            packageOne = mockWorkspaces.addPackageToWorkspace("/path/to/one", "/path/to").object;
-            packageTwo = mockWorkspaces.addPackageToWorkspace("/path/to/two", "/path/to").object;
-            mockWorkspaces.addPackageSetToWorkspace("/path/to/autoproj/remotes/set.one", "/path/to");
+            packageOne = builder1.addPackage("one");
+            packageTwo = builder1.addPackage("two");
+            packageSetOne = builder1.addPackageSet("set.one");
+            workspaces.add(builder1.workspace);
         });
         it("throws if installation manifest loading fails", async () => {
-            mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
-            mockWorkspaces.invalidateWorkspaceInfo("/path/to");
-            await helpers.assertThrowsAsync(subject.packagePickerChoices(),
-                /Could not load installation manifest/);
+            await fs.unlink(builder1.fs.fullPath(".autoproj", "installation-manifest"));
+            await assert.rejects(subject.packagePickerChoices(), /Could not load installation manifest/);
         });
         it("returns all packages if workspace is empty", async () => {
-            mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
-
             const choices = await subject.packagePickerChoices();
             assert.deepStrictEqual(choices, [
                 {
-                    description: "to (buildconf)",
+                    description: `${builder1.workspace.name} (buildconf)`,
                     label: "$(root-folder) autoproj",
                     folder: {
-                        name: "autoproj (to)",
-                        uri: vscode.Uri.file("/path/to/autoproj")
+                        name: `autoproj (${builder1.workspace.name})`,
+                        uri: vscode.Uri.file(builder1.fs.fullPath("autoproj"))
                     }
                 },
                 {
-                    description: "to",
+                    description: builder1.workspace.name,
                     label: "$(folder) one",
                     folder: {
                         name: packageOne.name,
@@ -199,15 +182,15 @@ describe("Commands", () => {
                     }
                 },
                 {
-                    description: "to (package set)",
+                    description: `${builder1.workspace.name} (package set)`,
                     label: "$(folder-library) set.one",
                     folder: {
                         name: "set.one (package set)",
-                        uri: vscode.Uri.file("/path/to/autoproj/remotes/set.one")
+                        uri: vscode.Uri.file(builder1.fs.fullPath("autoproj", "remotes", "set.one"))
                     }
                 },
                 {
-                    description: "to",
+                    description: builder1.workspace.name,
                     label: "$(folder) two",
                     folder: {
                         name: packageTwo.name,
@@ -217,26 +200,18 @@ describe("Commands", () => {
             ]);
         });
         it("returns packages that are not in the current workspace", async () => {
-            const folder1: vscode.WorkspaceFolder = {
-                index: 0,
-                name: "autoproj (buildconf)",
-                uri: vscode.Uri.file("/path/to/autoproj"),
-            };
-            const folder2: vscode.WorkspaceFolder = {
-                index: 1,
-                name: "set.one (package set)",
-                uri: vscode.Uri.file("/path/to/autoproj/remotes/set.one"),
-            };
-            const folder3: vscode.WorkspaceFolder = {
-                index: 2,
-                name: "one",
-                uri: vscode.Uri.file("/path/to/one"),
-            };
-            mockWrapper.setup((x) => x.workspaceFolders).returns(() => [folder1, folder2, folder3]);
+            workspaces.addFolder(builder1.fs.fullPath("autoproj"));
+            workspaces.addFolder(packageSetOne.user_local_dir);
+            workspaces.addFolder(packageOne.srcdir);
+            await host.addFolders(
+                builder1.fs.fullPath("autoproj"),
+                packageSetOne.user_local_dir,
+                packageOne.srcdir
+            )
 
             const choices = await subject.packagePickerChoices();
             assert.deepStrictEqual(choices, [{
-                description: "to",
+                description: builder1.workspace.name,
                 label: "$(folder) two",
                 folder: {
                     name: packageTwo.name,
@@ -255,158 +230,184 @@ describe("Commands", () => {
             placeHolder: "Select a package to add to this workspace",
         };
         beforeEach(() => {
-            packageOne = mockWorkspaces.addPackageToWorkspace("/path/to/drivers/one", "/path/to").object;
-            packageTwo = mockWorkspaces.addPackageToWorkspace("/path/to/tools/two", "/path/to").object;
+            packageOne = builder1.addPackage("one");
+            packageTwo = builder1.addPackage("two");
+            workspaces.add(builder1.workspace);
             choices = [{
-                description: "to",
+                description: builder1.workspace.name,
                 label: "$(folder) one",
                 folder: { name: packageOne.name, uri: vscode.Uri.file(packageOne.srcdir) }
             },
             {
-                description: "to",
+                description: builder1.workspace.name,
                 label: "$(folder) two",
                 folder: { name: packageTwo.name, uri: vscode.Uri.file(packageTwo.srcdir) }
             }];
             mockSubject = Mock.ofInstance(subject);
             subject = mockSubject.target;
+            using(mocks.showQuickPick);
         });
         it("throws if manifest loading fails", async () => {
             mockSubject.setup((x) => x.packagePickerChoices()).returns(() => Promise.reject(new Error("test")));
             await assert.rejects(subject.addPackageToWorkspace(), /test/);
         });
-        it("shows a quick pick ui", async () => {
-            const promise = Promise.resolve(choices);
-            mockSubject.setup((x) => x.packagePickerChoices()).returns(() => promise);
-            await subject.addPackageToWorkspace();
-            mockWrapper.verify((x) => x.showQuickPick(choices, options), Times.once());
-        });
-        it("sorts the folder list", async () => {
-            mockWorkspaces.addPackageSetToWorkspace("/path/to/autoproj/remotes/set.foo", "/path/to");
-            const folders: vscode.WorkspaceFolder[] = [
-                {
-                    index: 0,
-                    name: "autoproj (to)",
-                    uri: vscode.Uri.file("/path/to/autoproj"),
-                },
-                {
-                    index: 1,
-                    name: "tools/two",
-                    uri: vscode.Uri.file("/path/to/tools/two"),
-                },
-                {
-                    index: 2,
-                    name: "set.foo (package set)",
-                    uri: vscode.Uri.file("/path/to/autoproj/remotes/set.foo"),
-                }
-            ];
+        describe("with a mocked updateWorkspaceFolders() function", () => {
+            let updateWorkspaceFolders: IGlobalMock<typeof vscode.workspace.updateWorkspaceFolders>;
+            beforeEach(() => {
+                updateWorkspaceFolders = GlobalMock.ofInstance(
+                    vscode.workspace.updateWorkspaceFolders,
+                    "updateWorkspaceFolders",
+                    vscode.workspace);
 
-            type Folder = { name: string, uri: vscode.Uri };
-            const sortedFolders = [
-                It.is((x: Folder) => x.name == folders[0].name && x.uri.fsPath == folders[0].uri.fsPath),
-                It.is((x: Folder) => x.name == folders[2].name && x.uri.fsPath == folders[2].uri.fsPath),
-                It.is((x: Folder) => x.name == "drivers/one" && x.uri.fsPath == "/path/to/drivers/one"),
-                It.is((x: Folder) => x.name == folders[1].name && x.uri.fsPath == folders[1].uri.fsPath)
-            ];
+            })
+            it("sorts the folder list", async () => {
+                const packageSetFoo: autoproj.IPackageSet = builder1.addPackageSet("set.foo");
+                const folders: vscode.WorkspaceFolder[] = [
+                    {
+                        index: 0,
+                        name: "autoproj (to)",
+                        uri: vscode.Uri.file("/path/to/autoproj"),
+                    },
+                    {
+                        index: 1,
+                        name: "tools/two",
+                        uri: vscode.Uri.file("/path/to/tools/two"),
+                    },
+                    {
+                        index: 2,
+                        name: "set.foo (package set)",
+                        uri: vscode.Uri.file("/path/to/autoproj/remotes/set.foo"),
+                    }
+                ];
+                await host.addFolders(
+                    builder1.fs.fullPath("autoproj"),
+                    packageTwo.srcdir,
+                    packageSetFoo.user_local_dir);
 
-            const promise = Promise.resolve(choices);
-            mockWrapper.setup((x) => x.workspaceFolders).returns(() => folders);
-            mockSubject.setup((x) => x.packagePickerChoices()). returns(() => promise);
-            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, 3, ...sortedFolders)).returns(() => true);
-            mockWrapper.setup((x) => x.showQuickPick(choices, options)).returns(() => Promise.resolve(choices[0]));
-            await subject.addPackageToWorkspace();
-            mockWrapper.verify((x) => x.updateWorkspaceFolders(0, 3, ...sortedFolders), Times.once());
-        });
-        it("shows an error if folder could not be added", async () => {
-            const promise = Promise.resolve(choices);
-            mockWrapper.setup((x) => x.workspaceFolders).returns(() => undefined);
-            mockSubject.setup((x) => x.packagePickerChoices()).returns(() => promise);
-            mockWrapper.setup((x) => x.showQuickPick(choices, options)).returns(() => Promise.resolve(choices[1]));
-            mockWrapper.setup((x) => x.updateWorkspaceFolders(0, null,
-                    { uri: vscode.Uri.file("/path/to/tools/two") })).returns(() => false);
+                using(updateWorkspaceFolders);
 
-            await assert.rejects(subject.addPackageToWorkspace(), /Could not add folder: \/path\/to\/tools\/two/);
+                type Folder = { name: string, uri: vscode.Uri };
+                const sortedFolders = [
+                    It.is((x: Folder) => x.name == "autoproj" && x.uri.fsPath == builder1.fs.fullPath("autoproj")),
+                    It.is((x: Folder) => x.name == "set.foo" && x.uri.fsPath == packageSetFoo.user_local_dir),
+                    It.is((x: Folder) => x.name == "_"), // the test-workspace default folder
+                    It.is((x: Folder) => x.name == "one" && x.uri.fsPath == packageOne.srcdir),
+                    It.is((x: Folder) => x.name == "two" && x.uri.fsPath == packageTwo.srcdir)
+                ];
+
+                const promise = Promise.resolve([choices[0]]);
+                mockSubject.setup((x) => x.packagePickerChoices()). returns(() => promise);
+                updateWorkspaceFolders.setup((x) => x(0, 4, ...sortedFolders)).returns(() => true);
+                mocks.showQuickPick.setup((x) => x([choices[0]], options)).returns(() => Promise.resolve(choices[0]));
+                await subject.addPackageToWorkspace();
+                updateWorkspaceFolders.verify((x) => x(0, 4, ...sortedFolders), Times.once());
+            });
+            it("shows an error if folder could not be added", async () => {
+                using(updateWorkspaceFolders);
+
+                const promise = Promise.resolve(choices);
+                mockSubject.setup((x) => x.packagePickerChoices()).returns(() => promise);
+                mocks.showQuickPick.setup((x) => x(choices, options)).returns(() => Promise.resolve(choices[1]));
+                updateWorkspaceFolders.setup((x) => x(0, null,
+                        { uri: vscode.Uri.file(packageTwo.srcdir) })).returns(() => false);
+
+                await assert.rejects(subject.addPackageToWorkspace(),
+                    new RegExp(`Could not add folder: ${packageTwo.srcdir}`));
+            });
         });
     });
     describe("guessCurrentTestBinaryDir()", () => {
         let root: string;
-        let builder: helpers.WorkspaceBuilder;
-        let workspaces: autoproj.Workspaces;
         let pkg: autoproj.IPackage;
         beforeEach(() => {
-            root = helpers.init();
-            builder = new helpers.WorkspaceBuilder(root);
-            workspaces = new autoproj.Workspaces();
-            subject = new commands.Commands(
-                workspaces, mockWrapper.object, mockChannel.object, mockBundleManager.object);
+            root = builder1.fs.root;
+            subject = new commands.Commands(workspaces, mocks.logOutputChannel.object);
 
-            pkg = builder.addPackage("foobar");
+            pkg = builder1.addPackage("foobar");
             workspaces.addFolder(pkg.srcdir);
         });
-        afterEach(() => {
-            helpers.clear();
-        })
+        afterEach(async () => {
+            await host.closeAllTabs();
+        });
         it("returns the first workspace root if no editors are open", async () => {
             assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
         });
         it("returns the first workspace root if the current open file is not in any workspace", async () => {
-            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file("/path/to/file.cpp"));
-            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
+            const tempfs = new TempFS();
+            tempfs.init();
+
+            try {
+                const filePath = tempfs.mkfile("foo", "foo");
+                await vscode.window.showTextDocument(vscode.Uri.file(filePath));
+                assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
+            } finally {
+                tempfs.clear();
+            }
         });
         it("returns the first workspace root if the current open file is not in any package", async () => {
-            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file(path.join(root, "file.cpp")));
+            builder1.fs.mkdir("foo");
+            const filePath = builder1.fs.mkfile("empty", "foo", "bar");
+            await vscode.window.showTextDocument(vscode.Uri.file(filePath));
             assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
         });
         it("returns the first workspace root if the build folder does not exist", async () => {
-            helpers.rmdir(...builder.packageBuildDir(pkg.name));
-            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file(path.join(pkg.srcdir, "file.cpp")));
+            builder1.fs.mkdir(...builder1.packageSrcDir(pkg.name));
+            const filePath = builder1.fs.mkfile("empty", ...builder1.packageSrcDir(pkg.name), "main.cpp");
+            builder1.fs.rmdir(...builder1.packageBuildDir(pkg.name));
+            await vscode.window.showTextDocument(vscode.Uri.file(filePath));
             assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(root).fsPath);
         });
         it("returns the build folder if test folder does not exist", async () => {
-            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file(path.join(pkg.srcdir, "file.cpp")));
-            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, pkg.builddir);
+            builder1.fs.mkdir(...builder1.packageSrcDir(pkg.name));
+            const filePath = builder1.fs.mkfile("empty", ...builder1.packageSrcDir(pkg.name), "main.cpp");
+            builder1.fs.mkdir(...builder1.packageBuildDir(pkg.name));
+            await vscode.window.showTextDocument(vscode.Uri.file(filePath));
+            assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, vscode.Uri.file(pkg.builddir).fsPath);
         });
         it("returns the test folder if it exists", async () => {
-            helpers.mkdir(...builder.packageBuildDir(pkg.name), "test");
-            mockWrapper.setup((x) => x.activeDocumentURI).returns(() => vscode.Uri.file(path.join(pkg.srcdir, "file.cpp")));
+            builder1.fs.mkdir(...builder1.packageSrcDir(pkg.name));
+            const filePath = builder1.fs.mkfile("empty", ...builder1.packageSrcDir(pkg.name), "main.cpp");
+            builder1.fs.mkdir(...builder1.packageBuildDir(pkg.name), "test");
+            await vscode.window.showTextDocument(vscode.Uri.file(filePath));
             assert.equal((await subject.guessCurrentTestBinaryDir()).fsPath, path.join(pkg.builddir, "test"));
         });
     });
     describe("startDebugging()", () => {
         let root: string;
-        let builder: helpers.WorkspaceBuilder;
-        let workspaces: autoproj.Workspaces;
         let pkg: autoproj.IPackage;
         let testArguments: string;
         let testExecutable: vscode.Uri;
+        let startDebugging: IGlobalMock<typeof vscode.debug.startDebugging>;
         beforeEach(() => {
-            root = helpers.init();
-            builder = new helpers.WorkspaceBuilder(root);
+            root = builder1.fs.root;
             workspaces = new autoproj.Workspaces();
-            subject = new commands.Commands(
-                workspaces, mockWrapper.object, mockChannel.object, mockBundleManager.object);
+            subject = new commands.Commands(workspaces, mocks.logOutputChannel.object);
 
-            pkg = builder.addPackage("foobar");
+            pkg = builder1.addPackage("foobar");
             workspaces.addFolder(pkg.srcdir);
 
             const openDialogReturn = () => Promise.resolve(testExecutable ? [testExecutable] : undefined);
-            mockWrapper.setup((x) => x.showOpenDialog(It.isAny())).returns(openDialogReturn);
-            mockWrapper.setup((x) => x.showInputBox(It.isAny())).returns(() => Promise.resolve(testArguments));
+            mocks.showOpenDialog.setup((x) => x(It.isAny())).returns(openDialogReturn);
+            mocks.showInputBox.setup((x) => x(It.isAny())).returns(() => Promise.resolve(testArguments));
+            startDebugging = GlobalMock.ofInstance(
+                vscode.debug.startDebugging,
+                "startDebugging",
+                vscode.debug);
+
+            using(mocks.showOpenDialog, mocks.showInputBox, startDebugging);
         });
-        afterEach(() => {
-            helpers.clear();
-        })
         it("throws if workspace is empty", async () => {
             workspaces.deleteFolder(pkg.srcdir);
             await assert.rejects(subject.startDebugging(), new Error("Cannot debug an empty workspace"));
         });
         it("aborts if canceled while waiting for program selection", async () => {
             await subject.startDebugging();
-            mockWrapper.verify((x) => x.showInputBox(It.isAny()), Times.never());
+            mocks.showInputBox.verify((x) => x(It.isAny()), Times.never());
         });
         it("aborts if canceled while waiting for program arguments", async () => {
             testExecutable = vscode.Uri.file(path.join(pkg.builddir, "test", "test_suite"));
             await subject.startDebugging();
-            mockWrapper.verify((x) => x.startDebugging(It.isAny(), It.isAny()), Times.never());
+            startDebugging.verify((x) => x(It.isAny(), It.isAny()), Times.never());
         });
         it("throws if the selected program is not in the workspace", async () => {
             testExecutable = vscode.Uri.file(path.join("/test", "test_suite"));
@@ -423,7 +424,7 @@ describe("Commands", () => {
             });
             function assertStartsDebuggingWith(config: any) {
                 const matches = It.is(_.matches(config));
-                mockWrapper.verify((x) => x.startDebugging(It.isAny(), matches), Times.once());
+                startDebugging.verify((x) => x(It.isAny(), matches), Times.once());
             }
             it("splits the test arguments", async () => {
                 testArguments = "--gtest_filter=*foobar* --gtest_catch_exceptions=0";
@@ -465,8 +466,8 @@ describe("Commands", () => {
                 let selectedWs;
                 let selectedConfig
 
-                mockWrapper.setup((x) => x.getWorkspaceFolder(It.isAny())).returns(() => wsFolder);
-                mockWrapper.setup((x) => x.startDebugging(It.isAny(), It.isAny())).callback((ws, config) => {
+                await host.addFolders(pkg.srcdir);
+                startDebugging.setup((x) => x(It.isAny(), It.isAny())).callback((ws, config) => {
                     selectedWs = ws;
                     selectedConfig = config;
                 });
@@ -477,6 +478,15 @@ describe("Commands", () => {
         });
     });
     describe("restartDebugging()", () => {
+        let startDebugging: IGlobalMock<typeof vscode.debug.startDebugging>;
+        beforeEach(() => {
+            startDebugging = GlobalMock.ofInstance(
+                vscode.debug.startDebugging,
+                "startDebugging",
+                vscode.debug);
+
+            using(startDebugging);
+        });
         it("restarts last debugging session", async () => {
             const wsFolder: vscode.WorkspaceFolder = {
                 index: 0,
@@ -486,7 +496,7 @@ describe("Commands", () => {
             const config = { name: "launch (gdb)" };
             subject["_lastDebuggingSession"]= { ws: wsFolder, config: config! } as any;
             await subject.restartDebugging();
-            mockWrapper.verify((x) => x.startDebugging(wsFolder, config as any), Times.once());
+            startDebugging.verify((x) => x(wsFolder, config as any), Times.once());
         });
         it("throws if no debugging session was started", async () => {
             await assert.rejects(subject.restartDebugging(), /You have not started a debugging session yet/);
@@ -502,41 +512,31 @@ describe("Commands", () => {
                 /Cannot save a debugging session in an empty workspace/);
         });
         describe("in a non empty workspace", () => {
-            let builder: helpers.WorkspaceBuilder;
             let pkg: autoproj.IPackage;
             let root: string;
-            let workspaces: autoproj.Workspaces;
-            let mockWorkspaceConfig: IMock<vscode.WorkspaceConfiguration>;
             let currentConfigs: { name: string }[];
             beforeEach(() => {
-                root = helpers.init();
-                builder = new helpers.WorkspaceBuilder(root);
-                workspaces = new autoproj.Workspaces();
-                subject = new commands.Commands(
-                    workspaces, mockWrapper.object, mockChannel.object, mockBundleManager.object);
-                mockWorkspaceConfig = Mock.ofType<vscode.WorkspaceConfiguration>();
+                root = builder1.fs.root;
+                subject = new commands.Commands(workspaces, mocks.logOutputChannel.object);
 
-                pkg = builder.addPackage("foobar");
+                pkg = builder1.addPackage("foobar");
                 workspaces.addFolder(pkg.srcdir);
                 subject["_lastDebuggingSession"] = { ws: "" as any, config: { name: "foobar (gdb)" } as any };
-                mockWrapper.setup((x) => x.getConfiguration("launch")).returns(() => mockWorkspaceConfig.object);
-                mockWorkspaceConfig.setup((x) => x.configurations).returns(() => currentConfigs);
+                mocks.getConfiguration.setup((x) => x("launch")).returns(() => mocks.workspaceConfiguration.object);
+                mocks.workspaceConfiguration.setup((x) => x.configurations).returns(() => currentConfigs);
+                using(mocks.getConfiguration);
             });
             it("does not add the same launch configuration", async () => {
                 currentConfigs = [{ name: "foobar (gdb)" }]
                 await subject.saveLastDebuggingSession();
-                mockWorkspaceConfig.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
+                mocks.workspaceConfiguration.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
             });
             it("sorts launch configurations while addings", async () => {
                 currentConfigs = [{ name: "a" }, { name: "c"}];
                 subject["_lastDebuggingSession"] = { ws: "" as any, config: { name: "b" } as any };
                 await subject.saveLastDebuggingSession();
                 const expectedConfigs = [{ name: "a" }, { name: "b" }, { name: "c" }];
-                const isEqual = (received) => { return It.is((value) => { return _.isEqual(value, received); }) };
-                mockWorkspaceConfig.verify((x) => x.update("configurations", isEqual(expectedConfigs)), Times.once());
-            });
-            afterEach(() => {
-                helpers.clear();
+                mocks.workspaceConfiguration.verify((x) => x.update("configurations", expectedConfigs), Times.once());
             });
         });
     });
@@ -547,36 +547,27 @@ describe("Commands", () => {
         });
         describe("in a real workspace", () => {
             let mockSubject: IMock<commands.Commands>;
-            let mockWorkspaceConfig: IMock<vscode.WorkspaceConfiguration>;
             let root: string;
             let supression: boolean;
             beforeEach(() => {
-                root = helpers.init();
-                new helpers.WorkspaceBuilder(root);
-                const workspaces = new autoproj.Workspaces();
+                root = builder1.fs.root;
 
                 workspaces.addFolder(root);
-                mockWorkspaceConfig = Mock.ofType<vscode.WorkspaceConfiguration>();
-
-                mockWrapper.setup((x) => x.getConfiguration("autoproj")).returns(() => mockWorkspaceConfig.object);
-                mockWorkspaceConfig.setup((x) => x.get<boolean>("supressCmakeBuildTypeOverrideNotice"))
+                mocks.getConfiguration.setup((x) => x("autoproj")).returns(() => mocks.workspaceConfiguration.object);
+                mocks.workspaceConfiguration.setup((x) => x.get<boolean>("supressCmakeBuildTypeOverrideNotice"))
                     .returns(() => supression);
 
                 supression = false;
-                subject = new commands.Commands(
-                    workspaces, mockWrapper.object, mockChannel.object, mockBundleManager.object);
-            });
-            afterEach(() => {
-                helpers.clear();
+                subject = new commands.Commands(workspaces, mocks.logOutputChannel.object);
+                using(mocks.getConfiguration, mocks.showInformationMessage);
             });
             function assertNotice(show: boolean) {
                 const times = show ? Times.once() : Times.never();
-                mockWrapper.verify((x) => x.showInformationMessage(
-                    It.isAny(), It.isAny(), It.isAny(), It.isAny()), times);
+                mocks.showInformationMessage.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), times);
             }
             function assertSetSupression(update: boolean) {
                 const times = update ? Times.once() : Times.never();
-                mockWorkspaceConfig.verify((x) => x.update("supressCmakeBuildTypeOverrideNotice", true), times);
+                mocks.workspaceConfiguration.verify((x) => x.update("supressCmakeBuildTypeOverrideNotice", true), times);
             }
             it("does nothing if user cancels", async () => {
                 mockSubject = Mock.ofInstance(subject);
@@ -587,16 +578,15 @@ describe("Commands", () => {
                 assertNotice(false);
             });
             it("throws if script cannot be created", async () => {
-                helpers.mkfile("", "autoproj");
+                builder1.fs.mkfile("empty", "autoproj", "overrides.d"); // create file to make mkdir_p fail
                 await assert.rejects(subject.enableCmakeDebuggingSymbols(), /Could not create overrides script/);
                 assertNotice(false);
             });
             describe("the overrides script is created", () => {
                 let filePath: string;
                 beforeEach(() => {
-                    helpers.registerDir("autoproj")
-                    helpers.registerDir("autoproj", "overrides.d");
-                    helpers.registerFile("autoproj", "overrides.d", "vscode-autoproj-cmake-build-type.rb");
+                    builder1.fs.registerDir("autoproj", "overrides.d");
+                    builder1.fs.registerFile("autoproj", "overrides.d", "vscode-autoproj-cmake-build-type.rb");
                     filePath = path.join(root, "autoproj", "overrides.d", "vscode-autoproj-cmake-build-type.rb");
                 });
                 it("creates the overrides script", async () => {
@@ -613,7 +603,7 @@ describe("Commands", () => {
                 });
                 it("supresses future notices", async () => {
                     const doNotShowAgainClicked = Promise.resolve({ isCloseAffordance: false });
-                    mockWrapper.setup((x) => x.showInformationMessage(
+                    mocks.showInformationMessage.setup((x) => x(
                         It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => doNotShowAgainClicked);
 
                     await subject.enableCmakeDebuggingSymbols();
@@ -624,6 +614,8 @@ describe("Commands", () => {
     });
     describe("handleError()", () => {
         it("runs and handles errors on functions and async functions", async () => {
+            using(mocks.showErrorMessage);
+
             const fn = Mock.ofInstance(() => {});
             const asyncFn = Mock.ofInstance(async () => { });
 
@@ -635,12 +627,21 @@ describe("Commands", () => {
 
             fn.verify((x) => x(), Times.once());
             asyncFn.verify((x) => x(), Times.once());
-            mockWrapper.verify((x) => x.showErrorMessage("foobar"), Times.exactly(2));
+            mocks.showErrorMessage.verify((x) => x("foobar"), Times.exactly(2));
         });
     });
     describe("register()", () => {
+        let register: IGlobalMock<typeof vscode.commands.registerCommand>;
+        beforeEach(() => {
+            register = GlobalMock.ofInstance(
+                vscode.commands.registerCommand,
+                "registerCommand",
+                vscode.commands);
+
+            using(register);
+        });
         function setupMocks(methodName: string, command: string) {
-            mockWrapper.setup((x) => x.registerAndSubscribeCommand(command, It.isAny())).callback((_, cb) => cb());
+            register.setup((x) => x(command, It.isAny())).callback((_, cb) => cb());
 
             const mock = Mock.ofInstance(() => Promise.resolve());
             Object.assign(subject, {...subject, [methodName]: mock.object });
@@ -648,6 +649,7 @@ describe("Commands", () => {
             return mock;
         }
         it("registers all commands", async () => {
+            const disposables: vscode.Disposable[] = [];
             const mocks = [
                 setupMocks("updateWorkspaceEnvironment", "autoproj.updateWorkspaceEnvironment"),
                 setupMocks("addPackageToWorkspace", "autoproj.addPackageToWorkspace"),
@@ -661,10 +663,11 @@ describe("Commands", () => {
                 setupMocks("openWorkspace", "autoproj.openWorkspace")
             ];
 
-            subject.register();
+            subject.register(disposables);
             for (const mock of mocks) {
                 mock.verify((x) => x(), Times.once());
             }
+            assert.equal(disposables.length, mocks.length);
         });
     });
 });

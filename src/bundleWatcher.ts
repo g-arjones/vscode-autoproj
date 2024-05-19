@@ -7,17 +7,16 @@ import { FileWatcher } from "./fileWatcher";
 import { asyncSpawn, getLogger } from "./util";
 import { fs } from "./cmt/pr";
 import { Workspace } from "./autoproj";
-import { VSCode } from "./wrappers";
 
 export class BundleManager implements vscode.Disposable {
     private _folderToWatcher: Map<string, BundleWatcher>;
 
-    constructor(private _outputChannel: vscode.LogOutputChannel, private _vscode: VSCode) {
+    constructor(private _outputChannel: vscode.LogOutputChannel) {
         this._folderToWatcher = new Map<string, BundleWatcher>();
     }
 
     public createWatcher(workspace: Workspace) {
-        return new BundleWatcher(this._vscode, workspace, getLogger(this._outputChannel, workspace.name));
+        return new BundleWatcher(workspace, getLogger(this._outputChannel, workspace.name));
     }
 
     public getWatcher(workspace: Workspace): BundleWatcher {
@@ -66,7 +65,7 @@ export class BundleWatcher implements vscode.Disposable {
     private _queue: PromiseQueue;
     private _watching: boolean;
 
-    constructor(private _vscode: VSCode, private _ws: Workspace, private _logger: vscode.LogOutputChannel) {
+    constructor(private _ws: Workspace, private _logger: vscode.LogOutputChannel) {
         this._queue = new PromiseQueue();
         this._fileWatcher = new FileWatcher();
         this._watching = false;
@@ -197,7 +196,7 @@ export class BundleWatcher implements vscode.Disposable {
 
     public async install(): Promise<number | null> {
         const msg = `Installing extension dependencies in '${this._ws.name}' workspace`;
-        const view = progress.createProgressView(this._vscode, msg);
+        const view = progress.createProgressView(msg);
 
         view.show();
 
@@ -205,7 +204,7 @@ export class BundleWatcher implements vscode.Disposable {
             return await this._install();
         } catch (error) {
             this._logger.show();
-            this._vscode.showErrorMessage(error.message);
+            vscode.window.showErrorMessage(error.message);
             return null;
         } finally {
             view.close();

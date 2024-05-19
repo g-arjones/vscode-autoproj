@@ -1,15 +1,25 @@
 import { IGlobalMock } from "typemoq";
 import { isAsyncFunction } from "util/types";
+import { usingResultRegistry } from "./hooks";
+
 
 export class UsingResult {
-    constructor(public commit: () => void, public rollback: () => void) {}
+    public rollback: () => void;
+    constructor(rollback: () => void) {
+        this.rollback = () => {
+            usingResultRegistry.splice(0, usingResultRegistry.length,
+                ...usingResultRegistry.filter((item) => item !== this))
+            rollback();
+        }
+    }
 
     public do(callback: () => Promise<void>): Promise<void>;
     public do(callback: () => void): void;
     public do(callback: () => Promise<void> | void): Promise<void> | void {
-        this.commit();
         if (isAsyncFunction(callback)) {
-            return callback()!.finally(() => this.rollback());
+            return callback()!.finally(() => {
+                this.rollback();
+            });
         } else {
             try {
                 return callback();
@@ -61,5 +71,8 @@ export function using(...mocks: IGlobalMock<any>[]) {
             Object.defineProperty(initial.mock.container, initial.mock.name, initial.backup);
         }
     };
-    return new UsingResult(commit, rollback);
+    commit();
+    const usingResult = new UsingResult(rollback);
+    usingResultRegistry.push(usingResult);
+    return usingResult;
 }

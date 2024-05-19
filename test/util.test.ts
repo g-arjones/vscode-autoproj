@@ -1,14 +1,15 @@
 import { LogOutputChannel } from "vscode";
+import { Mocks } from "./helpers";
 import { asyncSpawn, getLogger, isSubdirOf } from "../src/util"
 import { IMock, Mock, Times } from "typemoq";
 import * as assert from "assert";
 
 describe("getLogger()", () => {
+    let mocks: Mocks;
     let logger: LogOutputChannel;
-    let mockChannel: IMock<LogOutputChannel>;
     beforeEach(() => {
-        mockChannel = Mock.ofType<LogOutputChannel>();
-        logger = getLogger(mockChannel.object, "ws");
+        mocks = new Mocks();
+        logger = getLogger(mocks.logOutputChannel.object, "ws");
     });
     it("appends a prefix to all logging messages", () => {
         logger.append("foobar");
@@ -20,18 +21,18 @@ describe("getLogger()", () => {
         logger.error("foobar");
         logger.replace("foobar");
 
-        mockChannel.verify((x) => x.append("[ws] foobar"), Times.once());
-        mockChannel.verify((x) => x.appendLine("[ws] foobar"), Times.once());
-        mockChannel.verify((x) => x.trace("[ws] foobar"), Times.once());
-        mockChannel.verify((x) => x.debug("[ws] foobar"), Times.once());
-        mockChannel.verify((x) => x.info("[ws] foobar"), Times.once());
-        mockChannel.verify((x) => x.warn("[ws] foobar"), Times.once());
-        mockChannel.verify((x) => x.error("[ws] foobar"), Times.once());
-        mockChannel.verify((x) => x.replace("[ws] foobar"), Times.once());
+        mocks.logOutputChannel.verify((x) => x.append("[ws] foobar"), Times.once());
+        mocks.logOutputChannel.verify((x) => x.appendLine("[ws] foobar"), Times.once());
+        mocks.logOutputChannel.verify((x) => x.trace("[ws] foobar"), Times.once());
+        mocks.logOutputChannel.verify((x) => x.debug("[ws] foobar"), Times.once());
+        mocks.logOutputChannel.verify((x) => x.info("[ws] foobar"), Times.once());
+        mocks.logOutputChannel.verify((x) => x.warn("[ws] foobar"), Times.once());
+        mocks.logOutputChannel.verify((x) => x.error("[ws] foobar"), Times.once());
+        mocks.logOutputChannel.verify((x) => x.replace("[ws] foobar"), Times.once());
     });
     it("does not override other methods", () => {
-        const logger = getLogger(mockChannel.object, "ws");
-        mockChannel.setup((x) => x.name).returns(() => "foobar");
+        const logger = getLogger(mocks.logOutputChannel.object, "ws");
+        mocks.logOutputChannel.setup((x) => x.name).returns(() => "foobar");
         assert.equal(logger.name, "foobar");
     });
 });

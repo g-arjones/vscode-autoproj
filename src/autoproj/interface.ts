@@ -20,4 +20,5 @@ export interface IPackageSet {
     vcs: IVCS;
     raw_local_dir: string;
     user_local_dir: string;
+    package_set: string;
 }

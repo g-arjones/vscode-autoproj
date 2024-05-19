@@ -1,25 +1,23 @@
 import * as assert from "assert";
 import * as path from "path";
-import * as vscode from "vscode";
 import { CompilationDatabase } from "../src/compilationDatabase";
-import * as helpers from "./helpers";
+import { Mocks, WorkspaceBuilder } from "./helpers";
 import { fs } from "../src/cmt/pr";
 import { using } from "./using";
-import { GlobalMock, It, Times } from "typemoq";
+import { It, Times } from "typemoq";
 
 describe("CompilationDatabase", () => {
-    let root: string;
+    let builder: WorkspaceBuilder;
     let subject: CompilationDatabase;
     let dbPath: string;
     beforeEach(() => {
-        root = helpers.init();
-        dbPath = path.join(root, "build", "compile_commands.json");
-        helpers.mkdir("build");
-        helpers.registerFile("build", "compile_commands.json");
+        builder = new WorkspaceBuilder();
+        dbPath = path.join(builder.root, "build", "compile_commands.json");
+        builder.fs.mkdir("build");
+        builder.fs.registerFile("build", "compile_commands.json");
         subject = new CompilationDatabase(dbPath);
     });
     afterEach(() => {
-        helpers.clear();
         subject.dispose();
     });
     it("is not loaded after instantiation", () => {
@@ -36,9 +34,9 @@ describe("CompilationDatabase", () => {
     });
     describe("load()", () => {
         it("shows an error message if loading fails", async () => {
-            const mock = GlobalMock.ofInstance(vscode.window.showErrorMessage, "showErrorMessage", vscode.window);
-            await using(mock).do(async () => await subject.load());
-            mock.verify((x) => x(It.isAnyString()), Times.once());
+            const mocks = new Mocks();
+            await using(mocks.showErrorMessage).do(async () => await subject.load());
+            mocks.showErrorMessage.verify((x) => x(It.isAnyString()), Times.once());
         });
     });
     describe("onChange()", () => {
@@ -94,22 +92,22 @@ describe("CompilationDatabase", () => {
             // remove the file and directory and wait for subject to acknowledge it
             event = createEvent();
             await fs.unlink(dbPath);
-            helpers.rmdir("build");
+            builder.fs.rmdir("build");
             await event;
 
             // recreate directory and file
             event = createEvent();
-            await fs.mkdir(path.join(root, "build"));
+            await fs.mkdir(path.join(builder.root, "build"));
             await fs.writeFile(dbPath, "{}");
             await event;
         });
         it("fires event when build dir is created", async () => {
-            helpers.rmdir("build");
+            builder.fs.rmdir("build");
             subject.dispose();
             subject = new CompilationDatabase(dbPath);
 
             const event = createEvent();
-            await fs.mkdir(path.join(root, "build"));
+            await fs.mkdir(path.join(builder.root, "build"));
             await fs.writeFile(dbPath, "{}");
             await event;
         });
@@ -119,22 +117,22 @@ describe("CompilationDatabase", () => {
             subject = new CompilationDatabase(dbPath);
 
             const event = createEvent();
-            helpers.registerDir("build2");
-            helpers.registerFile("build2", "compile_commands.json");
-            await fs.rename(path.join(root, "build"), path.join(root, "build2"));
+            builder.fs.registerDir("build2");
+            builder.fs.registerFile("build2", "compile_commands.json");
+            await fs.rename(path.join(builder.root, "build"), path.join(builder.root, "build2"));
             await event;
         });
         it("fires event when db is moved on", async () => {
             await fs.writeFile(dbPath, "{}");
-            helpers.registerDir("build2");
-            helpers.registerFile("build2", "compile_commands.json");
-            await fs.rename(path.join(root, "build"), path.join(root, "build2"));
+            builder.fs.registerDir("build2");
+            builder.fs.registerFile("build2", "compile_commands.json");
+            await fs.rename(path.join(builder.root, "build"), path.join(builder.root, "build2"));
 
             subject.dispose();
             subject = new CompilationDatabase(dbPath);
 
             const event = createEvent();
-            await fs.rename(path.join(root, "build2"), path.join(root, "build"));
+            await fs.rename(path.join(builder.root, "build2"), path.join(builder.root, "build"));
             await event;
         });
     });
