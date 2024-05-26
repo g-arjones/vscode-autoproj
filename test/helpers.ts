@@ -232,11 +232,13 @@ export class Mocks {
     public createProgressView: IGlobalMock<typeof progress.createProgressView>;
     public getConfiguration: IGlobalMock<typeof vscode.workspace.getConfiguration>;
     public showErrorMessage: IGlobalMock<typeof vscode.window.showErrorMessage>;
+    public showWarningMessage: IGlobalMock<typeof vscode.window.showWarningMessage>;
     public showQuickPick: IGlobalMock<typeof vscode.window.showQuickPick>;
     public showInputBox: IGlobalMock<typeof vscode.window.showInputBox>;
     public showOpenDialog: IGlobalMock<typeof vscode.window.showOpenDialog>;
     public showInformationMessage: IGlobalMock<typeof vscode.window.showInformationMessage>;
     public logOutputChannel: IMock<vscode.LogOutputChannel>;
+    public updateWorkspaceFolders: IGlobalMock<typeof vscode.workspace.updateWorkspaceFolders>;
     public workspaceConfiguration: IMock<vscode.WorkspaceConfiguration>;
 
     constructor() {
@@ -257,6 +259,14 @@ export class Mocks {
 
         this.showInformationMessage = GlobalMock.ofInstance(
             vscode.window.showInformationMessage, "showInformationMessage", vscode.window);
+
+        this.showWarningMessage = GlobalMock.ofInstance(
+            vscode.window.showWarningMessage, "showWarningMessage", vscode.window);
+
+        this.updateWorkspaceFolders = GlobalMock.ofInstance(
+            vscode.workspace.updateWorkspaceFolders,
+            "updateWorkspaceFolders",
+            vscode.workspace);
 
         this.asyncSpawn = GlobalMock.ofInstance(util.asyncSpawn, "asyncSpawn", util);
         this.createProgressView = GlobalMock.ofInstance(progress.createProgressView, "createProgressView", progress);

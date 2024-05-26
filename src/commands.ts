@@ -35,7 +35,7 @@ interface ITestExecuable {
     package?: autoproj.IPackage
 }
 
-interface IPackageItem extends QuickPickItem {
+export interface IPackageItem extends QuickPickItem {
     workspace: autoproj.Workspace,
     package: autoproj.IPackage
 }
@@ -121,7 +121,7 @@ export class Commands {
             }
         });
         if (choices.length == 0) {
-            vscode.window.showErrorMessage("There are no TestMate C++ entries to remove");
+            throw new Error("There are no TestMate C++ entries to remove");
         }
 
         choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
@@ -151,7 +151,7 @@ export class Commands {
             }
         });
         if (choices.length == 0) {
-            vscode.window.showErrorMessage("There are no launch configurations to remove");
+            throw new Error("There are no launch configurations to remove");
         }
 
         choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
@@ -239,7 +239,7 @@ export class Commands {
             });
 
             if (!vscode.workspace.updateWorkspaceFolders(0, wsFolders?.length || null, ...buildconfs, ...pkgSets, ...pkgs)) {
-                throw (`Could not add folder: ${selectedOption.folder.uri.fsPath}`);
+                throw new Error(`Could not add folder: ${selectedOption.folder.uri.fsPath}`);
             }
         }
     }
@@ -248,15 +248,6 @@ export class Commands {
         const workspaces = [...this._workspaces.workspaces.values()];
         if (workspaces.length == 0) {
             throw new Error(message);
-        }
-    }
-
-    private _assertSingleAutoprojWorkspace(messageEmpty: string, messageMany: string) {
-        this._assertWorkspaceNotEmpty(messageEmpty);
-
-        const workspaces = [...this._workspaces.workspaces.values()];
-        if (workspaces.length > 1) {
-            throw new Error(messageMany);
         }
     }
 
@@ -274,13 +265,11 @@ export class Commands {
         });
 
         if (packages.length == 0) {
-            vscode.window.showErrorMessage("No packages to add");
-            return;
+            throw new Error("No packages to add");
         }
 
         packages = packages.filter((pkg) => pkg.package.builddir);
-        packages = packages.sort((a, b) =>
-            a.package.name < b.package.name ? -1 : a.package.name > b.package.name ? 1 : 0);
+        packages.sort((a, b) => a.package.name < b.package.name ? -1 : a.package.name > b.package.name ? 1 : 0);
 
         const options: QuickPickOptions = {
             matchOnDescription: true,
@@ -334,9 +323,7 @@ export class Commands {
         }
 
         advancedExecutables.push(advancedExecutable);
-        advancedExecutables = advancedExecutables.sort((a, b) =>
-            a["name"] < b["name"] ? -1 : a["name"] > b["name"] ? 1 : 0);
-
+        advancedExecutables.sort((a, b) => a["name"] < b["name"] ? -1 : a["name"] > b["name"] ? 1 : 0);
         testMateConfig.update("advancedExecutables", advancedExecutables)
     }
 

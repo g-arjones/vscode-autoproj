@@ -252,14 +252,6 @@ describe("Commands", () => {
             await assert.rejects(subject.addPackageToWorkspace(), /test/);
         });
         describe("with a mocked updateWorkspaceFolders() function", () => {
-            let updateWorkspaceFolders: IGlobalMock<typeof vscode.workspace.updateWorkspaceFolders>;
-            beforeEach(() => {
-                updateWorkspaceFolders = GlobalMock.ofInstance(
-                    vscode.workspace.updateWorkspaceFolders,
-                    "updateWorkspaceFolders",
-                    vscode.workspace);
-
-            })
             it("sorts the folder list", async () => {
                 const packageSetFoo: autoproj.IPackageSet = builder1.addPackageSet("set.foo");
                 const folders: vscode.WorkspaceFolder[] = [
@@ -284,7 +276,7 @@ describe("Commands", () => {
                     packageTwo.srcdir,
                     packageSetFoo.user_local_dir);
 
-                using(updateWorkspaceFolders);
+                using(mocks.updateWorkspaceFolders);
 
                 type Folder = { name: string, uri: vscode.Uri };
                 const sortedFolders = [
@@ -297,18 +289,18 @@ describe("Commands", () => {
 
                 const promise = Promise.resolve([choices[0]]);
                 mockSubject.setup((x) => x.packagePickerChoices()). returns(() => promise);
-                updateWorkspaceFolders.setup((x) => x(0, 4, ...sortedFolders)).returns(() => true);
+                mocks.updateWorkspaceFolders.setup((x) => x(0, 4, ...sortedFolders)).returns(() => true);
                 mocks.showQuickPick.setup((x) => x([choices[0]], options)).returns(() => Promise.resolve(choices[0]));
                 await subject.addPackageToWorkspace();
-                updateWorkspaceFolders.verify((x) => x(0, 4, ...sortedFolders), Times.once());
+                mocks.updateWorkspaceFolders.verify((x) => x(0, 4, ...sortedFolders), Times.once());
             });
             it("shows an error if folder could not be added", async () => {
-                using(updateWorkspaceFolders);
+                using(mocks.updateWorkspaceFolders);
 
                 const promise = Promise.resolve(choices);
                 mockSubject.setup((x) => x.packagePickerChoices()).returns(() => promise);
                 mocks.showQuickPick.setup((x) => x(choices, options)).returns(() => Promise.resolve(choices[1]));
-                updateWorkspaceFolders.setup((x) => x(0, null,
+                mocks.updateWorkspaceFolders.setup((x) => x(0, null,
                         { uri: vscode.Uri.file(packageTwo.srcdir) })).returns(() => false);
 
                 await assert.rejects(subject.addPackageToWorkspace(),
@@ -609,6 +601,243 @@ describe("Commands", () => {
                     await subject.enableCmakeDebuggingSymbols();
                     assertSetSupression(true);
                 });
+            });
+        });
+    });
+    describe("openWorkspace()", () => {
+        let options: vscode.OpenDialogOptions;
+        let selectedUri: vscode.Uri | undefined;
+        beforeEach(() => {
+            options = {
+                canSelectFolders: true,
+                canSelectFiles: false,
+                canSelectMany: false,
+                openLabel: "Open",
+                title: "Select an an Autoproj workspace folder"
+            };
+            mocks.showOpenDialog.setup((x) => x(options))
+                .returns(() => Promise.resolve(selectedUri ? [selectedUri] : undefined)).verifiable();
+            using(mocks.showOpenDialog);
+        });
+        it("throws if an autoproj workspace is already open", async () => {
+            workspaces.add(builder1.workspace);
+            await assert.rejects(subject.openWorkspace(), /Opening multiple Autoproj workspaces is not supported/);
+        });
+        it("throws if selected folder is not in an autoproj workspace", async () => {
+            let tempfs: TempFS;
+            tempfs = new TempFS();
+            try {
+                const emptyFolder = tempfs.init();
+                selectedUri = vscode.Uri.file(emptyFolder);
+                await assert.rejects(subject.openWorkspace(), /The selected folder is not in an Autoproj workspace/);
+            } finally {
+                tempfs.clear();
+            }
+        });
+        describe("with a mocked updateWorkspaceFolders() function", () => {
+            it("does nothing if user cancels", async () => {
+                selectedUri = undefined
+                await subject.openWorkspace();
+                mocks.updateWorkspaceFolders.verify((x) => x(0, 1, It.isAny()), Times.never());
+            });
+            it("adds the buildconf as the first folder of the workspace", async () => {
+                selectedUri = vscode.Uri.file(builder1.root);
+                await using(mocks.updateWorkspaceFolders).do(async () => {
+                    await subject.openWorkspace();
+                });
+
+                type Folder = { name: string, uri: vscode.Uri };
+                const buildconf = builder1.fs.fullPath("autoproj");
+                const sortedFolders = [
+                    It.is((x: Folder) => x.name == `autoproj (${builder1.workspace.name})` && x.uri.fsPath == buildconf),
+                    It.is((x: Folder) => x.name == "_"), // the test-workspace default folder
+                ];
+
+                mocks.updateWorkspaceFolders.verify((x) => x(0, 1, ...sortedFolders), Times.once());
+            });
+        });
+    });
+    describe("removeTestMateEntry()", () => {
+        let advancedExecutables;
+        let selected: vscode.QuickPickItem | undefined;
+        beforeEach(() => {
+            mocks.getConfiguration.setup((x) => x("testMate.cpp.test"))
+                .returns(() => mocks.workspaceConfiguration.object);
+            mocks.workspaceConfiguration.setup((x) => x.get<any[]>("advancedExecutables"))
+                .returns(() => advancedExecutables);
+
+            let items: vscode.QuickPickItem[] = It.isAny();
+            let options: vscode.QuickPickOptions = It.isAny();
+            mocks.showQuickPick.setup((x) => x(items, options)).returns(() => Promise.resolve(selected));
+            using(mocks.getConfiguration, mocks.showQuickPick);
+        });
+        it("throws if there are not executables to remove", async () => {
+            await assert.rejects(subject.removeTestMateEntry(), /There are no TestMate C\+\+ entries to remove/);
+        });
+        it("does nothing if user cancels", async () => {
+            advancedExecutables = [
+                { name: "foo" },
+                { name: "bar" },
+            ];
+            await subject.removeTestMateEntry();
+            const expected = It.is((x: vscode.QuickPickItem[]) => {
+                return x[0].label == "$(debug-console) bar" &&
+                       x[1].label == "$(debug-console) foo"
+            });
+            mocks.showQuickPick.verify((x) => x(expected, It.isAny()), Times.once());
+            mocks.workspaceConfiguration.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
+        });
+        it("removes the selected entry", async () => {
+            advancedExecutables = [
+                { name: "foo" },
+                { name: "bar" },
+            ];
+            selected = { label: "$(debug-console) foo", entry: advancedExecutables[0] } as vscode.QuickPickItem;
+            await subject.removeTestMateEntry();
+            mocks.workspaceConfiguration.verify((x) => x.update("advancedExecutables", [advancedExecutables[1]]),
+                Times.once());
+        });
+    });
+    describe("removeDebugConfiguration()", () => {
+        let debugConfigs;
+        let selected: vscode.QuickPickItem | undefined;
+        beforeEach(() => {
+            mocks.getConfiguration.setup((x) => x("launch")).returns(() => mocks.workspaceConfiguration.object);
+            mocks.workspaceConfiguration.setup((x) => x.configurations).returns(() => debugConfigs);
+
+            let items: vscode.QuickPickItem[] = It.isAny();
+            let options: vscode.QuickPickOptions = It.isAny();
+            mocks.showQuickPick.setup((x) => x(items, options)).returns(() => Promise.resolve(selected));
+            using(mocks.getConfiguration, mocks.showQuickPick);
+        });
+        it("throws if there are not executables to remove", async () => {
+            await assert.rejects(subject.removeDebugConfiguration(), /There are no launch configurations to remove/);
+        });
+        it("does nothing if user cancels", async () => {
+            debugConfigs = [
+                { name: "foo" },
+                { name: "bar" },
+            ];
+            await subject.removeDebugConfiguration();
+            const expected = It.is((x: vscode.QuickPickItem[]) => {
+                return x[0].label == "$(debug) bar" &&
+                       x[1].label == "$(debug) foo"
+            });
+            mocks.showQuickPick.verify((x) => x(expected, It.isAny()), Times.once());
+            mocks.workspaceConfiguration.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
+        });
+        it("removes the selected entry", async () => {
+            debugConfigs = [
+                { name: "foo" },
+                { name: "bar" },
+            ];
+            selected = { label: "$(debug-console) foo", entry: debugConfigs[0] } as vscode.QuickPickItem;
+            await subject.removeDebugConfiguration();
+            mocks.workspaceConfiguration.verify((x) => x.update("configurations", [debugConfigs[1]]), Times.once());
+        });
+    });
+    describe("addPackageToTestMate()", () => {
+        let advancedExecutables;
+        let selected: commands.IPackageItem | undefined;
+        beforeEach(() => {
+            mocks.getConfiguration.setup((x) => x("testMate.cpp.test"))
+                .returns(() => mocks.workspaceConfiguration.object);
+            mocks.workspaceConfiguration.setup((x) => x.get<any[]>("advancedExecutables"))
+                .returns(() => advancedExecutables);
+
+            let items: vscode.QuickPickItem[] = It.isAny();
+            let options: vscode.QuickPickOptions = It.isAny();
+            mocks.showQuickPick.setup((x) => x(items, options)).returns(() => Promise.resolve(selected));
+            using(mocks.getConfiguration, mocks.showQuickPick);
+        });
+        it("throws if workspace is empty", async () => {
+            await assert.rejects(subject.addPackageToTestMate(), /No packages to add/);
+        })
+        describe("in a non empty workspace", () => {
+            let pkg1: autoproj.IPackage;
+            let pkg2: autoproj.IPackage;
+            let pkg3: autoproj.IPackage;
+            beforeEach(async () => {
+                workspaces.add(builder1.workspace);
+                pkg1 = builder1.addPackage("foo");
+                pkg2 = builder1.addPackage("bar");
+                pkg3 = builder1.addPackage("scripts");
+                delete (pkg3 as any).builddir;
+
+                workspaces.addFolder(pkg1.srcdir);
+                workspaces.addFolder(pkg2.srcdir);
+                workspaces.addFolder(pkg3.srcdir);
+                await host.addFolders(pkg1.srcdir, pkg2.srcdir, pkg3.srcdir);
+            });
+            it("does nothing if user cancels", async () => {
+                selected = undefined;
+                await subject.addPackageToTestMate();
+                // packages with no builddir should be filtered
+                const expected = It.is((x: vscode.QuickPickItem[]) => {
+                    return x[0].label == `$(folder) ${pkg2.name}` &&
+                           x[1].label == `$(folder) ${pkg1.name}`
+                });
+                mocks.showQuickPick.verify((x) => x(expected, It.isAny()), Times.once());
+                mocks.workspaceConfiguration.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
+            });
+            function testMateEntry(pkg: autoproj.IPackage) {
+                return {
+                    "name": pkg.name,
+                    "pattern": path.join(pkg.builddir, "**", "*{test,Test,TEST}*"),
+                    "cwd": "${absDirpath}",
+                    "testGrouping": {
+                        "groupByLabel": {
+                            "label": pkg.name,
+                            "description": builder1.workspace.name,
+                            "groupByTags": {
+                                "description": "${baseFilename}",
+                                "tags": [], "tagFormat": "${tag}"
+                            }
+                        },
+                    },
+                    "gtest": {
+                        "debug.enableOutputColouring": true,
+                    },
+                    "executionWrapper": {
+                        "path": builder1.workspace.autoprojExePath(),
+                        "args": ["exec", "--use-cache", "${cmd}", "${argsFlat}"]
+                    },
+                    "debug.configTemplate": {
+                        "type": "cppdbg",
+                        "MIMode": "gdb",
+                        "program": "${exec}",
+                        "args": "${argsArray}",
+                        "cwd": "${cwd}",
+                        "miDebuggerPath": path.join(builder1.workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb")
+                    }
+                }
+            }
+            it("does nothing if package was already added", async () => {
+                selected = {
+                    description: builder1.workspace.name,
+                    label: `$(folder) ${pkg1.name}`,
+                    package: pkg1,
+                    workspace: builder1.workspace
+                };
+                advancedExecutables = [testMateEntry(pkg1)];
+
+                await subject.addPackageToTestMate();
+                mocks.showQuickPick.verify((x) => x(It.isAny(), It.isAny()), Times.once());
+                mocks.workspaceConfiguration.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
+            });
+            it("adds and sorts the selected package", async () => {
+                selected = {
+                    description: builder1.workspace.name,
+                    label: `$(folder) ${pkg2.name}`,
+                    package: pkg2,
+                    workspace: builder1.workspace
+                };
+                advancedExecutables = [testMateEntry(pkg1)];
+
+                const expected = [testMateEntry(pkg2), testMateEntry(pkg1)];
+                await subject.addPackageToTestMate();
+                mocks.showQuickPick.verify((x) => x(It.isAny(), It.isAny()), Times.once());
+                mocks.workspaceConfiguration.verify((x) => x.update("configurations", expected), Times.never());
             });
         });
     });
