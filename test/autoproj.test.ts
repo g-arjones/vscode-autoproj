@@ -530,23 +530,20 @@ describe("Autoproj helpers tests", () => {
                 mockCallback.verify((x) => x(ws2), TypeMoq.Times.once());
             });
         });
-        describe("getWorkspaceFromFolder", () => {
-            it("returns the workspace that owns the package", () => {
-                const pkg = builder1.addPackage("pkg");
-                const ws1 = builder1.workspace;
-                workspaces.add(ws1);
-                workspaces.addFolder(pkg.srcdir);
-
-                const ws = workspaces.getWorkspaceFromFolder(pkg.srcdir);
-                assert.deepEqual(ws, ws1);
-            });
-        });
         describe("getWorkspaceAndPackage", () => {
             let pkg: autoproj.IPackage;
             beforeEach(() => {
                 pkg = builder1.addPackage("foobar");
                 workspaces.addFolder(builder1.root);
                 workspaces.addFolder(pkg.srcdir);
+            });
+            it("returns the workspace and undefined package if file belongs to ws but not to pkg", async () => {
+                const r = await workspaces.getWorkspaceAndPackage(
+                    vscode.Uri.file(path.join(builder1.root, "README.md")));
+
+                assert(r);
+                assert.equal(r.package, undefined);
+                assert.deepEqual(workspaces.folderToWorkspace.get(builder1.root), r.workspace);
             });
             it("returns the workspace and package file belongs to", async () => {
                 const r = await workspaces.getWorkspaceAndPackage(

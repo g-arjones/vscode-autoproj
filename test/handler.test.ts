@@ -1,6 +1,7 @@
 import { IMock, It, Mock, Times } from "typemoq";
 import * as autoproj from "../src/autoproj";
 import * as vscode from "vscode";
+import * as path from "path";
 import * as progress from "../src/progress";
 import * as tasks from "../src/tasks";
 import { Mocks, WorkspaceBuilder } from "./helpers";
@@ -82,6 +83,27 @@ describe("tasks Handler", () => {
                 { mode: tasks.PackageTaskMode.ForceBuild, title: `Building ${pkg.name} (force)...` },
                 { mode: tasks.PackageTaskMode.Rebuild, title: `Building ${pkg.name} (rebuild)...` },
                 { mode: tasks.PackageTaskMode.Update, title: `Updating ${pkg.name} (and its dependencies)...` },
+            ];
+            for (const packageTask of packageTasks) {
+                const definition: tasks.IPackageTaskDefinition = {
+                    mode: packageTask.mode,
+                    path: pkg.srcdir,
+                    type: tasks.TaskType.Package,
+                    workspace: workspace.root,
+                };
+                await testTaskView(packageTask, definition);
+            }
+        });
+        it("fallback to project relative dir if manifest is broken", async () => {
+            builder.fs.mkfile("- bla: [", ".autoproj", "installation-manifest");  // write and invalid manifest
+            const relPath = path.join("src", "foobar");
+            const packageTasks = [
+                { mode: tasks.PackageTaskMode.Build, title: `Building ${relPath}...` },
+                { mode: tasks.PackageTaskMode.BuildNoDeps, title: `Building ${relPath} (no dependencies)...` },
+                { mode: tasks.PackageTaskMode.Checkout, title: `Checking out ${relPath}...` },
+                { mode: tasks.PackageTaskMode.ForceBuild, title: `Building ${relPath} (force)...` },
+                { mode: tasks.PackageTaskMode.Rebuild, title: `Building ${relPath} (rebuild)...` },
+                { mode: tasks.PackageTaskMode.Update, title: `Updating ${relPath} (and its dependencies)...` },
             ];
             for (const packageTask of packageTasks) {
                 const definition: tasks.IPackageTaskDefinition = {
