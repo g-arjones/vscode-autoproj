@@ -78,6 +78,7 @@ export class EventHandler implements vscode.Disposable {
             this._configManager.onWorkspaceRemoved(deletedWs);
             await this._watchManager.stop(deletedWs);
         }
+        this._configManager.cleanupTestMate();
     }
 
     public watchManifest(ws: autoproj.Workspace): void {
@@ -117,6 +118,7 @@ export async function setupExtension(subscriptions: vscode.Disposable[]) {
 
     if (vscode.workspace.workspaceFolders) {
         vscode.workspace.workspaceFolders.forEach((folder) => eventHandler.onWorkspaceFolderAdded(folder));
+        configManager.cleanupTestMate();
     }
 
     autoprojTaskProvider.reloadTasks();
