@@ -180,12 +180,6 @@ export class Workspaces {
         return isConfig;
     }
 
-    /** Returns the workspace that matches a package folder
-     */
-    public getWorkspaceFromFolder(folder: string): Workspace | undefined {
-        return this.folderToWorkspace.get(folder);
-    }
-
     private async _loadInstallationManifest(workspace: Workspace): Promise<WorkspaceInfo> {
         try {
             return await workspace.info();

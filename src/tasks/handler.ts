@@ -79,13 +79,15 @@ export class Handler implements vscode.Disposable {
     }
 
     private async _getPackageName(taskDefinition: IPackageTaskDefinition): Promise<string> {
+        let pkg: autoproj.IPackage | undefined;
         try {
-            const ws = this._workspaces.getWorkspaceFromFolder(taskDefinition.path)!;
-            const wsInfo = await ws.info();
-            return wsInfo.findPackage(taskDefinition.path)!.name;
+            pkg = (await this._workspaces.getWorkspaceAndPackage(vscode.Uri.file(taskDefinition.path)))?.package;
         } catch (error) {
-            return path.relative(taskDefinition.workspace, taskDefinition.path);
+            // installation manifest could not be loaded, ignore
+            // and fallback to relative path to pkg srcdir
         }
+
+        return pkg?.name || path.relative(taskDefinition.workspace, taskDefinition.path);
     }
 
     private _createAndShowView(title: string, definition: vscode.TaskDefinition) {
