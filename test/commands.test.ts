@@ -837,7 +837,7 @@ describe("Commands", () => {
                 const expected = [testMateEntry(pkg2), testMateEntry(pkg1)];
                 await subject.addPackageToTestMate();
                 mocks.showQuickPick.verify((x) => x(It.isAny(), It.isAny()), Times.once());
-                mocks.workspaceConfiguration.verify((x) => x.update("configurations", expected), Times.never());
+                mocks.workspaceConfiguration.verify((x) => x.update("advancedExecutables", expected), Times.once());
             });
         });
     });
