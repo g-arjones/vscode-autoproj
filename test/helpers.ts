@@ -4,24 +4,46 @@ import * as FS from "fs";
 import * as YAML from "js-yaml";
 import * as os from "os";
 import * as Path from "path";
-import * as TypeMoq from "typemoq";
 import * as Autoproj from "../src/autoproj";
-import * as Wrappers from "../src/wrappers";
+import * as vscode from "vscode";
+import * as util from "../src/util";
+import * as progress from "../src/progress";
+import { workspaceBuilderRegistry } from "./hooks";
+import { GlobalMock, IGlobalMock, IMock, Mock } from "typemoq";
 
 export class WorkspaceBuilder {
     public readonly packages: Array<Autoproj.IPackage>;
     public readonly packageSets: Array<Autoproj.IPackageSet>;
+    public workspace: Autoproj.Workspace;
+    public root: string;
+    public fs: TempFS;
 
     constructor(
-        public root: string,
         public builddir: { dir: string[], relative: boolean } = { dir: ["build"], relative: false },
         public srcdir: string[] = ["src"]
     ) {
-        mkdir(".autoproj");
+        this.init();
+        this.fs.mkdir("autoproj");
+        this.fs.mkdir(".autoproj");
         this.packages = [];
         this.packageSets = [];
         this.writeManifest();
         this.writeEnvYml();
+    }
+
+    public init() {
+        this.fs = new TempFS();
+        this.root = this.fs.init();
+        workspaceBuilderRegistry.push(this);
+        this.workspace = new Autoproj.Workspace(this.root, false);
+    }
+
+    public clear() {
+        this.root = null as any;
+        this.workspace = null as any;
+        workspaceBuilderRegistry.splice(0, workspaceBuilderRegistry.length,
+            ...workspaceBuilderRegistry.filter((item) => item !== this))
+        return this.fs.clear();
     }
 
     public packageSrcDir(name: string, ...move: string[]): string[] {
@@ -52,174 +74,203 @@ export class WorkspaceBuilder {
                 url: `git@myserver.com:/${name}.git`,
             },
         };
-        mkdir(...this.packageSrcDir(name, ...move));
-        mkdir(...this.packageBuildDir(name));
+        this.fs.mkdir(...this.packageSrcDir(name, ...move));
+        this.fs.mkdir(...this.packageBuildDir(name));
 
         this.packages.push(pkg);
         this.writeManifest();
 
         return pkg;
     }
+    public addPackageSet(name: string) {
+        const pkgSet: Autoproj.IPackageSet = {
+            name: name,
+            vcs: {
+                repository_id: `myserver:/${name}.git`,
+                type: "git",
+                url: `git@myserver.com:/${name}.git`,
+            },
+            raw_local_dir: this.fs.fullPath(".autoproj", "remotes", `git_git_myserver_com_${name}_git`),
+            user_local_dir: this.fs.fullPath("autoproj", "remotes", name),
+            package_set: name
+        };
+        this.fs.mkdir(".autoproj", "remotes", `git_git_myserver_com_${name}_git`);
+        this.fs.mkdir("autoproj", "remotes", name);
+
+        this.packageSets.push(pkgSet);
+        this.writeManifest();
+
+        return pkgSet;
+    }
     public writeManifest() {
         const info = [...this.packages, ...this.packageSets];
-        mkfile(YAML.dump(info), ".autoproj", "installation-manifest");
+        this.fs.mkfile(YAML.dump(info), ".autoproj", "installation-manifest");
     }
     public writeEnvYml() {
         const env = {
             set: {
                 BUNDLE_GEMFILE: [
-                    Path.join(root, "install", "gems", "Gemfile")
+                    Path.join(this.root, "install", "gems", "Gemfile")
                 ]
             }
         };
 
-        mkfile(YAML.dump(env), ".autoproj", "env.yml");
+        this.fs.mkfile(YAML.dump(env), ".autoproj", "env.yml");
     }
 }
 
-export async function assertThrowsAsync(p, msg: RegExp): Promise<Error> {
-    try {
-        await p;
-    } catch (e) {
-        if (!msg.test(e.message)) {
-            throw new Error(`expected message "${e.message}" to match "${msg}"`);
-        }
-        return e;
-    }
-    throw new Error("expected promise failure but it succeeded");
-}
-
-let root;
-let createdFS: string[][] = [];
-
-export function init(): string {
-    if (root) {
-        throw new Error("Heleprs already initialized");
-    }
-
-    root = FS.mkdtempSync(Path.join(os.tmpdir(), "vscode-autoproj"));
-    return root;
-}
-
-export function fullPath(...path: string[]): string {
-    return Path.join(root, ...path);
-}
-export function mkdir(...path): string {
-    let joinedPath = root;
-    path.forEach((element) => {
-        joinedPath = Path.join(joinedPath, element);
-        if (!FS.existsSync(joinedPath)) {
-            FS.mkdirSync(joinedPath);
-            createdFS.push([joinedPath, "dir"]);
-        }
-    });
-    return joinedPath;
-}
-export function rmdir(...path) {
-    const joinedPath = fullPath(...path);
-    FS.rmdirSync(joinedPath);
-}
-export function mkfile(data: string, ...path): string {
-    const joinedPath = fullPath(...path);
-    FS.writeFileSync(joinedPath, data);
-    createdFS.push([joinedPath, "file"]);
-    return joinedPath;
-}
-export function registerDir(...path) {
-    const joinedPath = fullPath(...path);
-    createdFS.push([joinedPath, "dir"]);
-}
-export function registerFile(...path) {
-    const joinedPath = fullPath(...path);
-    createdFS.push([joinedPath, "file"]);
-}
-export function createInstallationManifest(data: any, ...workspacePath): string {
-    let joinedPath = fullPath(...workspacePath);
-    joinedPath = Autoproj.installationManifestPath(joinedPath);
-    mkdir(...workspacePath, ".autoproj");
-    FS.writeFileSync(joinedPath, YAML.dump(data));
-    createdFS.push([joinedPath, "file"]);
-    return joinedPath;
-}
-export function clear() {
-    createdFS.reverse().forEach((entry) => {
-        try {
-            if (entry[1] === "file") {
-                FS.unlinkSync(entry[0]);
-            } else if (entry[1] === "dir") {
-                FS.rmdirSync(entry[0]);
-            }
-        } catch (error) {
-            if (!(error.code === "ENOENT")) {
-                throw error;
-            }
-        }
-    });
-    createdFS = [];
-    FS.rmdirSync(root);
-    root = null;
-}
-
-export function addPackageToManifest(ws, path: string[], partialInfo: { [key: string]: any } = {}): Autoproj.IPackage {
-    const partialVCS: { [key: string]: any } = partialInfo.vcs || {};
-    const result: Autoproj.IPackage = {
-        builddir: partialInfo.builddir || "Unknown",
-        dependencies: partialInfo.dependencies || "Unknown",
-        logdir: partialInfo.logdir || "Unknown",
-        name: partialInfo.name || "Unknown",
-        prefix: partialInfo.prefix || "Unknown",
-        srcdir: fullPath(...path),
-        type: partialInfo.type || "Unknown",
-        vcs: {
-            repository_id: partialVCS.repository_id || "Unknown",
-            type: partialVCS.type || "Unknown",
-            url: partialVCS.url || "Unknown",
-        },
-
-    };
-
-    const manifestPath = Autoproj.installationManifestPath(ws.root);
-    const manifest = YAML.load(FS.readFileSync(manifestPath).toString()) as any[];
-    manifest.push(result);
-    FS.writeFileSync(manifestPath, YAML.dump(manifest));
-    ws.reload();
-    return result;
-}
-
-export class TestSetup {
-    public mockWrapper: TypeMoq.IMock<Wrappers.VSCode>;
-    get wrapper() {
-        return this.mockWrapper.object;
-    }
-
-    public mockWorkspaces: TypeMoq.IMock<Autoproj.Workspaces>;
-    get workspaces() {
-        return this.mockWorkspaces.target;
-    }
+export class TempFS {
+    public root: string;
+    public createdFS: string[][];
 
     constructor() {
-        this.mockWrapper = TypeMoq.Mock.ofType<Wrappers.VSCode>();
-        this.mockWorkspaces = TypeMoq.Mock.ofType2(Autoproj.Workspaces, [undefined]);
+        this.createdFS = [];
     }
 
-    public setupWrapper(fn) {
-        return this.mockWrapper.setup(fn);
+    public init(): string {
+        if (this.root) {
+            throw new Error("Helpers already initialized");
+        }
+
+        this.root = FS.mkdtempSync(Path.join(os.tmpdir(), "vscode-autoproj"));
+        return this.root;
     }
 
-    public createWorkspace(...path: string[]): string {
-        const wsPath = fullPath(...path);
-        createInstallationManifest([], ...path);
-        return wsPath;
+    public fullPath(...path: string[]): string {
+        return Path.join(this.root, ...path);
+    }
+    public mkdir(...path): string {
+        let joinedPath = this.root;
+        path.forEach((element) => {
+            joinedPath = Path.join(joinedPath, element);
+            if (!FS.existsSync(joinedPath)) {
+                FS.mkdirSync(joinedPath);
+                this.createdFS.push([joinedPath, "dir"]);
+            }
+        });
+        return joinedPath;
+    }
+    public rmdir(...path) {
+        const joinedPath = this.fullPath(...path);
+        FS.rmdirSync(joinedPath);
+    }
+    public mkfile(data: string, ...path): string {
+        const joinedPath = this.fullPath(...path);
+        FS.writeFileSync(joinedPath, data);
+        this.createdFS.push([joinedPath, "file"]);
+        return joinedPath;
+    }
+    public registerDir(...path) {
+        const joinedPath = this.fullPath(...path);
+        this.createdFS.push([joinedPath, "dir"]);
+    }
+    public registerFile(...path) {
+        const joinedPath = this.fullPath(...path);
+        this.createdFS.push([joinedPath, "file"]);
+    }
+    public createInstallationManifest(data: any, ...workspacePath): string {
+        let joinedPath = this.fullPath(...workspacePath);
+        joinedPath = Autoproj.installationManifestPath(joinedPath);
+        this.mkdir(...workspacePath, ".autoproj");
+        FS.writeFileSync(joinedPath, YAML.dump(data));
+        this.createdFS.push([joinedPath, "file"]);
+        return joinedPath;
+    }
+    public clear() {
+        this.createdFS.reverse().forEach((entry) => {
+            try {
+                if (entry[1] === "file") {
+                    FS.unlinkSync(entry[0]);
+                } else if (entry[1] === "dir") {
+                    FS.rmdirSync(entry[0]);
+                }
+            } catch (error) {
+                if (!(error.code === "ENOENT")) {
+                    throw error;
+                }
+            }
+        });
+        this.createdFS = [];
+        FS.rmdirSync(this.root);
+        this.root = null as any;
+    }
+}
+
+export namespace host {
+    export async function closeAllTabs() {
+        const tabs: vscode.Tab[] = vscode.window.tabGroups.all.map(tg => tg.tabs).flat();
+        const promises = tabs.map((tab) => vscode.window.tabGroups.close(tab));
+        await Promise.all(promises);
     }
 
-    public createAndRegisterWorkspace(...path: string[]) {
-        const wsPath = this.createWorkspace(...path);
-        const mock = TypeMoq.Mock.ofType2(Autoproj.Workspace, [wsPath, false]);
-        this.workspaces.add(mock.target);
-        return { mock, ws: mock.target };
+    export async function addFolders(...folderPaths: string[]) {
+        const foldersChangedEvent = new Promise<vscode.WorkspaceFoldersChangeEvent>((resolve) => {
+            const folders = vscode.workspace.workspaceFolders || [];
+            vscode.workspace.onDidChangeWorkspaceFolders((event) => resolve(event));
+            vscode.workspace.updateWorkspaceFolders(folders.length, 0,
+                ...folderPaths.map((p) => { return { uri: vscode.Uri.file(p) }})
+            );
+        });
+        await foldersChangedEvent;
     }
 
-    public addPackageToManifest(ws, path: string[], partialInfo: { [key: string]: any } = {}): Autoproj.IPackage {
-        return addPackageToManifest(ws, path, partialInfo);
+    export async function resetFolders() {
+        if (vscode.workspace.workspaceFolders!.length < 2) {
+            return;
+        }
+        const foldersChangedEvent = new Promise<vscode.WorkspaceFoldersChangeEvent>((resolve) => {
+            const folders = vscode.workspace.workspaceFolders || [];
+            vscode.workspace.onDidChangeWorkspaceFolders((event) => resolve(event));
+            vscode.workspace.updateWorkspaceFolders(1, folders.length - 1);
+        });
+        return await foldersChangedEvent;
+    }
+}
+
+export class Mocks {
+    public asyncSpawn: IGlobalMock<typeof util.asyncSpawn>;
+    public createProgressView: IGlobalMock<typeof progress.createProgressView>;
+    public getConfiguration: IGlobalMock<typeof vscode.workspace.getConfiguration>;
+    public showErrorMessage: IGlobalMock<typeof vscode.window.showErrorMessage>;
+    public showWarningMessage: IGlobalMock<typeof vscode.window.showWarningMessage>;
+    public showQuickPick: IGlobalMock<typeof vscode.window.showQuickPick>;
+    public showInputBox: IGlobalMock<typeof vscode.window.showInputBox>;
+    public showOpenDialog: IGlobalMock<typeof vscode.window.showOpenDialog>;
+    public showInformationMessage: IGlobalMock<typeof vscode.window.showInformationMessage>;
+    public logOutputChannel: IMock<vscode.LogOutputChannel>;
+    public updateWorkspaceFolders: IGlobalMock<typeof vscode.workspace.updateWorkspaceFolders>;
+    public workspaceConfiguration: IMock<vscode.WorkspaceConfiguration>;
+
+    constructor() {
+        this.getConfiguration = GlobalMock.ofInstance(
+            vscode.workspace.getConfiguration, "getConfiguration", vscode.workspace);
+
+        this.showErrorMessage = GlobalMock.ofInstance(
+            vscode.window.showErrorMessage, "showErrorMessage", vscode.window);
+
+        this.showQuickPick = GlobalMock.ofInstance(
+            vscode.window.showQuickPick, "showQuickPick", vscode.window);
+
+        this.showInputBox = GlobalMock.ofInstance(
+            vscode.window.showInputBox, "showInputBox", vscode.window);
+
+        this.showOpenDialog = GlobalMock.ofInstance(
+            vscode.window.showOpenDialog, "showOpenDialog", vscode.window);
+
+        this.showInformationMessage = GlobalMock.ofInstance(
+            vscode.window.showInformationMessage, "showInformationMessage", vscode.window);
+
+        this.showWarningMessage = GlobalMock.ofInstance(
+            vscode.window.showWarningMessage, "showWarningMessage", vscode.window);
+
+        this.updateWorkspaceFolders = GlobalMock.ofInstance(
+            vscode.workspace.updateWorkspaceFolders,
+            "updateWorkspaceFolders",
+            vscode.workspace);
+
+        this.asyncSpawn = GlobalMock.ofInstance(util.asyncSpawn, "asyncSpawn", util);
+        this.createProgressView = GlobalMock.ofInstance(progress.createProgressView, "createProgressView", progress);
+        this.workspaceConfiguration = Mock.ofType<vscode.WorkspaceConfiguration>();
+        this.logOutputChannel = Mock.ofType<vscode.LogOutputChannel>();
     }
 }

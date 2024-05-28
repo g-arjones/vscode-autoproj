@@ -7,7 +7,7 @@ import { replaceAll } from "../src/cmt/util";
 import { IPackage, Workspaces } from "../src/autoproj";
 import { CompilationDatabase } from "../src/compilationDatabase";
 import { CppConfigurationProvider } from "../src/cpptools";
-import * as helpers from "./helpers";
+import { WorkspaceBuilder } from "./helpers";
 import { using } from "./using";
 import { fs } from "../src/cmt/pr";
 
@@ -60,18 +60,15 @@ function generateCompileCommands(root: string) {
 
 describe("CppConfigurationProvider", () => {
     let mockGetCppToolsApi: IGlobalMock<typeof cpptools.getCppToolsApi>;
-    let root: string;
     let subject: CppConfigurationProvider;
     let workspaces: Workspaces;
     beforeEach(async () => {
         mockGetCppToolsApi = GlobalMock.ofInstance(cpptools.getCppToolsApi, "getCppToolsApi", cpptools);
-        root = helpers.init();
         workspaces = new Workspaces();
         subject = new CppConfigurationProvider(workspaces);
     });
     afterEach(() => {
         subject.dispose();
-        helpers.clear();
     });
     describe("an environment without the ms-vscode.cpptools extension", () => {
         describe("register()", () => {
@@ -189,17 +186,17 @@ describe("CppConfigurationProvider", () => {
             });
             describe("provideConfigurations()", () => {
                 it("returns an empty array if workspace is empty", async () => {
-                    new helpers.WorkspaceBuilder(root).writeManifest();
+                    new WorkspaceBuilder().writeManifest();
                     assert.equal(await subject.provideConfigurations([vscode.Uri.file("/path/to/file.cpp")]), 0);
                 });
             });
             describe("in a workspace with a cmake package", () => {
                 let pkg: IPackage;
                 let files: vscode.Uri[];
-                let builder: helpers.WorkspaceBuilder;
+                let builder: WorkspaceBuilder;
                 let compileCommandsPath: string[];
                 beforeEach(() => {
-                    builder = new helpers.WorkspaceBuilder(root);
+                    builder = new WorkspaceBuilder();
                     pkg = builder.addPackage("sample_driver", "drivers");
                     files = [
                         vscode.Uri.file(path.join(pkg.srcdir, "src", "driver.cpp")),
@@ -208,7 +205,7 @@ describe("CppConfigurationProvider", () => {
                     ]
 
                     compileCommandsPath = [...builder.packageBuildDir("sample_driver"), "compile_commands.json"];
-                    helpers.mkfile(generateCompileCommands(root), ...compileCommandsPath);
+                    builder.fs.mkfile(generateCompileCommands(builder.root), ...compileCommandsPath);
                     workspaces.addFolder(pkg.srcdir);
                 });
                 it("gets notified when a db changes", async () => {
@@ -268,7 +265,7 @@ describe("CppConfigurationProvider", () => {
                         await fs.unlink(joinedPath);
                         const db = await subject.getCompilationDb(joinedPath);
 
-                        helpers.mkfile(generateCompileCommands(root), ...compileCommandsPath);
+                        builder.fs.mkfile(generateCompileCommands(builder.root), ...compileCommandsPath);
                         const mock = GlobalMock.ofInstance(db.load, "load", db);
 
                         await using(mock).do(async () => {
@@ -298,9 +295,9 @@ describe("CppConfigurationProvider", () => {
                                 "-DBOOST_SYSTEM_DYN_LINK",
                                 "-DBOOST_THREAD_DYN_LINK",
                                 "-Dsample_driver_EXPORTS",
-                                `-I${root}/src/drivers/sample_driver/include`,
+                                `-I${builder.root}/src/drivers/sample_driver/include`,
                                 "-isystem",
-                                `${root}/install/drivers/drivers_base/include`,
+                                `${builder.root}/install/drivers/drivers_base/include`,
                                 "--coverage",
                                 "-g",
                                 "-std=gnu++11",
@@ -308,7 +305,7 @@ describe("CppConfigurationProvider", () => {
                                 "-o",
                                 "CMakeFiles/sample_driver.dir/driver.cpp.o",
                                 "-c",
-                                `${root}/src/drivers/sample_driver/src/driver.cpp`,
+                                `${builder.root}/src/drivers/sample_driver/src/driver.cpp`,
                             ],
                             compilerPath: "/usr/bin/c++",
                             defines: [],

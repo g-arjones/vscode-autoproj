@@ -395,9 +395,7 @@
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile",
-        "test": "node ./out/test/runTest.js",
-        "test-ci": "c8 --reporter=lcov --exclude='*/test/*' --exclude='*/src/wrappers.js' npm run test",
-        "coverage": "c8 --reporter=html --exclude='*/test/*' --exclude='*/src/wrappers.js' npm run test"
+        "test": "vscode-test --coverage"
     },
     "extensionDependencies": [
         "matepek.vscode-catch2-test-adapter",
@@ -417,8 +415,8 @@
         "@types/mocha": "^5.2.5",
         "@types/node": "^20.12.2",
         "@types/vscode": "^1.85.2",
-        "@vscode/test-electron": "^2.3.9",
-        "c8": "^9.1.0",
+        "@vscode/test-cli": "^0.0.9",
+        "@vscode/test-electron": "^2.3.10",
         "lodash": "^4.17.21",
         "mocha": "^10.4.0",
         "source-map-support": "^0.5.21",

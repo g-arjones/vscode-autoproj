@@ -39,7 +39,7 @@ export class Workspace {
 
     public reload() {
         this._infoPromise = this._createInfoPromise();
-        this._infoPromise.then((info) => { this._infoUpdatedEvent.fire(info); });
+        this._infoPromise.then((info) => { this._infoUpdatedEvent.fire(info); }).catch(() => {});
         return this._infoPromise;
     }
 

@@ -2,14 +2,19 @@ import * as path from "path";
 import * as vscode from "vscode";
 import * as autoproj from "../autoproj";
 import * as progress from "../progress";
-import * as wrappers from "../wrappers";
-import { definitionsEqual, IPackageTaskDefinition, ITaskDefinition,
-         PackageTaskMode, TaskType, WorkspaceTaskMode } from "./definitions";
+import {
+    definitionsEqual,
+    IPackageTaskDefinition,
+    ITaskDefinition,
+    PackageTaskMode,
+    TaskType,
+    WorkspaceTaskMode
+} from "./definitions";
 
 export class Handler implements vscode.Disposable {
     private _definitionToView: Map<ITaskDefinition, progress.ProgressView>;
 
-    constructor(private _wrapper: wrappers.VSCode, private _workspaces: autoproj.Workspaces) {
+    constructor(private _workspaces: autoproj.Workspaces) {
         this._definitionToView = new Map();
     }
 
@@ -84,7 +89,7 @@ export class Handler implements vscode.Disposable {
     }
 
     private _createAndShowView(title: string, definition: vscode.TaskDefinition) {
-        const view = progress.createProgressView(this._wrapper, title);
+        const view = progress.createProgressView(title);
         this._definitionToView.set(definition as ITaskDefinition, view);
         view.show();
     }

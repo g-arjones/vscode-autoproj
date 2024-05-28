@@ -1,19 +1,12 @@
 "use strict";
-import { relative as pathRelative } from "path";
 import * as vscode from "vscode";
 import * as autoproj from "../autoproj";
-import * as wrappers from "../wrappers";
 import { PackageTaskMode, TaskType, WorkspaceTaskMode } from "./definitions";
 
 function runAutoproj(ws, ...args) {
     return new vscode.ProcessExecution(ws.autoprojExePath(), args, { cwd: ws.root });
 }
 
-/*
- TODO: Update to allow adding folders with multiple packages.
-       In this case, tasks should be generated for packages
-       contained in the given folder.
-*/
 export class AutoprojProvider implements vscode.TaskProvider {
     public workspaces: autoproj.Workspaces;
 
@@ -27,11 +20,9 @@ export class AutoprojProvider implements vscode.TaskProvider {
     private _updateConfigTasks: Map<string, vscode.Task>;
     private _tasksPromise: Promise<vscode.Task[]>;
     private _allTasks: vscode.Task[];
-    private _vscode: wrappers.VSCode;
 
-    constructor(workspaces: autoproj.Workspaces, wrapper: wrappers.VSCode) {
+    constructor(workspaces: autoproj.Workspaces) {
         this.workspaces = workspaces;
-        this._vscode = wrapper;
         this.reloadTasks();
     }
 
@@ -92,7 +83,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
     }
 
     public isTaskEnabled(type: TaskType, mode: PackageTaskMode | WorkspaceTaskMode): boolean {
-        const tasksConfig = this._vscode.getConfiguration("autoproj.tasks");
+        const tasksConfig = vscode.workspace.getConfiguration("autoproj.tasks");
         if (type === TaskType.Package) {
             const packageTasks = tasksConfig.get<{ [name: string]: boolean }>("package")!;
             switch (mode as PackageTaskMode) {
@@ -165,7 +156,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
         try {
             allPackages = await this.workspaces.getPackagesInCodeWorkspace();
         } catch (error) {
-            this._vscode.showErrorMessage(`Could not generate package tasks: ${error.message}`);
+            vscode.window.showErrorMessage(`Could not generate package tasks: ${error.message}`);
             return this._allTasks;
         }
 
@@ -227,7 +218,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
         // vscode currently does not support workspace and global tasks
         // so we just use scope = vscode.workspaces.workspace[0] (this was the behavior of the,
         // now deprecated constructor)
-        return this._createTask(name, ws, "workspace", { mode, ...defs }, args, this._vscode.workspaceFolders![0]);
+        return this._createTask(name, ws, "workspace", { mode, ...defs }, args, vscode.workspace.workspaceFolders![0]);
     }
 
     private _createOsdepsTask(name, ws, defs = {}, args: string[] = []) {
@@ -238,7 +229,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
     // so we just use scope = vscode.workspaces.workspace[0] (this was the behavior of the,
     // now deprecated constructor)
     private _createBuildTask(name, ws, type, defs = {}, args: string[] = [],
-                             scope = this._vscode.workspaceFolders![0]) {
+                             scope = vscode.workspace.workspaceFolders![0]) {
         const task = this._createTask(name, ws, type, { mode: "build", ...defs }, ["build", "--tool", ...args], scope);
         task.group = vscode.TaskGroup.Build;
         task.problemMatchers = [
@@ -258,7 +249,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
     // so we just use scope = vscode.workspaces.workspace[0] (this was the behavior of the,
     // now deprecated constructor)
     private _createUpdateTask(name, ws, type, defs = {}, args: string[] = [],
-                              scope = this._vscode.workspaceFolders![0]) {
+                              scope = vscode.workspace.workspaceFolders![0]) {
         const task = this._createTask(name, ws, type,
             { mode: "update", ...defs }, ["update", "-k", "--color", ...args], scope);
         task.problemMatchers = ["$autoproj"];
@@ -276,15 +267,15 @@ export class AutoprojProvider implements vscode.TaskProvider {
         // vscode currently does not support workspace and global tasks
         // so we just use scope = vscode.workspaces.workspace[0] (this was the behavior of the,
         // now deprecated constructor)
-        const wsFolder = this._vscode.workspaceFolders![0];
+        const wsFolder = vscode.workspace.workspaceFolders![0];
         const task = this._createUpdateTask(name, ws, type,
             { mode: "checkout", ...defs }, ["--checkout-only", ...args], wsFolder);
         task.problemMatchers = ["$autoproj"];
         return task;
     }
 
-    private _createPackageBuildTask(name, ws, folder, defs = {}, args: string[] = []) {
-        const wsFolder = this._vscode.getWorkspaceFolder(folder);
+    private _createPackageBuildTask(name, ws, folder: string, defs = {}, args: string[] = []) {
+        const wsFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(folder));
         return this._createBuildTask(name, ws, "package", { path: folder, ...defs }, [...args, folder], wsFolder);
     }
 
@@ -303,8 +294,8 @@ export class AutoprojProvider implements vscode.TaskProvider {
             { mode: "rebuild", ...defs }, ["--rebuild", "--deps=f", "--no-confirm", ...args]);
     }
 
-    private _createPackageUpdateTask(name, ws, folder, defs = {}, args: string[] = []) {
-        const wsFolder = this._vscode.getWorkspaceFolder(folder);
+    private _createPackageUpdateTask(name, ws, folder: string, defs = {}, args: string[] = []) {
+        const wsFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(folder));
         const task = this._createUpdateTask(name, ws, "package",
             { path: folder, ...defs }, [...args, folder], wsFolder);
 

@@ -4,8 +4,7 @@ import * as path from "path";
 import * as TypeMoq from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
-import * as helpers from "./helpers";
-import { using } from "./using";
+import { host, TempFS, WorkspaceBuilder } from "./helpers";
 
 const MANIFEST_TEST_FILE = `
 - package_set: orocos.toolchain
@@ -106,61 +105,65 @@ const PKG_TOOLS_REST_API = {
 };
 
 describe("Autoproj helpers tests", () => {
-    const originalSpawn = require("child_process").spawn;
+    let builder1: WorkspaceBuilder;
+    let builder2: WorkspaceBuilder;
     let root: string;
+    let tempfs: TempFS;
     beforeEach(() => {
-        root = helpers.init();
+        builder1 = new WorkspaceBuilder();
+        builder2 = new WorkspaceBuilder();
+        tempfs = new TempFS();
+        root = tempfs.init();
     });
     afterEach(() => {
-        helpers.clear();
-        require("child_process").spawn = originalSpawn;
+        tempfs.clear();
     });
 
     describe("findWorkspaceRoot", () => {
         it("finds the workspace when given the root", () => {
-            helpers.mkdir(".autoproj");
-            helpers.createInstallationManifest([]);
+            tempfs.mkdir(".autoproj");
+            tempfs.createInstallationManifest([]);
             assert.equal(root, autoproj.findWorkspaceRoot(root));
         });
         it("finds the workspace root if given a subdirectory within it", () => {
-            helpers.mkdir(".autoproj");
-            helpers.createInstallationManifest([]);
-            helpers.mkdir("a");
-            const dir = helpers.mkdir("a", "b");
+            tempfs.mkdir(".autoproj");
+            tempfs.createInstallationManifest([]);
+            tempfs.mkdir("a");
+            const dir = tempfs.mkdir("a", "b");
             assert.equal(root, autoproj.findWorkspaceRoot(dir));
         });
         it("returns null if not in a workspace", () => {
-            helpers.mkdir(".autoproj");
+            tempfs.mkdir(".autoproj");
             assert.equal(null, autoproj.findWorkspaceRoot(root));
         });
     });
     describe("loadWorkspaceInfo", () => {
         it("parses the manifest and returns it", async () => {
-            helpers.mkdir(".autoproj");
-            helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+            tempfs.mkdir(".autoproj");
+            tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
             const manifest = await autoproj.loadWorkspaceInfo(root);
             assert.deepStrictEqual(manifest.packageSets.get("user/pkg/set/dir"), PKG_SET_OROCOS_TOOLCHAIN);
             assert.deepStrictEqual(manifest.packageSets.get("user/ros2/pkg/set/dir"), PKG_SET_ROS2_COMMON);
             assert.deepStrictEqual(manifest.packages.get("/path/to/tools/rest_api"), PKG_TOOLS_REST_API);
         });
         it("parses an empty manifest", async () => {
-            helpers.mkdir(".autoproj");
-            helpers.mkfile("", ".autoproj", "installation-manifest");
+            tempfs.mkdir(".autoproj");
+            tempfs.mkfile("", ".autoproj", "installation-manifest");
             const manifest = await autoproj.loadWorkspaceInfo(root);
             assert.equal(manifest.path, root);
             assert.equal(0, manifest.packages.size);
             assert.equal(0, manifest.packages.size);
         });
         it("throws if manifest cannot be read", async () => {
-            helpers.mkdir(".autoproj");
-            await helpers.assertThrowsAsync(autoproj.loadWorkspaceInfo(root), /ENOENT/);
+            tempfs.mkdir(".autoproj");
+            await assert.rejects(autoproj.loadWorkspaceInfo(root), /ENOENT/);
         });
     });
     describe("WorkspaceInfo", () => {
         let wsInfo: autoproj.WorkspaceInfo;
         beforeEach(async () => {
-            helpers.mkdir(".autoproj");
-            helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+            tempfs.mkdir(".autoproj");
+            tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
             let ws = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
             wsInfo = await ws.info();
         });
@@ -198,8 +201,8 @@ describe("Autoproj helpers tests", () => {
     describe("Workspace", () => {
         describe("constructor", () => {
             it("starts the info loading by default", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
                 const ws = new autoproj.Workspace(root);
                 assert(ws.loadingInfo());
                 await ws.info();
@@ -211,25 +214,25 @@ describe("Autoproj helpers tests", () => {
         });
         describe("fromDir", () => {
             it("returns null when called outside a workspace", () => {
-                helpers.mkdir(".autoproj");
+                tempfs.mkdir(".autoproj");
                 assert.equal(null, autoproj.Workspace.fromDir(root));
             });
             it("returns a Workspace object when called within a workspace", () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
                 assert(autoproj.Workspace.fromDir(root) instanceof autoproj.Workspace);
             });
             it("sets the workspace name using the folder's basename", () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
                 const ws = autoproj.Workspace.fromDir(root) as autoproj.Workspace;
                 assert.equal(path.basename(root), ws.name);
             });
         });
         describe("info", () => {
             it("returns a promise that gives access to the info", () => {
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+                tempfs.mkdir(".autoproj");
+                tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
                 const ws = autoproj.Workspace.fromDir(root) as autoproj.Workspace;
                 return ws.info().then((manifest) => {
                     assert.deepStrictEqual(manifest.packageSets.get("user/pkg/set/dir"), PKG_SET_OROCOS_TOOLCHAIN);
@@ -237,8 +240,8 @@ describe("Autoproj helpers tests", () => {
                 });
             });
             it("creates and returns the promise if the constructor was not instructed to load it", () => {
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+                tempfs.mkdir(".autoproj");
+                tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
                 const ws = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
                 return ws.info().then((manifest) => {
                     assert.deepStrictEqual(manifest.packageSets.get("user/pkg/set/dir"), PKG_SET_OROCOS_TOOLCHAIN);
@@ -246,16 +249,16 @@ describe("Autoproj helpers tests", () => {
                 });
             });
             it("does not re-resolve the info on each call", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+                tempfs.mkdir(".autoproj");
+                tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
                 const workspace = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
                 const promise = await workspace.info();
                 const promise2 = await workspace.info();
                 assert.equal(promise, promise2);
             });
             it("reloads the information on reload()", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+                tempfs.mkdir(".autoproj");
+                tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
                 const workspace = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
                 const initial = await workspace.info();
                 const reloaded = await workspace.reload();
@@ -263,8 +266,8 @@ describe("Autoproj helpers tests", () => {
                 assert.equal(reloaded, await workspace.info());
             });
             it("triggers onInfoUpdated the first time the info is resolved", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+                tempfs.mkdir(".autoproj");
+                tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
                 const workspace = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
 
                 let called = false;
@@ -273,8 +276,8 @@ describe("Autoproj helpers tests", () => {
                 assert(called);
             });
             it("does not re-trigger onInfoUpdated on multiple info() calls", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+                tempfs.mkdir(".autoproj");
+                tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
                 const workspace = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
 
                 await workspace.info();
@@ -284,8 +287,8 @@ describe("Autoproj helpers tests", () => {
                 assert(!called);
             });
             it("re-triggers onInfoUpdated on reload", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
+                tempfs.mkdir(".autoproj");
+                tempfs.mkfile(MANIFEST_TEST_FILE, ".autoproj", "installation-manifest");
                 const workspace = autoproj.Workspace.fromDir(root, false) as autoproj.Workspace;
 
                 await workspace.info();
@@ -305,8 +308,8 @@ describe("Autoproj helpers tests", () => {
 
         describe("add", () => {
             it ("leaves the workspace name alone if no devFolder has been given", () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
                 const ws = autoproj.Workspace.fromDir(root) as autoproj.Workspace;
                 ws.name = "test";
                 workspaces.add(ws);
@@ -314,8 +317,8 @@ describe("Autoproj helpers tests", () => {
             });
             it ("sets the workspace name if devFolder is set", () => {
                 workspaces.devFolder = root;
-                const dir = helpers.mkdir("a");
-                helpers.createInstallationManifest([], "a");
+                const dir = tempfs.mkdir("a");
+                tempfs.createInstallationManifest([], "a");
                 const ws = autoproj.Workspace.fromDir(dir) as autoproj.Workspace;
                 ws.name = "test";
                 workspaces.add(ws);
@@ -349,48 +352,56 @@ describe("Autoproj helpers tests", () => {
         describe("useCount", () => {
             // useCount nominal behavior is tested in addFolder/deleteFolder
             it ("ignores folders that are not part of the given workspace", () => {
-                const s = new helpers.TestSetup();
-                const ws1 = s.createAndRegisterWorkspace("ws1");
-                const ws2 = s.createAndRegisterWorkspace("ws2");
+                const ws1 = builder1.workspace;
+                const ws2 = builder2.workspace;
 
-                const a = s.workspaces.addFolder(path.join(ws1.ws.root, "pkg"));
-                const b = s.workspaces.addFolder(path.join(ws2.ws.root, "pkg"));
-                assert.equal(s.workspaces.useCount(ws1.ws), 1);
+                workspaces.add(ws1);
+                workspaces.add(ws2);
+
+                const pkg1 = builder1.addPackage("pkg");
+                const pkg2 = builder2.addPackage("pkg");
+
+                workspaces.addFolder(pkg1.srcdir);
+                workspaces.addFolder(pkg2.srcdir);
+
+                assert.equal(workspaces.useCount(ws1), 1);
+                assert.equal(workspaces.useCount(ws2), 1);
             });
         });
 
         describe("delete", () => {
             // delete's nominal behavior is tested in deleteFolder
-            it ("throws if the workspace is in use", () => {
-                const s = new helpers.TestSetup();
-                const ws1 = s.createAndRegisterWorkspace("ws1");
-                s.workspaces.addFolder(path.join(ws1.ws.root, "pkg"));
-                assert.throws(() => { s.workspaces.delete(ws1.ws); }, /cannot remove a workspace that is in-use/);
+            it("throws if the workspace is in use", () => {
+                const ws1 = builder1.workspace;
+                const pkg = builder1.addPackage("pkg");
+                workspaces.add(ws1);
+                workspaces.addFolder(pkg.srcdir);
+                assert.throws(() => { workspaces.delete(ws1); }, /cannot remove a workspace that is in-use/);
             });
         });
 
         describe("addFolder", () => {
             it("does not add a folder that is not within an Autoproj workspace", () => {
-                const dir = helpers.mkdir("a", "b");
+                const dir = tempfs.mkdir("a", "b");
                 const workspace = workspaces.addFolder(dir);
                 assert(!workspace.added);
                 assert(!workspace.workspace);
             });
             it("adds folders that are within a workspace", () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
-                const dir = helpers.mkdir("a", "b");
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
+                const dir = tempfs.mkdir("a", "b");
                 let { workspace } = workspaces.addFolder(dir);
                 workspace = workspace as autoproj.Workspace;
                 assert.equal(workspace.root, root);
                 assert.equal(1, workspaces.useCount(workspace));
             });
             it("adds the same workspace only once", () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
-                const a = helpers.mkdir("a");
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
+                const a = tempfs.mkdir("a");
                 const wsA = workspaces.addFolder(a);
-                const b = helpers.mkdir("a", "b");
+                const b = tempfs.mkdir("a", "b");
                 const wsB = workspaces.addFolder(b);
                 assert(wsA.added);
                 assert(!wsB.added);
@@ -398,9 +409,9 @@ describe("Autoproj helpers tests", () => {
                 assert.equal(2, workspaces.useCount(wsB.workspace as autoproj.Workspace));
             });
             it("forwards the workspace info updated event", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
-                const dir = helpers.mkdir("a", "b");
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
+                const dir = tempfs.mkdir("a", "b");
                 let { workspace } = workspaces.addFolder(dir);
                 let called = false;
                 workspaces.onWorkspaceInfo((info) => called = true);
@@ -409,9 +420,9 @@ describe("Autoproj helpers tests", () => {
                 assert(called);
             });
             it("does not fire the package info event if the manifest has no data for it", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
-                const dir = helpers.mkdir("a", "b");
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
+                const dir = tempfs.mkdir("a", "b");
                 let { workspace } = workspaces.addFolder(dir);
                 let called = false;
                 workspaces.onFolderInfo((info) => called = true);
@@ -420,39 +431,36 @@ describe("Autoproj helpers tests", () => {
                 assert(!called);
             });
             it("fires the package info event if the manifest has data for it", async () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
-                const dir = helpers.mkdir("a", "b");
-                let { workspace } = workspaces.addFolder(dir);
-                helpers.addPackageToManifest(workspace, ["a", "b"]);
+                const pkg = builder1.addPackage("foobar");
+                let { workspace } = workspaces.addFolder(pkg.srcdir);
                 let received;
                 workspaces.onFolderInfo((info) => received = info);
                 workspace = workspace as autoproj.Workspace;
                 await workspace.reload();
                 assert(received);
-                assert.equal(dir, received.srcdir);
+                assert.equal(pkg.srcdir, received.srcdir);
             });
         });
 
         describe("deleteFolder", () => {
             it("does nothing for a folder that is not registered", () => {
-                const dir = helpers.mkdir("a", "b");
+                const dir = tempfs.mkdir("a", "b");
                 assert(!workspaces.deleteFolder(dir));
             });
             it("removes a registered folder", () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
-                const dir = helpers.mkdir("a", "b");
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
+                const dir = tempfs.mkdir("a", "b");
                 const { added, workspace } = workspaces.addFolder(dir);
                 assert(workspaces.deleteFolder(dir));
                 assert.equal(0, workspaces.useCount(workspace as autoproj.Workspace));
             });
             it("keeps a workspace until all the corresponding folders have been removed", () => {
-                helpers.mkdir(".autoproj");
-                helpers.createInstallationManifest([]);
-                const a = helpers.mkdir("a");
+                tempfs.mkdir(".autoproj");
+                tempfs.createInstallationManifest([]);
+                const a = tempfs.mkdir("a");
                 const { added, workspace } = workspaces.addFolder(a);
-                const b = helpers.mkdir("a", "b");
+                const b = tempfs.mkdir("a", "b");
                 workspaces.addFolder(b);
                 workspaces.deleteFolder(b);
                 assert.equal(1, workspaces.useCount(workspace as autoproj.Workspace));
@@ -462,17 +470,17 @@ describe("Autoproj helpers tests", () => {
         });
         describe("isConfig", () => {
             beforeEach(() => {
-                helpers.mkdir("one");
-                helpers.mkdir("two");
-                helpers.mkdir("one", ".autoproj");
-                helpers.mkdir("two", ".autoproj");
-                helpers.createInstallationManifest([], "one");
-                helpers.createInstallationManifest([], "two");
+                tempfs.mkdir("one");
+                tempfs.mkdir("two");
+                tempfs.mkdir("one", ".autoproj");
+                tempfs.mkdir("two", ".autoproj");
+                tempfs.createInstallationManifest([], "one");
+                tempfs.createInstallationManifest([], "two");
             });
             it("returns true if the folder is a child of the workspace configuration", () => {
-                const a = helpers.mkdir("one", "autoproj");
-                const b = helpers.mkdir("one", "autoproj", "overrides.d");
-                const c = helpers.mkdir("two", ".autoproj", "remotes");
+                const a = tempfs.mkdir("one", "autoproj");
+                const b = tempfs.mkdir("one", "autoproj", "overrides.d");
+                const c = tempfs.mkdir("two", ".autoproj", "remotes");
                 const ws = workspaces.addFolder(a);
                 workspaces.addFolder(b);
                 workspaces.addFolder(c);
@@ -481,9 +489,9 @@ describe("Autoproj helpers tests", () => {
                 assert.equal(workspaces.isConfig(c), true);
             });
             it("returns false if the folder is not part of the workspace configuration", () => {
-                const a = helpers.mkdir("one", "a");
-                const b = helpers.mkdir("one", "b");
-                const c = helpers.mkdir("two", "c");
+                const a = tempfs.mkdir("one", "a");
+                const b = tempfs.mkdir("one", "b");
+                const c = tempfs.mkdir("two", "c");
                 const ws = workspaces.addFolder(a);
                 workspaces.addFolder(b);
                 workspaces.addFolder(c);
@@ -495,46 +503,50 @@ describe("Autoproj helpers tests", () => {
         describe("forEachFolder", () => {
             it ("invokes the callback for each folder in the workspace", () => {
                 const mockCallback = TypeMoq.Mock.ofType<(ws: autoproj.Workspace, folder: string) => void>();
-                const s = new helpers.TestSetup();
-                const ws1 = s.createAndRegisterWorkspace("ws1");
-                const ws2 = s.createAndRegisterWorkspace("ws2");
-                s.workspaces.addFolder(path.join(ws1.ws.root, "pkg"));
-                s.workspaces.addFolder(path.join(ws2.ws.root, "pkg"));
+                const ws1 = builder1.workspace;
+                const ws2 = builder2.workspace;
+                const pkg1 = builder1.addPackage("pkg");
+                const pkg2 = builder2.addPackage("pkg");
+                workspaces.add(ws1);
+                workspaces.add(ws2);
+                workspaces.addFolder(pkg1.srcdir);
+                workspaces.addFolder(pkg2.srcdir);
 
-                s.workspaces.forEachFolder((ws, folder) => { mockCallback.object(ws, folder); });
-                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws1.ws.root),
-                    path.join(ws1.ws.root, "pkg")), TypeMoq.Times.once());
-                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws2.ws.root),
-                    path.join(ws2.ws.root, "pkg")), TypeMoq.Times.once());
+                workspaces.forEachFolder((ws, folder) => { mockCallback.object(ws, folder); });
+                mockCallback.verify((x) => x(ws1, pkg1.srcdir), TypeMoq.Times.once());
+                mockCallback.verify((x) => x(ws2, pkg2.srcdir), TypeMoq.Times.once());
             });
         });
         describe("forEachWorkspace", () => {
             it ("invokes the callback for each registered workspace", () => {
                 const mockCallback = TypeMoq.Mock.ofType<(ws: autoproj.Workspace) => void>();
-                const s = new helpers.TestSetup();
-                const ws1 = s.createAndRegisterWorkspace("ws1");
-                const ws2 = s.createAndRegisterWorkspace("ws2");
+                const ws1 = builder1.workspace;
+                const ws2 = builder2.workspace;
+                workspaces.add(ws1);
+                workspaces.add(ws2);
 
-                s.workspaces.forEachWorkspace((ws) => { mockCallback.object(ws); });
-                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws1.ws.root)), TypeMoq.Times.once());
-                mockCallback.verify((x) => x(TypeMoq.It.is((ws) => ws.root === ws2.ws.root)), TypeMoq.Times.once());
+                workspaces.forEachWorkspace((ws) => { mockCallback.object(ws); });
+                mockCallback.verify((x) => x(ws1), TypeMoq.Times.once());
+                mockCallback.verify((x) => x(ws2), TypeMoq.Times.once());
             });
         });
         describe("getWorkspaceFromFolder", () => {
-            it ("returns the workspace that owns the package", () => {
-                const s = new helpers.TestSetup();
-                const ws1 = s.createAndRegisterWorkspace("ws1");
-                s.workspaces.addFolder(path.join(ws1.ws.root, "pkg"));
+            it("returns the workspace that owns the package", () => {
+                const pkg = builder1.addPackage("pkg");
+                const ws1 = builder1.workspace;
+                workspaces.add(ws1);
+                workspaces.addFolder(pkg.srcdir);
 
-                const ws = s.workspaces.getWorkspaceFromFolder(path.join(ws1.ws.root, "pkg"));
-                assert.deepEqual(ws, ws1.ws);
+                const ws = workspaces.getWorkspaceFromFolder(pkg.srcdir);
+                assert.deepEqual(ws, ws1);
             });
         });
         describe("getWorkspaceAndPackage", () => {
             let pkg: autoproj.IPackage;
             beforeEach(() => {
-                pkg = new helpers.WorkspaceBuilder(root).addPackage("foobar");
-                workspaces.addFolder(root);
+                pkg = builder1.addPackage("foobar");
+                workspaces.addFolder(builder1.root);
+                workspaces.addFolder(pkg.srcdir);
             });
             it("returns the workspace and package file belongs to", async () => {
                 const r = await workspaces.getWorkspaceAndPackage(
@@ -542,12 +554,12 @@ describe("Autoproj helpers tests", () => {
 
                 assert(r);
                 assert.deepEqual(pkg, r.package);
-                assert.deepEqual(workspaces.folderToWorkspace.get(root), r.workspace);
+                assert.deepEqual(workspaces.folderToWorkspace.get(builder1.root), r.workspace);
             });
             it("throws if manifest cannot be read", async () => {
-                helpers.mkfile("- bla: [", ".autoproj", "installation-manifest");
+                builder1.fs.mkfile("- bla: [", ".autoproj", "installation-manifest");
 
-                const ws = workspaces.folderToWorkspace.get(root)!;
+                const ws = workspaces.folderToWorkspace.get(builder1.root)!;
                 await assert.rejects(
                     workspaces.getWorkspaceAndPackage(vscode.Uri.file(path.join(pkg.srcdir, "CMakeLists.txt"))),
                     new RegExp(`Could not load '${ws.name}' installation manifest`));
@@ -556,38 +568,25 @@ describe("Autoproj helpers tests", () => {
         describe("getPackagesInCodeWorkspace", () => {
             let foo: autoproj.IPackage;
             let bar: autoproj.IPackage;
-            let dummy: autoproj.IPackage;
-            let builder: helpers.WorkspaceBuilder;
             beforeEach(() => {
-                builder = new helpers.WorkspaceBuilder(root);
-                foo = builder.addPackage("foo");
-                bar = builder.addPackage("bar");
-                dummy = builder.addPackage("dummy");
-                workspaces.addFolder(root);
+                foo = builder1.addPackage("foo");
+                bar = builder1.addPackage("bar");
+                workspaces.add(builder1.workspace);
+                workspaces.addFolder(foo.srcdir);
+                workspaces.addFolder(bar.srcdir);
             });
             it("returns the packages and their autoproj workspaces currently in the vscode workspace", async () => {
-                const mockGetWorkspaceFolder = TypeMoq.GlobalMock.ofInstance(
-                    vscode.workspace.getWorkspaceFolder,
-                    "getWorkspaceFolder",
-                    vscode.workspace);
-
-                let fooFolder: vscode.WorkspaceFolder = { name: "foo", uri: vscode.Uri.file(foo.srcdir), index: 0 };
-                let barFolder: vscode.WorkspaceFolder = { name: "bar", uri: vscode.Uri.file(bar.srcdir), index: 1 };
-                mockGetWorkspaceFolder.setup((x) => x(vscode.Uri.file(foo.srcdir))).returns(() => fooFolder);
-                mockGetWorkspaceFolder.setup((x) => x(vscode.Uri.file(bar.srcdir))).returns(() => barFolder);
-
-                await using(mockGetWorkspaceFolder).do(async () => {
-                    const r = await workspaces.getPackagesInCodeWorkspace();
-                    assert.deepStrictEqual(r, [
-                        { workspace: workspaces.getWorkspaceFromFolder(root), package: foo },
-                        { workspace: workspaces.getWorkspaceFromFolder(root), package: bar },
-                    ]);
-                });
+                await host.addFolders(foo.srcdir, bar.srcdir);
+                const r = await workspaces.getPackagesInCodeWorkspace();
+                assert.deepStrictEqual(r, [
+                    { workspace: builder1.workspace, package: foo },
+                    { workspace: builder1.workspace, package: bar },
+                ]);
             });
             it("throws if manifest cannot be read", async () => {
-                helpers.mkfile("- bla: [", ".autoproj", "installation-manifest");
+                builder1.fs.mkfile("- bla: [", ".autoproj", "installation-manifest");
 
-                const ws = workspaces.getWorkspaceFromFolder(root)!;
+                const ws = builder1.workspace;
                 await assert.rejects(
                     workspaces.getPackagesInCodeWorkspace(),
                     new RegExp(`Could not load '${ws.name}' installation manifest`));

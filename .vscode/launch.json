@@ -17,7 +17,16 @@
             "request": "launch",
             "runtimeExecutable": "${execPath}",
             "args": [
+                "${workspaceFolder}/.test-workspace/test-workspace.code-workspace",
                 "--disable-extensions",
+                "--no-sandbox",
+                // https://github.com/microsoft/vscode-test/issues/221
+                "--disable-gpu-sandbox",
+                // https://github.com/microsoft/vscode-test/issues/120
+                "--disable-updates",
+                "--skip-welcome",
+                "--skip-release-notes",
+                "--disable-workspace-trust",
                 "--extensionDevelopmentPath=${workspaceFolder}",
                 "--extensionTestsPath=${workspaceFolder}/out/test"
             ],

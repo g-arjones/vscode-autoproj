@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import * as helpers from "./helpers";
+import { Mocks, WorkspaceBuilder } from "./helpers";
 import * as path from "path";
 import * as progress from "../src/progress";
 import * as util from "../src/util";
@@ -7,31 +7,23 @@ import * as fileWatcher from "../src/fileWatcher";
 import { BundleWatcher, BundleManager } from "../src/bundleWatcher";
 import { Workspace } from "../src/autoproj";
 import { GlobalMock, IGlobalMock, IMock, It, Mock, Times } from "typemoq";
-import { LogOutputChannel } from "vscode";
-import { VSCode } from "../src/wrappers";
-import { UsingResult, using } from "./using";
+import { using } from "./using";
 import { fs } from "../src/cmt/pr";
 import { setTimeout as sleep } from "timers/promises";
 
 describe("BundleManager", () => {
-    let builder: helpers.WorkspaceBuilder;
-    let root: string;
+    let mocks: Mocks;
+    let builder: WorkspaceBuilder;
     let workspace: Workspace;
     let subject: BundleManager;
-    let mockChannel: IMock<LogOutputChannel>;
-    let mockWrapper: IMock<VSCode>;
 
     beforeEach(() => {
-        root = helpers.init();
-        builder = new helpers.WorkspaceBuilder(root);
-        workspace = new Workspace(root);
-        mockChannel = Mock.ofType<LogOutputChannel>();
-        mockWrapper = Mock.ofType<VSCode>();
-        subject = new BundleManager(mockChannel.object, mockWrapper.object);
+        mocks = new Mocks();
+        builder = new WorkspaceBuilder();
+        workspace = builder.workspace;
+        subject = new BundleManager(mocks.logOutputChannel.object);
+        using(mocks.showErrorMessage);
     })
-    afterEach(() => {
-        helpers.clear();
-    });
     describe("getWatcher()", () => {
         it("always returns the same watcher", () => {
             const watcher = subject.getWatcher(workspace);
@@ -63,66 +55,54 @@ describe("BundleManager", () => {
 });
 
 describe("BundleWatcher", () => {
-    let builder: helpers.WorkspaceBuilder;
-    let root: string;
+    let builder: WorkspaceBuilder;
+    let mocks: Mocks;
     let workspace: Workspace;
     let subject: BundleWatcher;
-    let mockAsyncSpawn: IGlobalMock<typeof util.asyncSpawn>;
-    let mockCreateProgress: IGlobalMock<typeof progress.createProgressView>;
-    let mockChannel: IMock<LogOutputChannel>;
     let mockView: IMock<progress.ProgressView>;
-    let mockWrapper: IMock<VSCode>;
-    let usingResult: UsingResult;
     let extensionGemfile: string;
     let stateFile: string;
     let execution: util.IAsyncExecution;
 
     beforeEach(() => {
-        root = helpers.init();
-        builder = new helpers.WorkspaceBuilder(root);
-        workspace = new Workspace(root);
-        mockAsyncSpawn = GlobalMock.ofInstance(util.asyncSpawn, "asyncSpawn", util);
-        mockCreateProgress = GlobalMock.ofInstance(progress.createProgressView, "createProgressView", progress);
+        mocks = new Mocks();
+        builder = new WorkspaceBuilder();
+        workspace = builder.workspace;
         mockView = Mock.ofType<progress.ProgressView>();
-        mockChannel = Mock.ofType<LogOutputChannel>();
-        mockWrapper = Mock.ofType<VSCode>();
-        usingResult = using(mockAsyncSpawn, mockCreateProgress);
-        usingResult.commit();
+        using(mocks.asyncSpawn, mocks.createProgressView, mocks.showErrorMessage);
 
         let envshFile = path.join(workspace.root, "env.sh");
         extensionGemfile = path.join(workspace.root, ".autoproj", "vscode-autoproj", "Gemfile");
         stateFile = path.join(workspace.root, ".autoproj", "vscode-autoproj", "state.json");
         const cmd = `. ${envshFile} && BUNDLE_GEMFILE='${extensionGemfile}' exec bundle install`;
 
-        mockCreateProgress.setup((x) => x(It.isAny(), It.isAny())).returns((x) => mockView.object);
-        mockAsyncSpawn.setup((x) => x(mockChannel.object, "/bin/sh", ["-c", cmd]))
-            .callback(() => helpers.mkfile("three", ".autoproj", "vscode-autoproj", "Gemfile.lock"))
+        mocks.createProgressView.setup((x) => x(It.isAny())).returns((x) => mockView.object);
+        mocks.asyncSpawn.setup((x) => x(mocks.logOutputChannel.object, "/bin/sh", ["-c", cmd]))
+            .callback(() => builder.fs.mkfile("three", ".autoproj", "vscode-autoproj", "Gemfile.lock"))
             .returns(() => execution)
 
-        subject = new BundleWatcher(mockWrapper.object, workspace, mockChannel.object);
+        subject = new BundleWatcher(workspace, mocks.logOutputChannel.object);
 
-        helpers.registerDir(".autoproj", "vscode-autoproj");
-        helpers.registerFile(".autoproj", "vscode-autoproj", "Gemfile");
-        helpers.registerFile(".autoproj", "vscode-autoproj", "Gemfile.lcok");
-        helpers.registerFile(".autoproj", "vscode-autoproj", "state.json");
-        helpers.mkdir("install", "gems");
-        helpers.mkfile("one", "install", "gems", "Gemfile.lock");
-        helpers.mkfile("two", ".autoproj", "Gemfile.lock");
+        builder.fs.registerDir(".autoproj", "vscode-autoproj");
+        builder.fs.registerFile(".autoproj", "vscode-autoproj", "Gemfile");
+        builder.fs.registerFile(".autoproj", "vscode-autoproj", "Gemfile.lcok");
+        builder.fs.registerFile(".autoproj", "vscode-autoproj", "state.json");
+        builder.fs.mkdir("install", "gems");
+        builder.fs.mkfile("one", "install", "gems", "Gemfile.lock");
+        builder.fs.mkfile("two", ".autoproj", "Gemfile.lock");
     })
     afterEach(() => {
-        usingResult.rollback();
         subject.dispose();
-        helpers.clear();
     });
     function assertFailureUi(show: boolean) {
         const times = show ? Times.once() : Times.never();
         mockView.verify((x) => x.show(), Times.once());
         mockView.verify((x) => x.close(), Times.once());
-        mockChannel.verify((x) => x.show(), times);
-        mockWrapper.verify((x) => x.showErrorMessage(It.isAny()), times);
+        mocks.logOutputChannel.verify((x) => x.show(), times);
+        mocks.showErrorMessage.verify((x) => x(It.isAny()), times);
     }
     function assertSpawned(times: number) {
-        mockAsyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny()), Times.exactly(times));
+        mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny()), Times.exactly(times));
     }
     describe("queueInstall()", async () => {
         it("shows a progress and an error UI in case of failure", async () => {
@@ -147,7 +127,7 @@ describe("BundleWatcher", () => {
             assertFailureUi(true);
         });
         it("shows a progress and an error UI if gemfile cannot be created", async () => {
-            helpers.mkdir(".autoproj", "vscode-autoproj", "Gemfile"); // mkdir to make 'fs.writeFile' fail
+            builder.fs.mkdir(".autoproj", "vscode-autoproj", "Gemfile"); // mkdir to make 'fs.writeFile' fail
             await subject.queueInstall();
             assertSpawned(0);
             assertFailureUi(true);
@@ -239,18 +219,13 @@ describe("BundleWatcher", () => {
     });
     describe("with a fake file watcher", () => {
         let mockFileWatcher: IGlobalMock<fileWatcher.FileWatcher>;
-        let usingMockFileWatcher: UsingResult;
         beforeEach(() => {
             mockFileWatcher = GlobalMock.ofType<fileWatcher.FileWatcher>(fileWatcher.FileWatcher, fileWatcher);
-            usingMockFileWatcher = using(mockFileWatcher);
-            usingMockFileWatcher.commit();
+            using(mockFileWatcher);
 
             subject.dispose();
-            subject = new BundleWatcher(mockWrapper.object, workspace, mockChannel.object);
+            subject = new BundleWatcher(workspace, mocks.logOutputChannel.object);
         })
-        afterEach(() => {
-            usingMockFileWatcher.rollback();
-        });
         describe("dispose()", () => {
             it("disposes of file watcher", () => {
                 subject.dispose();

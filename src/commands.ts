@@ -8,15 +8,14 @@ import {
     MessageItem,
     LogOutputChannel
 } from "vscode";
+import * as vscode from "vscode";
 import { fs } from "./cmt/pr";
 import * as progress from "./progress";
 import * as shlex from "./cmt/shlex";
 import * as autoproj from "./autoproj";
-import * as wrappers from "./wrappers";
 import * as path from "path";
 import { asyncSpawn, getLogger, IAsyncExecution, isSubdirOf } from "./util";
 import { ShimsWriter } from "./shimsWriter";
-import { BundleManager } from "./bundleWatcher";
 
 interface IWorkspaceItem extends QuickPickItem {
     workspace: autoproj.Workspace,
@@ -36,7 +35,7 @@ interface ITestExecuable {
     package?: autoproj.IPackage
 }
 
-interface IPackageItem extends QuickPickItem {
+export interface IPackageItem extends QuickPickItem {
     workspace: autoproj.Workspace,
     package: autoproj.IPackage
 }
@@ -50,9 +49,7 @@ export class Commands {
     private _updateEnvExecutions: Map<string, IAsyncExecution>;
 
     constructor(private readonly _workspaces: autoproj.Workspaces,
-                private readonly _vscode: wrappers.VSCode,
-                private readonly _channel: LogOutputChannel,
-                private readonly _bundleManager: BundleManager)
+                private readonly _channel: LogOutputChannel)
     {
         this._updateEnvExecutions = new Map();
     }
@@ -71,7 +68,7 @@ export class Commands {
                 workspace: workspace,
             }
         });
-        const ws = await this._vscode.showQuickPick(choices, { placeHolder: "Select a workspace" });
+        const ws = await vscode.window.showQuickPick(choices, { placeHolder: "Select a workspace" });
         return ws?.workspace;
     }
 
@@ -84,7 +81,7 @@ export class Commands {
             const env = { ...process.env, RUBYOPT: rubyopts };
             const logger = getLogger(this._channel, ws.name);
             const execution = asyncSpawn(logger, ws.autoprojExePath(), ["envsh"], { env: env });
-            const view = progress.createProgressView(this._vscode, `Updating '${ws.name}' workspace environment`);
+            const view = progress.createProgressView(`Updating '${ws.name}' workspace environment`);
 
             this._updateEnvExecutions.set(ws.root, execution);
             view.show();
@@ -106,7 +103,7 @@ export class Commands {
     }
 
     public async removeTestMateEntry() {
-        const testMateConfig = this._vscode.getConfiguration("testMate.cpp.test");
+        const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test");
         let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
 
         interface Executable {
@@ -124,7 +121,7 @@ export class Commands {
             }
         });
         if (choices.length == 0) {
-            this._vscode.showErrorMessage("There are no TestMate C++ entries to remove");
+            throw new Error("There are no TestMate C++ entries to remove");
         }
 
         choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
@@ -132,7 +129,7 @@ export class Commands {
             matchOnDescription: true,
             placeHolder: "Select an entry to remove from TestMate C++",
         };
-        const entry = await this._vscode.showQuickPick(choices, options);
+        const entry = await vscode.window.showQuickPick(choices, options);
         if (!entry) {
             return;
         }
@@ -143,7 +140,7 @@ export class Commands {
     }
 
     public async removeDebugConfiguration() {
-        const launch = this._vscode.getConfiguration("launch");
+        const launch = vscode.workspace.getConfiguration("launch");
         let configurations = (launch.configurations || []) as DebugConfiguration[];
 
         const choices: IEntryItem<DebugConfiguration>[] = configurations.map((configuration) => {
@@ -154,7 +151,7 @@ export class Commands {
             }
         });
         if (choices.length == 0) {
-            this._vscode.showErrorMessage("There are no launch configurations to remove");
+            throw new Error("There are no launch configurations to remove");
         }
 
         choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
@@ -162,7 +159,7 @@ export class Commands {
             matchOnDescription: true,
             placeHolder: "Select a launch configuration to remove",
         };
-        const entry = await this._vscode.showQuickPick(choices, options);
+        const entry = await vscode.window.showQuickPick(choices, options);
         if (!entry) {
             return;
         }
@@ -174,7 +171,7 @@ export class Commands {
 
     public async packagePickerChoices(): Promise<IFolderItem[]> {
         let choices: IFolderItem[] = [];
-        let currentFsPaths = this._vscode.workspaceFolders?.map((folder) => folder.uri.fsPath) || [];
+        let currentFsPaths = vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) || [];
         for (const ws of this._workspaces.workspaces.values()) {
             try {
                 const wsInfo = await ws.info();
@@ -222,10 +219,10 @@ export class Commands {
         };
 
         const choices = await this.packagePickerChoices();
-        const selectedOption = await this._vscode.showQuickPick(choices, options);
+        const selectedOption = await vscode.window.showQuickPick(choices, options);
 
         if (selectedOption) {
-            const wsFolders = this._vscode.workspaceFolders;
+            const wsFolders = vscode.workspace.workspaceFolders;
             let folders = wsFolders?.map((folder) => { return { name: folder.name, uri: folder.uri }; }) || [];
             folders = folders.concat(selectedOption.folder);
 
@@ -241,8 +238,8 @@ export class Commands {
                 group.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
             });
 
-            if (!this._vscode.updateWorkspaceFolders(0, wsFolders?.length || null, ...buildconfs, ...pkgSets, ...pkgs)) {
-                throw (`Could not add folder: ${selectedOption.folder.uri.fsPath}`);
+            if (!vscode.workspace.updateWorkspaceFolders(0, wsFolders?.length || null, ...buildconfs, ...pkgSets, ...pkgs)) {
+                throw new Error(`Could not add folder: ${selectedOption.folder.uri.fsPath}`);
             }
         }
     }
@@ -251,15 +248,6 @@ export class Commands {
         const workspaces = [...this._workspaces.workspaces.values()];
         if (workspaces.length == 0) {
             throw new Error(message);
-        }
-    }
-
-    private _assertSingleAutoprojWorkspace(messageEmpty: string, messageMany: string) {
-        this._assertWorkspaceNotEmpty(messageEmpty);
-
-        const workspaces = [...this._workspaces.workspaces.values()];
-        if (workspaces.length > 1) {
-            throw new Error(messageMany);
         }
     }
 
@@ -277,20 +265,18 @@ export class Commands {
         });
 
         if (packages.length == 0) {
-            this._vscode.showErrorMessage("No packages to add");
-            return;
+            throw new Error("No packages to add");
         }
 
         packages = packages.filter((pkg) => pkg.package.builddir);
-        packages = packages.sort((a, b) =>
-            a.package.name < b.package.name ? -1 : a.package.name > b.package.name ? 1 : 0);
+        packages.sort((a, b) => a.package.name < b.package.name ? -1 : a.package.name > b.package.name ? 1 : 0);
 
         const options: QuickPickOptions = {
             matchOnDescription: true,
             placeHolder: "Select a package to add to TestMate C++",
         };
 
-        const selectedPackage = await this._vscode.showQuickPick(packages, options);
+        const selectedPackage = await vscode.window.showQuickPick(packages, options);
         if (!selectedPackage) {
             return;
         }
@@ -328,7 +314,7 @@ export class Commands {
             }
         }
 
-        const testMateConfig = this._vscode.getConfiguration("testMate.cpp.test");
+        const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test");
         let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
 
         const jsonEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -337,9 +323,7 @@ export class Commands {
         }
 
         advancedExecutables.push(advancedExecutable);
-        advancedExecutables = advancedExecutables.sort((a, b) =>
-            a["name"] < b["name"] ? -1 : a["name"] > b["name"] ? 1 : 0);
-
+        advancedExecutables.sort((a, b) => a["name"] < b["name"] ? -1 : a["name"] > b["name"] ? 1 : 0);
         testMateConfig.update("advancedExecutables", advancedExecutables)
     }
 
@@ -368,7 +352,7 @@ export class Commands {
             await fs.mkdir_p(overridesPath);
             await fs.writeFile(path.join(overridesPath, "vscode-autoproj-cmake-build-type.rb"), rbfileContents);
 
-            const config = this._vscode.getConfiguration("autoproj")
+            const config = vscode.workspace.getConfiguration("autoproj")
             const supressNotice = config.get<boolean>("supressCmakeBuildTypeOverrideNotice");
 
             if (!supressNotice) {
@@ -380,7 +364,7 @@ export class Commands {
 
                 const ok: MessageItem = { title: "OK", isCloseAffordance: true };
                 const supress: MessageItem = { title: "Don't show this again", isCloseAffordance: false };
-                const item = await this._vscode.showInformationMessage(message.join(""), { modal: true }, ok, supress);
+                const item = await vscode.window.showInformationMessage(message.join(""), { modal: true }, ok, supress);
 
                 if (item && !item.isCloseAffordance) {
                     config.update("supressCmakeBuildTypeOverrideNotice", true);
@@ -397,7 +381,7 @@ export class Commands {
         }
         this._assertWorkspaceNotEmpty("Cannot save a debugging session in an empty workspace");
 
-        const wsConfig = this._vscode.getConfiguration("launch");
+        const wsConfig = vscode.workspace.getConfiguration("launch");
         let currentDebugConfigs = wsConfig.configurations as Array<any>;
 
         const jsonEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -417,7 +401,7 @@ export class Commands {
             throw new Error("Opening multiple Autoproj workspaces is not supported");
         }
 
-        const uri = await this._vscode.showOpenDialog({
+        const uri = await vscode.window.showOpenDialog({
             canSelectFolders: true,
             canSelectFiles: false,
             canSelectMany: false,
@@ -436,13 +420,13 @@ export class Commands {
 
         const name = path.basename(root);
         const ws = { name: `autoproj (${name})`, uri: Uri.file(path.join(root, "autoproj")) };
-        const folders = this._vscode.workspaceFolders || [];
-        this._vscode.updateWorkspaceFolders(0, folders.length, ws, ...folders);
+        const folders = vscode.workspace.workspaceFolders || [];
+        vscode.workspace.updateWorkspaceFolders(0, folders.length, ws, ...folders);
     }
 
     public async showTestExecutablePicker(workspaceList: autoproj.Workspace[]): Promise<ITestExecuable | undefined> {
         let name: string;
-        const program = await this._vscode.showOpenDialog({
+        const program = await vscode.window.showOpenDialog({
             canSelectFolders: false,
             canSelectMany: false,
             openLabel: "Debug",
@@ -492,11 +476,11 @@ export class Commands {
         if (!this._lastDebuggingSession) {
             throw new Error("You have not started a debugging session yet");
         }
-        await this._vscode.startDebugging(this._lastDebuggingSession.ws, this._lastDebuggingSession.config);
+        await vscode.debug.startDebugging(this._lastDebuggingSession.ws, this._lastDebuggingSession.config);
     }
 
     public async getCurrentWorkspaceAndPackage(): Promise<{ workspace: autoproj.Workspace, package: autoproj.IPackage | undefined } | undefined> {
-        const currentFile = this._vscode.activeDocumentURI;
+        const currentFile = vscode.window.activeTextEditor?.document.uri;
         if (currentFile) {
             return this._workspaces.getWorkspaceAndPackage(currentFile)
         }
@@ -534,7 +518,7 @@ export class Commands {
             return;
         }
 
-        const args = await this._vscode.showInputBox({
+        const args = await vscode.window.showInputBox({
             title: "Program arguments",
             placeHolder: "Optional command line arguments for the program"
         });
@@ -545,7 +529,7 @@ export class Commands {
 
         const debuggerPath = path.join(testExecutable.workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb");
         const srcdir = Uri.file(testExecutable.package?.srcdir || testExecutable.workspace.root);
-        const parentWs = this._vscode.getWorkspaceFolder(srcdir);
+        const parentWs = vscode.workspace.getWorkspaceFolder(srcdir);
         const config = {
             "name": testExecutable.name,
             "type": "cppdbg",
@@ -568,47 +552,47 @@ export class Commands {
         }
 
         this._lastDebuggingSession = { ws: parentWs, config };
-        await this._vscode.startDebugging(parentWs, config);
+        await vscode.debug.startDebugging(parentWs, config);
     }
 
     public async handleError(f: () => void | Promise<void>) {
         try {
             await f();
         } catch (error) {
-            await this._vscode.showErrorMessage(error.message);
+            await vscode.window.showErrorMessage(error.message);
         }
     }
 
-    public register() {
-        this._vscode.registerAndSubscribeCommand("autoproj.addPackageToWorkspace", () => {
+    public register(subscriptions: vscode.Disposable[]) {
+        subscriptions.push(vscode.commands.registerCommand("autoproj.addPackageToWorkspace", () => {
             this.handleError(() => this.addPackageToWorkspace());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.updateWorkspaceEnvironment", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.updateWorkspaceEnvironment", () => {
             this.handleError(() => this.updateWorkspaceEnvironment())
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.startDebugging", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.startDebugging", () => {
             this.handleError(() => this.startDebugging());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.restartDebugging", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.restartDebugging", () => {
             this.handleError(() => this.restartDebugging());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.saveLastDebuggingSession", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.saveLastDebuggingSession", () => {
             this.handleError(() => this.saveLastDebuggingSession());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.enableCmakeDebuggingSymbols", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.enableCmakeDebuggingSymbols", () => {
             this.handleError(() => this.enableCmakeDebuggingSymbols());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.addPackageToTestMate", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.addPackageToTestMate", () => {
             this.handleError(() => this.addPackageToTestMate());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.openWorkspace", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.openWorkspace", () => {
             this.handleError(() => this.openWorkspace());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.removeTestMateEntry", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.removeTestMateEntry", () => {
             this.handleError(() => this.removeTestMateEntry());
-        });
-        this._vscode.registerAndSubscribeCommand("autoproj.removeDebugConfiguration", () => {
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.removeDebugConfiguration", () => {
             this.handleError(() => this.removeDebugConfiguration());
-        });
+        }));
     }
 }

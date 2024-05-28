@@ -1,8 +1,8 @@
 import { Progress, ProgressLocation } from "vscode";
-import * as wrappers from "./wrappers";
+import * as vscode from "vscode";
 
-export function createProgressView(vscode: wrappers.VSCode, title?: string) {
-    return new ProgressView(vscode, title);
+export function createProgressView(title?: string) {
+    return new ProgressView(title);
 }
 
 export class ProgressView {
@@ -12,12 +12,12 @@ export class ProgressView {
     private _currentText: string;
     private _promise: Promise<void>;
 
-    constructor(private readonly _vscode: wrappers.VSCode, public readonly title?: string) {
+    constructor(public readonly title?: string) {
         this._currentProgress = 0;
     }
 
     public show(): void {
-        this._vscode.withProgress({
+        vscode.window.withProgress({
             cancellable: false,
             location: ProgressLocation.Notification,
             title: this.title,
