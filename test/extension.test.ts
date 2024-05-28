@@ -165,6 +165,7 @@ describe("EventHandler", () => {
             mocks.showErrorMessage.verify((x) => x(It.isAny()), Times.never());
             mockWatchManager.verify((x) => x.stop(workspace), Times.never());
             mockConfigManager.verify((x) => x.onWorkspaceRemoved(workspace), Times.never());
+            mockConfigManager.verify((x) => x.cleanupTestMate(), Times.once());
         });
         it("de-registers the folder and stops the watcher", async () => {
             workspaces.addFolder(buildconfPath);
