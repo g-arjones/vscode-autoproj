@@ -3,6 +3,10 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.2.1
+- Fixed package name if task progress view ([#37](https://github.com/g-arjones/vscode-autoproj/pull/37))
+- Cleanup TestMate C++ entries when a folder is removed ([#38](https://github.com/g-arjones/vscode-autoproj/pull/38))
+
 ## 0.2.0
 - Added a C++ configuration provider to setup IntelliSense (zero configuration required)
 - Replaced rebornix.ruby with shopify.ruby-lsp
