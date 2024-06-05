@@ -141,11 +141,12 @@ describe("configManager", () => {
             builder.fs.mkdir(".autoproj", "vscode-autoproj");
             builder.fs.mkfile("", ".autoproj", "vscode-autoproj", "Gemfile");
             mockBundleWatcher.setup((x) => x.extensionGemfile).returns(() => extensionGemfile);
+            m.getConfiguration.setup((x) => x("rubyLsp")).returns(() => m.workspaceConfiguration.object);
 
             await subject.setupRubyExtension();
             mockBundleWatcher.verify((x) => x.check(), Times.once());
             mockBundleWatcher.verify((x) => x.queueInstall(), Times.never());
-            m.getConfiguration.verify((x) => x(It.isAny()), Times.never());
+            m.getConfiguration.verify((x) => x(It.isAny()), Times.exactly(3));
         });
         describe("the dependencies are installed", () => {
             let extensionGemfile: string;
@@ -159,7 +160,7 @@ describe("configManager", () => {
                 await subject.setupRubyExtension();
 
                 const shimsPath = path.join(builder.root, ".autoproj", "vscode-autoproj", "bin");
-                m.workspaceConfiguration.verify((x) => x.update("rubyVersionManager.identifier", "custom"), Times.once());
+                m.workspaceConfiguration.verify((x) => x.update("rubyVersionManager", { identifier: "custom" }), Times.once());
                 m.workspaceConfiguration.verify((x) => x.update("customRubyCommand", `PATH=${shimsPath}:$PATH`), Times.once());
                 m.workspaceConfiguration.verify((x) => x.update("bundleGemfile", extensionGemfile), Times.once());
             });
