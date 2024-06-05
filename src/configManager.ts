@@ -68,13 +68,19 @@ export class ConfigManager {
 
         if (await fs.exists(bundle.extensionGemfile)) {
             await bundle.check();
+            await this._setRubyLspConfiguration(workspace);
         } else if (await bundle.queueInstall() === 0) {
-            const shimsPath = path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH);
-
-            vscode.workspace.getConfiguration("rubyLsp").update("rubyVersionManager", { identifier: "custom" });
-            vscode.workspace.getConfiguration("rubyLsp").update("customRubyCommand", `PATH=${shimsPath}:$PATH`);
-            vscode.workspace.getConfiguration("rubyLsp").update("bundleGemfile", bundle.extensionGemfile);
+            await this._setRubyLspConfiguration(workspace);
         }
+    }
+
+    private async _setRubyLspConfiguration(workspace: autoproj.Workspace) {
+        const bundle = this._bundleManager.getWatcher(workspace);
+        const shimsPath = path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH);
+
+        await vscode.workspace.getConfiguration("rubyLsp").update("rubyVersionManager", { identifier: "custom" });
+        await vscode.workspace.getConfiguration("rubyLsp").update("customRubyCommand", `PATH=${shimsPath}:$PATH`);
+        await vscode.workspace.getConfiguration("rubyLsp").update("bundleGemfile", bundle.extensionGemfile);
     }
 
     public async writeShims() {
