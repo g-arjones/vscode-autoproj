@@ -10,10 +10,8 @@ export default defineConfig(
                 skipExtensionDependencies: true,
                 launchArgs: [
                     "--disable-extensions",
-                    '--no-sandbox',
-                    // https://github.com/microsoft/vscode-test/issues/221
-                    '--disable-gpu-sandbox',
-                    // https://github.com/microsoft/vscode-test/issues/120
+                    '--no-sandbox', // https://github.com/microsoft/vscode-test/issues/221
+                    '--disable-gpu',
                     '--disable-updates',
                     '--skip-welcome',
                     '--skip-release-notes',
