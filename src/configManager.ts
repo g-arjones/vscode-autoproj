@@ -71,7 +71,7 @@ export class ConfigManager {
         } else if (await bundle.queueInstall() === 0) {
             const shimsPath = path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH);
 
-            vscode.workspace.getConfiguration("rubyLsp").update("rubyVersionManager.identifier", "custom");
+            vscode.workspace.getConfiguration("rubyLsp").update("rubyVersionManager", { identifier: "custom" });
             vscode.workspace.getConfiguration("rubyLsp").update("customRubyCommand", `PATH=${shimsPath}:$PATH`);
             vscode.workspace.getConfiguration("rubyLsp").update("bundleGemfile", bundle.extensionGemfile);
         }
