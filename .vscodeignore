@@ -1,6 +1,7 @@
 .github/**
 .vscode/**
 .vscode-test/**
+.devcontainer/**
 out/test/**
 out/**/*.map
 src/**
@@ -8,6 +9,8 @@ src/**
 .gitpod.yml
 tsconfig.json
 vsc-extension-quickstart.md
+.vscode-test.mjs
+.test-workspace/**
 coverconfig.json
 coverage/**
 test/**
