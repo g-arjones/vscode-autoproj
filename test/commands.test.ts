@@ -32,7 +32,7 @@ describe("Commands", () => {
         let execution: util.IAsyncExecution;
         let mockProgressView: IMock<progress.ProgressView>;
         let mockSubject: IMock<commands.Commands>;
-        let workspace: autoproj.Workspace;0
+        let workspace: autoproj.Workspace;
         beforeEach(() => {
             mockProgressView = Mock.ofType<progress.ProgressView>();
             workspace = builder1.workspace;
@@ -841,6 +841,131 @@ describe("Commands", () => {
             });
         });
     });
+    describe("enablePackageTests()", () => {
+        it("throws if workspace is empty", async () => {
+            await assert.rejects(subject.enablePackageTests(), /No packages to enable tests/);
+        })
+        describe("in a non empty workspace", () => {
+            let selected: commands.IPackageItem | undefined;
+            let pkg1: autoproj.IPackage;
+            let pkg2: autoproj.IPackage;
+            let pkg3: autoproj.IPackage;
+            let execution: util.IAsyncExecution;
+            beforeEach(async () => {
+                workspaces.add(builder1.workspace);
+                pkg1 = builder1.addPackage("foo");
+                pkg2 = builder1.addPackage("bar");
+                pkg3 = builder1.addPackage("scripts");
+
+                workspaces.addFolder(pkg1.srcdir);
+                workspaces.addFolder(pkg2.srcdir);
+                workspaces.addFolder(pkg3.srcdir);
+                await host.addFolders(pkg1.srcdir, pkg2.srcdir, pkg3.srcdir);
+
+                let items: vscode.QuickPickItem[] = It.isAny();
+                let options: vscode.QuickPickOptions = It.isAny();
+
+                using(mocks.asyncSpawn, mocks.showQuickPick);
+                mocks.showQuickPick.setup((x) => x(items, options)).returns(() => Promise.resolve(selected));
+                mocks.asyncSpawn.setup((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => execution);
+
+            });
+            it("does nothing if user cancels", async () => {
+                selected = undefined;
+                await subject.enablePackageTests();
+                mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.never());
+            });
+            it("enables package tests", async () => {
+                selected = {
+                    description: builder1.workspace.name,
+                    label: `$(folder) ${pkg2.name}`,
+                    package: pkg2,
+                    workspace: builder1.workspace
+                };
+                execution = {
+                    childProcess: undefined as any,
+                    returnCode: Promise.resolve(0)
+                };
+                await subject.enablePackageTests();
+                const cmd = ["test", "enable", "bar"];
+                mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), cmd, It.isAny()), Times.once());
+            });
+            it("throws if command fails", async () => {
+                selected = {
+                    description: builder1.workspace.name,
+                    label: `$(folder) ${pkg2.name}`,
+                    package: pkg2,
+                    workspace: builder1.workspace
+                };
+                execution = {
+                    childProcess: undefined as any,
+                    returnCode: Promise.resolve(1)
+                };
+                await assert.rejects(subject.enablePackageTests(), /Could not enable 'bar' tests/);
+            });
+            it("throws if command cannot be executed", async () => {
+                selected = {
+                    description: builder1.workspace.name,
+                    label: `$(folder) ${pkg2.name}`,
+                    package: pkg2,
+                    workspace: builder1.workspace
+                };
+                execution = {
+                    childProcess: undefined as any,
+                    returnCode: Promise.reject(new Error("ENOENT"))
+                };
+                await assert.rejects(subject.enablePackageTests(), /Could not enable 'bar' tests: ENOENT/);
+            });
+        });
+    });
+    describe("enableTestsByDefault()", () => {
+        let mockSubject: IMock<commands.Commands>;
+        let selectedWorkspace: autoproj.Workspace | undefined;
+        let execution: util.IAsyncExecution;
+        beforeEach(() => {
+            mockSubject = Mock.ofInstance(subject);
+            subject = mockSubject.target;
+
+            using(mocks.asyncSpawn);
+            mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(selectedWorkspace));
+            mocks.asyncSpawn.setup((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => execution);
+        });
+        describe("in a non empty workspace", () => {
+            it("does nothing if user cancels", async () => {
+                selectedWorkspace = undefined;
+                await subject.enableTestsByDefault();
+                mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.never());
+            });
+            it("enables tests by default", async () => {
+                selectedWorkspace = builder1.workspace;
+                execution = {
+                    childProcess: undefined as any,
+                    returnCode: Promise.resolve(0)
+                };
+                await subject.enableTestsByDefault();
+                const cmd = ["test", "default", "on"];
+                mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), cmd, It.isAny()), Times.once());
+            });
+            it("throws if command fails", async () => {
+                selectedWorkspace = builder1.workspace;
+                execution = {
+                    childProcess: undefined as any,
+                    returnCode: Promise.resolve(1)
+                };
+                const error = RegExp(`Could not enable '${selectedWorkspace.name}' tests`);
+                await assert.rejects(subject.enableTestsByDefault(), error);
+            });
+            it("throws if command cannot be executed", async () => {
+                selectedWorkspace = builder1.workspace;
+                execution = {
+                    childProcess: undefined as any,
+                    returnCode: Promise.reject(new Error("ENOENT"))
+                };
+                const error = RegExp(`Could not enable '${selectedWorkspace.name}' tests: ENOENT`);
+                await assert.rejects(subject.enableTestsByDefault(), error);
+            });
+        });
+    });
     describe("handleError()", () => {
         it("runs and handles errors on functions and async functions", async () => {
             using(mocks.showErrorMessage);
@@ -889,7 +1014,11 @@ describe("Commands", () => {
                 setupMocks("addPackageToTestMate", "autoproj.addPackageToTestMate"),
                 setupMocks("removeTestMateEntry", "autoproj.removeTestMateEntry"),
                 setupMocks("removeDebugConfiguration", "autoproj.removeDebugConfiguration"),
-                setupMocks("openWorkspace", "autoproj.openWorkspace")
+                setupMocks("openWorkspace", "autoproj.openWorkspace"),
+                setupMocks("enablePackageTests", "autoproj.enablePackageTests"),
+                setupMocks("enableTestsByDefault", "autoproj.enableTestsByDefault"),
+                setupMocks("disablePackageTests", "autoproj.disablePackageTests"),
+                setupMocks("disableTestsByDefault", "autoproj.disableTestsByDefault")
             ];
 
             subject.register(disposables);

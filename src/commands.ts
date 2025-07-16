@@ -77,10 +77,7 @@ export class Commands {
         const ws = await this.showWorkspacePicker();
 
         if (ws && !this._updateEnvExecutions.has(ws.root)) {
-            const rubyopts = `-r${path.join(ws.root, ShimsWriter.RELATIVE_OPTS_PATH, "rubyopt.rb")}`;
-            const env = { ...process.env, RUBYOPT: rubyopts };
-            const logger = getLogger(this._channel, ws.name);
-            const execution = asyncSpawn(logger, ws.autoprojExePath(), ["envsh"], { env: env });
+            const execution = this.runAutoprojCommand(ws, ["envsh"]);
             const view = progress.createProgressView(`Updating '${ws.name}' workspace environment`);
 
             this._updateEnvExecutions.set(ws.root, execution);
@@ -252,25 +249,12 @@ export class Commands {
     }
 
     public async addPackageToTestMate() {
-        let packages: IPackageItem[] = (await this._workspaces.getPackagesInCodeWorkspace()).map((item) => {
-            const ws = item.workspace;
-            const pkg = item.package;
-
-            return {
-                description: ws.name,
-                label: `$(folder) ${pkg.name}`,
-                package: pkg,
-                workspace: ws
-            }
-        });
-
+        let packages = await this.getPackagesInCodeWorkspace();
         if (packages.length == 0) {
             throw new Error("No packages to add");
         }
 
         packages = packages.filter((pkg) => pkg.package.builddir);
-        packages.sort((a, b) => a.package.name < b.package.name ? -1 : a.package.name > b.package.name ? 1 : 0);
-
         const options: QuickPickOptions = {
             matchOnDescription: true,
             placeHolder: "Select a package to add to TestMate C++",
@@ -326,6 +310,103 @@ export class Commands {
         advancedExecutables.sort((a, b) => a["name"] < b["name"] ? -1 : a["name"] > b["name"] ? 1 : 0);
         testMateConfig.update("advancedExecutables", advancedExecutables)
     }
+
+    public runAutoprojCommand(ws: autoproj.Workspace, cmd: string[]): IAsyncExecution {
+        const rubyopts = `-r${path.join(ws.root, ShimsWriter.RELATIVE_OPTS_PATH, "rubyopt.rb")}`;
+        const env = { ...process.env, RUBYOPT: rubyopts };
+        const logger = getLogger(this._channel, ws.name);
+        return asyncSpawn(logger, ws.autoprojExePath(), cmd, { env: env });
+    }
+
+    public async getPackagesInCodeWorkspace(): Promise<IPackageItem[]> {
+        let packages: IPackageItem[] = (await this._workspaces.getPackagesInCodeWorkspace()).map((item) => {
+            const ws = item.workspace;
+            const pkg = item.package;
+
+            return {
+                description: ws.name,
+                label: `$(folder) ${pkg.name}`,
+                package: pkg,
+                workspace: ws
+            }
+        });
+        packages.sort((a, b) => a.package.name < b.package.name ? -1 : a.package.name > b.package.name ? 1 : 0);
+        return packages;
+    }
+
+    public async togglePackageTests(enabled: boolean) {
+        const packages = await this.getPackagesInCodeWorkspace();
+        const toggle = enabled ? "enable" : "disable";
+
+        if (packages.length == 0) {
+            throw new Error(`No packages to ${toggle} tests`);
+        }
+
+        const options: QuickPickOptions = {
+            matchOnDescription: true,
+            placeHolder: `Select a package to ${toggle} tests`
+        };
+        const selectedPackage = await vscode.window.showQuickPick(packages, options);
+
+        if (!selectedPackage) {
+            return;
+        }
+
+        const ws = selectedPackage.workspace;
+        const pkg = selectedPackage.package;
+        let returnCode: number | null;
+
+        const execution = this.runAutoprojCommand(ws, ["test", toggle, pkg.name]);
+        const action = enabled ? "Enabling" : "Disabling";
+        const view = progress.createProgressView(`${action} '${pkg.name}' tests`);
+
+        view.show();
+
+        try {
+            returnCode = await execution.returnCode;
+        } catch (err) {
+            throw new Error(`Could not ${toggle} '${pkg.name}' tests: ${err.message}`);
+        } finally {
+            view.close();
+        }
+
+        if (returnCode !== 0) {
+            this._channel.show();
+            throw new Error(`Could not ${toggle} '${pkg.name}' tests`);
+        }
+    }
+
+    public async toggleTestsByDefault(enabled: boolean) {
+        const ws = await this.showWorkspacePicker();
+        if (!ws) {
+            return;
+        }
+
+        let returnCode: number | null;
+        const toggle = enabled ? "enable" : "disable";
+        const execution = this.runAutoprojCommand(ws, ["test", "default", enabled ? "on" : "off"]);
+        const view = progress.createProgressView(`${enabled ? "Enabling" : "Disabling"} '${ws.name}' tests by default`);
+
+        view.show();
+
+        try {
+            returnCode = await execution.returnCode;
+        } catch (err) {
+            throw new Error(`Could not ${toggle} '${ws.name}' tests: ${err.message}`);
+        } finally {
+            view.close();
+        }
+
+        if (returnCode !== 0) {
+            this._channel.show();
+            throw new Error(`Could not ${toggle} '${ws.name}' tests`);
+        }
+    }
+
+    public async enablePackageTests() { return await this.togglePackageTests(true); }
+    public async disablePackageTests() { return await this.togglePackageTests(false); }
+    public async enableTestsByDefault() { return await this.toggleTestsByDefault(true); }
+    public async disableTestsByDefault() { return await this.toggleTestsByDefault(false); }
 
     public async enableCmakeDebuggingSymbols() {
         this._assertWorkspaceNotEmpty("Cannot enable CMake debugging symbols on an empty workspace");
@@ -593,6 +674,18 @@ export class Commands {
         }));
         subscriptions.push(vscode.commands.registerCommand("autoproj.removeDebugConfiguration", () => {
             this.handleError(() => this.removeDebugConfiguration());
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.enablePackageTests", () => {
+            this.handleError(() => this.enablePackageTests());
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.enableTestsByDefault", () => {
+            this.handleError(() => this.enableTestsByDefault());
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.disablePackageTests", () => {
+            this.handleError(() => this.disablePackageTests());
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.disableTestsByDefault", () => {
+            this.handleError(() => this.disableTestsByDefault());
         }));
     }
 }
