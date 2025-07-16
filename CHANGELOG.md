@@ -3,6 +3,9 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.2.3
+- Added command to enable and disable tests
+
 ## 0.2.2
 - Fixed rubyLsp.rubyVersionManager not being set ([#39](https://github.com/g-arjones/vscode-autoproj/pull/39))
 

@@ -93,6 +93,26 @@
                 "title": "Update workspace environment",
                 "category": "Autoproj",
                 "command": "autoproj.updateWorkspaceEnvironment"
+            },
+            {
+                "title": "Enable package tests",
+                "category": "Autoproj",
+                "command": "autoproj.enablePackageTests"
+            },
+            {
+                "title": "Enable tests by default",
+                "category": "Autoproj",
+                "command": "autoproj.enableTestsByDefault"
+            },
+            {
+                "title": "Disable package tests",
+                "category": "Autoproj",
+                "command": "autoproj.disablePackageTests"
+            },
+            {
+                "title": "Disable tests by default",
+                "category": "Autoproj",
+                "command": "autoproj.disableTestsByDefault"
             }
         ],
         "languages": [
