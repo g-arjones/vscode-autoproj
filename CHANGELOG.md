@@ -3,6 +3,9 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.2.5
+- Improve startup time by improving activation event ([#44](https://github.com/g-arjones/vscode-autoproj/pull/44))
+
 ## 0.2.4
 - Fixed python interpreter shim ([#43](https://github.com/g-arjones/vscode-autoproj/pull/43))
 
