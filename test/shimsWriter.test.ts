@@ -25,13 +25,17 @@ describe("ShimsWriter instanciated", () => {
     });
     describe("writePython", () => {
         let relativeShimPath: string;
+        let relativeAdapterPath: string;
         beforeEach(() => {
             relativeShimPath = path.join(ShimsWriter.RELATIVE_SHIMS_PATH, "python");
+            relativeAdapterPath = path.join(ShimsWriter.RELATIVE_SHIMS_PATH, "python-argv-adapter");
             tempfs.registerFile(relativeShimPath);
+            tempfs.registerFile(relativeAdapterPath);
         });
         it("writes python shim in the given workspace", async () => {
             await subject.writePython(workspace);
             accessSync(path.join(root, relativeShimPath), constants.X_OK);
+            accessSync(path.join(root, relativeAdapterPath), constants.X_OK);
         });
     });
     describe("writeGdb", () => {

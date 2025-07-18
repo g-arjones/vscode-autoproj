@@ -2,7 +2,7 @@ import * as autoproj from "./autoproj";
 import { fs } from "./cmt/pr";
 import * as path from "path";
 
-function pythonGenerator(workspace: autoproj.Workspace) {
+function pythonShimGenerator(workspace: autoproj.Workspace) {
     return `\
 #!/bin/sh
 
@@ -14,7 +14,24 @@ VSCODE_PYTHONPATH="$PYTHONPATH"
 if [ "\${VSCODE_PYTHONPATH}x" != "x" ]; then
     PYTHONPATH="$VSCODE_PYTHONPATH:$PYTHONPATH"
 fi
-exec python "$@"
+
+python_path="$(python -c 'import sys;print(sys.executable)')"
+exec "${path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, 'python-argv-adapter')}" \\
+     "\${python_path}" "$@"
+`
+}
+
+function pythonArgvAdapterGenerator(workspace: autoproj.Workspace) {
+    return `\
+#!/usr/bin/env python
+import os
+import sys
+
+python_path = sys.argv[1]
+shim_path = "${path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, 'python')}"
+
+new_argv = [shim_path] + sys.argv[2:]
+os.execv(python_path, new_argv)
 `
 }
 
@@ -62,7 +79,8 @@ export class ShimsWriter {
     }
 
     public async writePython(workspace: autoproj.Workspace): Promise<void> {
-        return await this._writeShim(workspace, "python", pythonGenerator);
+        await this._writeShim(workspace, "python", pythonShimGenerator);
+        await this._writeShim(workspace, "python-argv-adapter", pythonArgvAdapterGenerator);
     }
 
     public async writeGdb(workspace: autoproj.Workspace): Promise<void> {
