@@ -31,7 +31,30 @@
         "vscode": "^1.85.2"
     },
     "activationEvents": [
-        "*"
+        "workspaceContains:.autoproj",
+        "workspaceContains:../.autoproj",
+        "workspaceContains:../../.autoproj",
+        "workspaceContains:../../../.autoproj",
+        "workspaceContains:../../../../.autoproj",
+        "workspaceContains:../../../../../.autoproj",
+        "workspaceContains:../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../../../../../../../../.autoproj",
+        "workspaceContains:../../../../../../../../../../../../../../../../../../../../../../../.autoproj"
     ],
     "main": "./out/src/extension",
     "categories": [
