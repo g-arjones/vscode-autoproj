@@ -73,20 +73,6 @@ describe("configManager", () => {
             m.showErrorMessage.verify((x) => x("Working on multiple Autoproj workspaces is not supported"),
                 Times.once());
         });
-        it("does nothing if workspace is not saved", async () => {
-            spySubject();
-            const mockWorkspace = GlobalMock.ofInstance(vscode.workspace, "workspace", vscode);
-            mockWorkspace.setup((x) => x.workspaceFile).returns(() => undefined);
-
-            await using(m.showWarningMessage, mockWorkspace).do(async () => {
-                await subject.setupExtension();
-            });
-
-            assertSetup(Times.never());
-            m.showWarningMessage.verify((x) =>
-                x("You must save your workspace for the Autoproj extension to work properly"),
-                Times.once());
-        });
         it("sets the workspace up", async () => {
             spySubject();
             await subject.setupExtension();
@@ -190,6 +176,22 @@ describe("configManager", () => {
                 await subject.cleanupTestMate();
             });
             m.getConfiguration.verify((x) => x("testMate.cpp.test"), Times.never());
+        });
+        it("does nothing if advancedExecutables is empty", async () => {
+            const pkg = builder.addPackage("foo");
+            const advancedExecutables = []
+
+            workspaces.addFolder(pkg.srcdir);
+            await host.addFolders(pkg.srcdir);
+
+            m.getConfiguration.setup((x) => x("testMate.cpp.test")).returns(() => m.workspaceConfiguration.object);
+            m.workspaceConfiguration.setup((x) => x.get<any[]>("advancedExecutables"))
+                .returns(() => advancedExecutables);
+
+            await using(m.getConfiguration).do(async () => {
+                await subject.cleanupTestMate();
+            });
+            m.workspaceConfiguration.verify((x) => x.update("advancedExecutables", It.isAny()), Times.never());
         });
         it("remove entries that don't belong to any open package", async () => {
             const pkg1 = builder.addPackage("foo");

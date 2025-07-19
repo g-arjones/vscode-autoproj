@@ -28,12 +28,6 @@ export class ConfigManager {
             return;
         }
 
-        if (!vscode.workspace.workspaceFile) {
-            vscode.window.showWarningMessage(
-                "You must save your workspace for the Autoproj extension to work properly");
-            return;
-        }
-
         await this.writeShims();
 
         this.setupTestMate();
@@ -105,6 +99,9 @@ export class ConfigManager {
 
         const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test");
         let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
+        if (advancedExecutables.length === 0) {
+            return;
+        }
 
         advancedExecutables = advancedExecutables.filter((executable) => {
             return builddirs.some((builddir) => isSubdirOf(executable.pattern, builddir))
