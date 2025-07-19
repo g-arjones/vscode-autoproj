@@ -7,6 +7,7 @@ import { FileWatcher } from "./fileWatcher";
 import { asyncSpawn, getLogger } from "./util";
 import { fs } from "./cmt/pr";
 import { Workspace } from "./autoproj";
+import { setTimeout as sleep } from "timers/promises";
 
 export class BundleManager implements vscode.Disposable {
     private _folderToWatcher: Map<string, BundleWatcher>;
@@ -61,6 +62,8 @@ class PromiseQueue {
 }
 
 export class BundleWatcher implements vscode.Disposable {
+    public static BACKUP_FILE_POLLING_PERIOD_MS = 1000;
+
     private _fileWatcher: FileWatcher;
     private _queue: PromiseQueue;
     private _watching: boolean;
@@ -195,6 +198,24 @@ export class BundleWatcher implements vscode.Disposable {
     }
 
     public async install(): Promise<number | null> {
+        // If there's a backup file of the user lock file (i.e. Gemfile.lock.orig),
+        // that means autoproj is currently updating the workspace.
+        // In this, case, we wait until the file is gone, check for changes
+        // and then install the dependencies.
+        if (await fs.exists(await this.userLockPath + ".orig")) {
+            this._logger.info("Waiting for autoproj to finish updating the workspace");
+            while (await fs.exists(await this.userLockPath + ".orig")) {
+                await sleep(BundleWatcher.BACKUP_FILE_POLLING_PERIOD_MS);
+            }
+            this._logger.info("Autoproj finished updating the workspace");
+
+            // Check for changes and abort if the extension's bundle is up to date
+            if (await this.isUpToDate()) {
+                this._logger.info("Extension's bundle is up to date");
+                return 0;
+            }
+        }
+
         const msg = `Installing extension dependencies in '${this._ws.name}' workspace`;
         const view = progress.createProgressView(msg);
 
