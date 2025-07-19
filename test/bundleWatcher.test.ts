@@ -10,6 +10,7 @@ import { GlobalMock, IGlobalMock, IMock, It, Mock, Times } from "typemoq";
 import { using } from "./using";
 import { fs } from "../src/cmt/pr";
 import { setTimeout as sleep } from "timers/promises";
+import { existsSync } from "fs";
 
 describe("BundleManager", () => {
     let mocks: Mocks;
@@ -182,6 +183,58 @@ describe("BundleWatcher", () => {
             await fs.writeFile(await subject.userLockPath, "foo");
             await sleep(50);
             assertSpawned(2);
+        });
+        describe("while autoproj is updating the workspace", () => {
+            let backupFile: string;
+            beforeEach(async () => {
+                execution = {
+                    childProcess: undefined as any,
+                    returnCode: Promise.resolve(0)
+                };
+
+                BundleWatcher.BACKUP_FILE_POLLING_PERIOD_MS = 100;
+                backupFile = path.join(workspace.root, "install", "gems", "Gemfile.lock.orig")
+                await subject.queueInstall();
+                await subject.saveCurrentState();
+                await fs.writeFile(backupFile, "");
+            });
+            afterEach(async () => {
+                BundleWatcher.BACKUP_FILE_POLLING_PERIOD_MS = 1000;
+                if (existsSync(backupFile)) {
+                    await fs.unlink(backupFile);
+                }
+            });
+            it("waits until autoproj is done updating the workspace", async () => {
+                Promise.resolve().then(async () => {
+                    await sleep(200);
+                    await fs.unlink(backupFile);
+                });
+                BundleWatcher.BACKUP_FILE_POLLING_PERIOD_MS = 50;
+
+                const start = Date.now();
+                await subject.queueInstall();
+                const duration = Date.now() - start;
+                assert.ok(duration >= 200 && duration < 350, `Expected at least 200ms but got ${duration}ms`);
+            });
+            it("does not install if bundle has not changed", async () => {
+                Promise.resolve().then(async () => {
+                    await sleep(200);
+                    await fs.unlink(backupFile);
+                });
+
+                assert.equal(await subject.queueInstall(), 0);
+                assertSpawned(1);  // installed once before
+            });
+            it("installs if bundle has changed", async () => {
+                Promise.resolve().then(async () => {
+                    await fs.writeFile(await subject.userLockPath, "");
+                    await sleep(200);
+                    await fs.unlink(backupFile);
+                });
+
+                assert.equal(await subject.queueInstall(), 0);
+                assertSpawned(2);  // installed once before, once after
+            });
         });
     });
     describe("getSavedState()", () => {
