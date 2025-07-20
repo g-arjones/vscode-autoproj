@@ -456,25 +456,28 @@ export class Commands {
         }
     }
 
+    public async saveLaunchConfiguration(config: DebugConfiguration) {
+        const wsConfig = vscode.workspace.getConfiguration("launch");
+        let currentDebugConfigs = wsConfig.configurations as Array<any>;
+
+        const jsonEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+        if (currentDebugConfigs.some((existing) => jsonEqual(config, existing))) {
+            return;
+        }
+
+        let newConfigurations = currentDebugConfigs.concat(config);
+        newConfigurations = newConfigurations.sort((a, b) =>
+            a["name"] < b["name"] ? -1 : a["name"] > b["name"] ? 1 : 0);
+
+        await wsConfig.update("configurations", newConfigurations)
+    }
+
     public async saveLastDebuggingSession() {
         if (!this._lastDebuggingSession) {
             throw new Error("You have not started a debugging session yet");
         }
         this._assertWorkspaceNotEmpty("Cannot save a debugging session in an empty workspace");
-
-        const wsConfig = vscode.workspace.getConfiguration("launch");
-        let currentDebugConfigs = wsConfig.configurations as Array<any>;
-
-        const jsonEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-        if (currentDebugConfigs.some((config) => jsonEqual(config, this._lastDebuggingSession?.config))) {
-            return;
-        }
-
-        let newConfigurations = currentDebugConfigs.concat(this._lastDebuggingSession.config);
-        newConfigurations = newConfigurations.sort((a, b) =>
-            a["name"] < b["name"] ? -1 : a["name"] > b["name"] ? 1 : 0);
-
-        wsConfig.update("configurations", newConfigurations)
+        await this.saveLaunchConfiguration(this._lastDebuggingSession.config);
     }
 
     public async openWorkspace() {
@@ -588,7 +591,7 @@ export class Commands {
         return defaultUri;
     }
 
-    public async startDebugging() {
+    public async generateDebugConfiguration() {
         const workspaceList = [...this._workspaces.workspaces.values()];
         if (workspaceList.length == 0) {
             throw new Error("Cannot debug an empty workspace");
@@ -631,9 +634,24 @@ export class Commands {
                 }
             ]
         }
+        return { config: config, ws: parentWs };
+    }
 
-        this._lastDebuggingSession = { ws: parentWs, config };
-        await vscode.debug.startDebugging(parentWs, config);
+    public async startDebugging() {
+        const selection = await this.generateDebugConfiguration();
+        if (!selection) {
+            return;
+        }
+        this._lastDebuggingSession = selection;
+        await vscode.debug.startDebugging(selection.ws, selection.config);
+    }
+
+    public async addLaunchConfiguration() {
+        const selection = await this.generateDebugConfiguration();
+        if (!selection) {
+            return;
+        }
+        await this.saveLaunchConfiguration(selection.config);
     }
 
     public async handleError(f: () => void | Promise<void>) {
@@ -686,6 +704,9 @@ export class Commands {
         }));
         subscriptions.push(vscode.commands.registerCommand("autoproj.disableTestsByDefault", () => {
             this.handleError(() => this.disableTestsByDefault());
+        }));
+        subscriptions.push(vscode.commands.registerCommand("autoproj.addLaunchConfiguration", () => {
+            this.handleError(() => this.addLaunchConfiguration());
         }));
     }
 }
