@@ -469,6 +469,38 @@ describe("Commands", () => {
             });
         });
     });
+    describe("addLaunchConfiguration()", () => {
+        let selected: any;
+        let mockSubject: IMock<commands.Commands>;
+        beforeEach(() => {
+            mockSubject = Mock.ofInstance(subject);
+            subject = mockSubject.target;
+        });
+        afterEach(async () => {
+            await vscode.workspace.getConfiguration("launch").update("configurations", undefined);
+        });
+        it("does nothing if user cancels", async () => {
+            selected = undefined;
+            mockSubject.setup((x) => x.generateDebugConfiguration()).returns(() => Promise.resolve(undefined));
+            await subject.addLaunchConfiguration();
+            assert.deepEqual([], vscode.workspace.getConfiguration("launch").get("configurations"));
+        });
+        it("adds a launch configuration", async () => {
+            const config = {
+                "name": "foo",
+                "type": "cppdbg",
+                "request": "launch",
+                "cwd": "/path/to",
+                "program": "/path/to/foo",
+                "MIMode": "gdb",
+            }
+            selected = { config: config, ws: vscode.workspace.workspaceFolders![0] };
+            mockSubject.setup((x) => x.generateDebugConfiguration()).returns(() => Promise.resolve(selected));
+            await subject.addLaunchConfiguration();
+            assert.deepEqual([config], vscode.workspace.getConfiguration("launch").get("configurations"));
+        });
+
+    });
     describe("restartDebugging()", () => {
         let startDebugging: IGlobalMock<typeof vscode.debug.startDebugging>;
         beforeEach(() => {
@@ -1018,7 +1050,8 @@ describe("Commands", () => {
                 setupMocks("enablePackageTests", "autoproj.enablePackageTests"),
                 setupMocks("enableTestsByDefault", "autoproj.enableTestsByDefault"),
                 setupMocks("disablePackageTests", "autoproj.disablePackageTests"),
-                setupMocks("disableTestsByDefault", "autoproj.disableTestsByDefault")
+                setupMocks("disableTestsByDefault", "autoproj.disableTestsByDefault"),
+                setupMocks("addLaunchConfiguration", "autoproj.addLaunchConfiguration")
             ];
 
             subject.register(disposables);

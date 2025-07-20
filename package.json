@@ -136,6 +136,11 @@
                 "title": "Disable tests by default",
                 "category": "Autoproj",
                 "command": "autoproj.disableTestsByDefault"
+            },
+            {
+                "title": "Add C/C++ launch configuration",
+                "category": "Autoproj",
+                "command": "autoproj.addLaunchConfiguration"
             }
         ],
         "languages": [
