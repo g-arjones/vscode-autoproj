@@ -692,11 +692,15 @@ describe("Commands", () => {
     describe("removeTestMateEntry()", () => {
         let advancedExecutables;
         let selected: vscode.QuickPickItem | undefined;
+        let details: { workspaceFolderValue };
         beforeEach(() => {
-            mocks.getConfiguration.setup((x) => x("testMate.cpp.test"))
+            details = { workspaceFolderValue: undefined };
+            mocks.getConfiguration.setup((x) => x("testMate.cpp.test", It.isAny()))
                 .returns(() => mocks.workspaceConfiguration.object);
             mocks.workspaceConfiguration.setup((x) => x.get<any[]>("advancedExecutables"))
                 .returns(() => advancedExecutables);
+            mocks.workspaceConfiguration.setup((x) => x.inspect("advancedExecutables"))
+                .returns(() => details as any);
 
             let items: vscode.QuickPickItem[] = It.isAny();
             let options: vscode.QuickPickOptions = It.isAny();
@@ -724,10 +728,26 @@ describe("Commands", () => {
                 { name: "foo" },
                 { name: "bar" },
             ];
-            selected = { label: "$(debug-console) foo", entry: advancedExecutables[0] } as vscode.QuickPickItem;
+            selected = {
+                label: "$(debug-console) foo",
+                entry: advancedExecutables[0],
+                config: mocks.workspaceConfiguration.object
+            } as vscode.QuickPickItem;
+
             await subject.removeTestMateEntry();
             mocks.workspaceConfiguration.verify((x) => x.update("advancedExecutables", [advancedExecutables[1]]),
                 Times.once());
+        });
+        it("removes setting if empty", async () => {
+            advancedExecutables = [{ name: "foo" }];
+            selected = {
+                label: "$(debug-console) foo",
+                entry: advancedExecutables[0],
+                config: mocks.workspaceConfiguration.object
+            } as vscode.QuickPickItem;
+
+            await subject.removeTestMateEntry();
+            mocks.workspaceConfiguration.verify((x) => x.update("advancedExecutables", undefined), Times.once());
         });
     });
     describe("removeDebugConfiguration()", () => {
