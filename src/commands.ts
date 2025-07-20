@@ -44,6 +44,10 @@ interface IEntryItem<T> extends QuickPickItem {
     entry: T
 }
 
+interface IEntryWithConfigItem<T> extends IEntryItem<T> {
+    config: vscode.WorkspaceConfiguration
+}
+
 export class Commands {
     private _lastDebuggingSession: { ws: WorkspaceFolder | undefined, config: DebugConfiguration } | undefined;
     private _updateEnvExecutions: Map<string, IAsyncExecution>;
@@ -100,9 +104,6 @@ export class Commands {
     }
 
     public async removeTestMateEntry() {
-        const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test");
-        let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
-
         interface Executable {
             name?: string,
             groupByLabel?: {
@@ -110,13 +111,26 @@ export class Commands {
                 description?: string
             };
         }
-        const choices: IEntryItem<Executable>[] = advancedExecutables.map((executable: Executable) => {
-            return {
-                description: executable.groupByLabel?.description,
-                entry: executable,
-                label: `$(debug-console) ${executable.groupByLabel?.label || executable.name}`,
+
+        let choices: IEntryWithConfigItem<Executable>[] = [];
+        for (const scope of [...vscode.workspace.workspaceFolders || [], null]) {
+            const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test", scope);
+            const details = vscode.workspace.getConfiguration("testMate.cpp.test", scope).inspect("advancedExecutables");
+            if (scope && details && !details.workspaceFolderValue) {
+                continue;
             }
-        });
+            let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
+            const scopedChoices: IEntryWithConfigItem<Executable>[] = advancedExecutables.map((executable: Executable) => {
+                return {
+                    description: executable.groupByLabel?.description,
+                    entry: executable,
+                    label: `$(debug-console) ${executable.groupByLabel?.label || executable.name}`,
+                    config: testMateConfig
+                }
+            });
+            choices = choices.concat(scopedChoices);
+        }
+
         if (choices.length == 0) {
             throw new Error("There are no TestMate C++ entries to remove");
         }
@@ -130,10 +144,17 @@ export class Commands {
         if (!entry) {
             return;
         }
+        const testMateConfig = entry.config;
+        let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
         advancedExecutables = advancedExecutables.filter((executable) => {
             return JSON.stringify(executable) !== JSON.stringify(entry.entry);
         });
-        testMateConfig.update("advancedExecutables", advancedExecutables);
+        if (advancedExecutables.length === 0) {
+            // If there are no more advanced executables, remove the setting
+            await testMateConfig.update("advancedExecutables", undefined);
+            return;
+        }
+        await testMateConfig.update("advancedExecutables", advancedExecutables);
     }
 
     public async removeDebugConfiguration() {
