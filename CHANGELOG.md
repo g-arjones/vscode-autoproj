@@ -8,6 +8,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Handle workspace folder local configuration when removing testmate entries ([#49](https://github.com/g-arjones/vscode-autoproj/pull/49))
 - Implement 'Add C/C++ launch configuration command' ([#48](https://github.com/g-arjones/vscode-autoproj/pull/48))
 - Do not require saving the workspace ([#47](https://github.com/g-arjones/vscode-autoproj/pull/47))
+- Wait before installing bundle if autoproj is updating ([#46](https://github.com/g-arjones/vscode-autoproj/pull/46))
 
 ## 0.2.5
 - Improve startup time by improving activation event ([#44](https://github.com/g-arjones/vscode-autoproj/pull/44))
