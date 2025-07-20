@@ -46,6 +46,7 @@ interface IEntryItem<T> extends QuickPickItem {
 
 interface IEntryWithConfigItem<T> extends IEntryItem<T> {
     config: vscode.WorkspaceConfiguration
+    target: vscode.ConfigurationTarget
 }
 
 export class Commands {
@@ -125,7 +126,8 @@ export class Commands {
                     description: executable.groupByLabel?.description,
                     entry: executable,
                     label: `$(debug-console) ${executable.groupByLabel?.label || executable.name}`,
-                    config: testMateConfig
+                    config: testMateConfig,
+                    target: scope ? vscode.ConfigurationTarget.WorkspaceFolder : vscode.ConfigurationTarget.Workspace,
                 }
             });
             choices = choices.concat(scopedChoices);
@@ -151,23 +153,33 @@ export class Commands {
         });
         if (advancedExecutables.length === 0) {
             // If there are no more advanced executables, remove the setting
-            await testMateConfig.update("advancedExecutables", undefined);
+            await testMateConfig.update("advancedExecutables", undefined, entry.target);
             return;
         }
-        await testMateConfig.update("advancedExecutables", advancedExecutables);
+        await testMateConfig.update("advancedExecutables", advancedExecutables, entry.target);
     }
 
     public async removeDebugConfiguration() {
-        const launch = vscode.workspace.getConfiguration("launch");
-        let configurations = (launch.configurations || []) as DebugConfiguration[];
-
-        const choices: IEntryItem<DebugConfiguration>[] = configurations.map((configuration) => {
-            return {
-                description: configuration.type,
-                entry: configuration,
-                label: `$(debug) ${configuration.name}`,
+        const choices: IEntryWithConfigItem<DebugConfiguration>[] = [];
+        for (const scope of [...vscode.workspace.workspaceFolders || [], null]) {
+            const launch = vscode.workspace.getConfiguration("launch", scope);
+            const details = vscode.workspace.getConfiguration("launch", scope).inspect("configurations");
+            if (scope && details && !details.workspaceFolderValue) {
+                continue;
             }
-        });
+            let configurations = (launch.configurations || []) as DebugConfiguration[];
+            const scopedChoices: IEntryWithConfigItem<DebugConfiguration>[] = configurations.map((configuration) => {
+                return {
+                    description: configuration.type,
+                    entry: configuration,
+                    label: `$(debug) ${configuration.name}`,
+                    config: launch,
+                    target: scope ? vscode.ConfigurationTarget.WorkspaceFolder : vscode.ConfigurationTarget.Workspace,
+                }
+            });
+            choices.push(...scopedChoices);
+        }
+
         if (choices.length == 0) {
             throw new Error("There are no launch configurations to remove");
         }
@@ -181,10 +193,11 @@ export class Commands {
         if (!entry) {
             return;
         }
+        let configurations = entry.config.get("configurations") as Array<DebugConfiguration>;
         configurations = configurations.filter((configuration) => {
             return JSON.stringify(configuration) !== JSON.stringify(entry.entry);
         });
-        launch.update("configurations", configurations);
+        await entry.config.update("configurations", configurations, entry.target);
     }
 
     public async packagePickerChoices(): Promise<IFolderItem[]> {
