@@ -538,30 +538,69 @@ describe("Commands", () => {
         });
         describe("in a non empty workspace", () => {
             let pkg: autoproj.IPackage;
-            let root: string;
-            let currentConfigs: { name: string }[];
             beforeEach(() => {
-                root = builder1.fs.root;
                 subject = new commands.Commands(workspaces, mocks.logOutputChannel.object);
 
                 pkg = builder1.addPackage("foobar");
                 workspaces.addFolder(pkg.srcdir);
-                subject["_lastDebuggingSession"] = { ws: "" as any, config: { name: "foobar (gdb)" } as any };
-                mocks.getConfiguration.setup((x) => x("launch")).returns(() => mocks.workspaceConfiguration.object);
-                mocks.workspaceConfiguration.setup((x) => x.configurations).returns(() => currentConfigs);
-                using(mocks.getConfiguration);
+
+                const lastConfig: vscode.DebugConfiguration = {
+                    "name": "foo",
+                    "type": "cppdbg",
+                    "request": "launch"
+                };
+                subject["_lastDebuggingSession"] = { ws: "" as any, config: lastConfig };
+            });
+            afterEach(async () => {
+                await vscode.workspace.getConfiguration("launch").update("configurations", undefined);
             });
             it("does not add the same launch configuration", async () => {
-                currentConfigs = [{ name: "foobar (gdb)" }]
+                const currentConfigs: vscode.DebugConfiguration[] = [{
+                    "name": "foo",
+                    "type": "cppdbg",
+                    "request": "launch"
+                }];
+                await vscode.workspace.getConfiguration("launch").update("configurations", currentConfigs);
                 await subject.saveLastDebuggingSession();
-                mocks.workspaceConfiguration.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
+                const newConfigs = vscode.workspace.getConfiguration("launch").get("configurations");
+                assert.deepStrictEqual(newConfigs, currentConfigs);
             });
-            it("sorts launch configurations while addings", async () => {
-                currentConfigs = [{ name: "a" }, { name: "c"}];
-                subject["_lastDebuggingSession"] = { ws: "" as any, config: { name: "b" } as any };
+            it("sorts launch configurations while adding a new one", async () => {
+                const currentConfigs: vscode.DebugConfiguration[] = [
+                    {
+                        "name": "w",
+                        "type": "cppdbg",
+                        "request": "launch"
+                    },
+                    {
+                        "name": "a",
+                        "type": "cppdbg",
+                        "request": "launch"
+                    },
+                ];
+
+                await vscode.workspace.getConfiguration("launch").update("configurations", currentConfigs);
                 await subject.saveLastDebuggingSession();
-                const expectedConfigs = [{ name: "a" }, { name: "b" }, { name: "c" }];
-                mocks.workspaceConfiguration.verify((x) => x.update("configurations", expectedConfigs), Times.once());
+
+                const expectedConfigs = [
+                    {
+                        "name": "a",
+                        "type": "cppdbg",
+                        "request": "launch"
+                    },
+                    {
+                        "name": "foo",
+                        "type": "cppdbg",
+                        "request": "launch"
+                    },
+                    {
+                        "name": "w",
+                        "type": "cppdbg",
+                        "request": "launch"
+                    }
+                ];
+                const newConfigs = vscode.workspace.getConfiguration("launch").get("configurations");
+                assert.deepStrictEqual(newConfigs, expectedConfigs);
             });
         });
     });
