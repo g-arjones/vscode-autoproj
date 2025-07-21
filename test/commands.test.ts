@@ -858,7 +858,7 @@ describe("Commands", () => {
     });
     describe("addPackageToTestMate()", () => {
         let advancedExecutables;
-        let selected: commands.IPackageItem | undefined;
+        let pick: number | undefined;
         beforeEach(() => {
             mocks.getConfiguration.setup((x) => x("testMate.cpp.test"))
                 .returns(() => mocks.workspaceConfiguration.object);
@@ -867,7 +867,9 @@ describe("Commands", () => {
 
             let items: vscode.QuickPickItem[] = It.isAny();
             let options: vscode.QuickPickOptions = It.isAny();
-            mocks.showQuickPick.setup((x) => x(items, options)).returns(() => Promise.resolve(selected));
+            mocks.showQuickPick.setup((x) => x(items, options)).returns((i, o) => {
+                return Promise.resolve(pick != undefined ? i[pick] : undefined);
+            });
             using(mocks.getConfiguration, mocks.showQuickPick);
         });
         it("throws if workspace is empty", async () => {
@@ -890,7 +892,6 @@ describe("Commands", () => {
                 await host.addFolders(pkg1.srcdir, pkg2.srcdir, pkg3.srcdir);
             });
             it("does nothing if user cancels", async () => {
-                selected = undefined;
                 await subject.addPackageToTestMate();
                 // packages with no builddir should be filtered
                 const expected = It.is((x: vscode.QuickPickItem[]) => {
@@ -933,12 +934,7 @@ describe("Commands", () => {
                 }
             }
             it("does nothing if package was already added", async () => {
-                selected = {
-                    description: builder1.workspace.name,
-                    label: `$(folder) ${pkg1.name}`,
-                    package: pkg1,
-                    workspace: builder1.workspace
-                };
+                pick = 1;
                 advancedExecutables = [testMateEntry(pkg1)];
 
                 await subject.addPackageToTestMate();
@@ -946,12 +942,7 @@ describe("Commands", () => {
                 mocks.workspaceConfiguration.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
             });
             it("adds and sorts the selected package", async () => {
-                selected = {
-                    description: builder1.workspace.name,
-                    label: `$(folder) ${pkg2.name}`,
-                    package: pkg2,
-                    workspace: builder1.workspace
-                };
+                pick = 0;
                 advancedExecutables = [testMateEntry(pkg1)];
 
                 const expected = [testMateEntry(pkg2), testMateEntry(pkg1)];
@@ -966,7 +957,7 @@ describe("Commands", () => {
             await assert.rejects(subject.enablePackageTests(), /No packages to enable tests/);
         })
         describe("in a non empty workspace", () => {
-            let selected: commands.IPackageItem | undefined;
+            let pick: number | undefined;
             let pkg1: autoproj.IPackage;
             let pkg2: autoproj.IPackage;
             let pkg3: autoproj.IPackage;
@@ -986,22 +977,18 @@ describe("Commands", () => {
                 let options: vscode.QuickPickOptions = It.isAny();
 
                 using(mocks.asyncSpawn, mocks.showQuickPick);
-                mocks.showQuickPick.setup((x) => x(items, options)).returns(() => Promise.resolve(selected));
+                mocks.showQuickPick.setup((x) => x(items, options)).returns((i, o) => {
+                    return Promise.resolve(pick != undefined ? i[pick] : undefined);
+                });
                 mocks.asyncSpawn.setup((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => execution);
 
             });
             it("does nothing if user cancels", async () => {
-                selected = undefined;
                 await subject.enablePackageTests();
                 mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), Times.never());
             });
             it("enables package tests", async () => {
-                selected = {
-                    description: builder1.workspace.name,
-                    label: `$(folder) ${pkg2.name}`,
-                    package: pkg2,
-                    workspace: builder1.workspace
-                };
+                pick = 0;
                 execution = {
                     childProcess: undefined as any,
                     returnCode: Promise.resolve(0)
@@ -1011,12 +998,7 @@ describe("Commands", () => {
                 mocks.asyncSpawn.verify((x) => x(It.isAny(), It.isAny(), cmd, It.isAny()), Times.once());
             });
             it("throws if command fails", async () => {
-                selected = {
-                    description: builder1.workspace.name,
-                    label: `$(folder) ${pkg2.name}`,
-                    package: pkg2,
-                    workspace: builder1.workspace
-                };
+                pick = 0;
                 execution = {
                     childProcess: undefined as any,
                     returnCode: Promise.resolve(1)
@@ -1024,12 +1006,7 @@ describe("Commands", () => {
                 await assert.rejects(subject.enablePackageTests(), /Could not enable 'bar' tests/);
             });
             it("throws if command cannot be executed", async () => {
-                selected = {
-                    description: builder1.workspace.name,
-                    label: `$(folder) ${pkg2.name}`,
-                    package: pkg2,
-                    workspace: builder1.workspace
-                };
+                pick = 0;
                 execution = {
                     childProcess: undefined as any,
                     returnCode: Promise.reject(new Error("ENOENT"))
