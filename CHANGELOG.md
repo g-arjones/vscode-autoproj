@@ -3,6 +3,9 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.3.1
+- Don't optout from python test adapter experiment ([#52](https://github.com/g-arjones/vscode-autoproj/pull/52))
+
 ## 0.3.0
 - Handle workspace folder local configuration when removing launch entries ([#50](https://github.com/g-arjones/vscode-autoproj/pull/50))
 - Handle workspace folder local configuration when removing testmate entries ([#49](https://github.com/g-arjones/vscode-autoproj/pull/49))

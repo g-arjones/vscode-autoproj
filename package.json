@@ -2,7 +2,7 @@
     "name": "autoproj",
     "displayName": "Autoproj",
     "description": "Base support for Autoproj workspaces",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "publisher": "arjones",
     "license": "SEE LICENSE IN LICENSE.txt",
     "icon": "images/icon.png",
