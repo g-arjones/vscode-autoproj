@@ -49,6 +49,12 @@ interface IEntryWithConfigItem<T> extends IEntryItem<T> {
     target: vscode.ConfigurationTarget
 }
 
+type IConfigItemCallback<T> = (
+    item: T,
+    config: vscode.WorkspaceConfiguration,
+    scope: vscode.ConfigurationScope | null
+) => IEntryWithConfigItem<T>;
+
 export class Commands {
     private _lastDebuggingSession: { ws: WorkspaceFolder | undefined, config: DebugConfiguration } | undefined;
     private _updateEnvExecutions: Map<string, IAsyncExecution>;
@@ -104,6 +110,51 @@ export class Commands {
         }
     }
 
+    private _mapConfigItemsToQuickPickItems<T>(
+        config: string,
+        section: string,
+        callback: IConfigItemCallback<T>
+    ): IEntryWithConfigItem<T>[] {
+        let choices: IEntryWithConfigItem<T>[] = [];
+        for (const scope of [...vscode.workspace.workspaceFolders || [], null]) {
+            const configuration = vscode.workspace.getConfiguration(config, scope);
+            const details = vscode.workspace.getConfiguration(config, scope).inspect(section);
+
+            if (scope && details && !details.workspaceFolderValue) {
+                continue;
+            }
+
+            const items = configuration.get<any[]>(section) || [];
+            const scopedChoices: IEntryWithConfigItem<T>[] = items.map((item: T) => {
+                return callback(item, configuration, scope);
+            });
+
+            choices.push(...scopedChoices);
+        }
+
+        choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
+        return choices;
+    }
+
+    private async _removeConfigItem<T>(
+        section: string,
+        entry: IEntryWithConfigItem<T>
+    ): Promise<void> {
+        const configuration = entry.config;
+        const items = (configuration.get<any[]>(section) || []).filter((item) => {
+            return JSON.stringify(item) !== JSON.stringify(entry.entry);
+        });
+
+        if (items.length === 0) {
+            // If there are no more items, remove the setting
+            await configuration.update(section, undefined, entry.target);
+            return;
+        }
+
+        // Otherwise, update the setting with the remaining items
+        await configuration.update(section, items, entry.target);
+    }
+
     public async removeTestMateEntry() {
         interface Executable {
             name?: string,
@@ -113,91 +164,63 @@ export class Commands {
             };
         }
 
-        let choices: IEntryWithConfigItem<Executable>[] = [];
-        for (const scope of [...vscode.workspace.workspaceFolders || [], null]) {
-            const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test", scope);
-            const details = vscode.workspace.getConfiguration("testMate.cpp.test", scope).inspect("advancedExecutables");
-            if (scope && details && !details.workspaceFolderValue) {
-                continue;
-            }
-            let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
-            const scopedChoices: IEntryWithConfigItem<Executable>[] = advancedExecutables.map((executable: Executable) => {
+        const choices = this._mapConfigItemsToQuickPickItems<Executable>("testMate.cpp.test", "advancedExecutables",
+            (executable, config, scope) => {
                 return {
                     description: executable.groupByLabel?.description,
                     entry: executable,
                     label: `$(debug-console) ${executable.groupByLabel?.label || executable.name}`,
-                    config: testMateConfig,
+                    config: config,
                     target: scope ? vscode.ConfigurationTarget.WorkspaceFolder : vscode.ConfigurationTarget.Workspace,
                 }
-            });
-            choices = choices.concat(scopedChoices);
-        }
+            }
+        );
 
         if (choices.length == 0) {
             throw new Error("There are no TestMate C++ entries to remove");
         }
 
-        choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
         const options: QuickPickOptions = {
             matchOnDescription: true,
             placeHolder: "Select an entry to remove from TestMate C++",
         };
+
         const entry = await vscode.window.showQuickPick(choices, options);
         if (!entry) {
             return;
         }
-        const testMateConfig = entry.config;
-        let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
-        advancedExecutables = advancedExecutables.filter((executable) => {
-            return JSON.stringify(executable) !== JSON.stringify(entry.entry);
-        });
-        if (advancedExecutables.length === 0) {
-            // If there are no more advanced executables, remove the setting
-            await testMateConfig.update("advancedExecutables", undefined, entry.target);
-            return;
-        }
-        await testMateConfig.update("advancedExecutables", advancedExecutables, entry.target);
+
+        await this._removeConfigItem("advancedExecutables", entry);
     }
 
     public async removeDebugConfiguration() {
-        const choices: IEntryWithConfigItem<DebugConfiguration>[] = [];
-        for (const scope of [...vscode.workspace.workspaceFolders || [], null]) {
-            const launch = vscode.workspace.getConfiguration("launch", scope);
-            const details = vscode.workspace.getConfiguration("launch", scope).inspect("configurations");
-            if (scope && details && !details.workspaceFolderValue) {
-                continue;
-            }
-            let configurations = (launch.configurations || []) as DebugConfiguration[];
-            const scopedChoices: IEntryWithConfigItem<DebugConfiguration>[] = configurations.map((configuration) => {
+        const choices = this._mapConfigItemsToQuickPickItems<DebugConfiguration>("launch", "configurations",
+            (configuration, launch, scope) => {
                 return {
                     description: configuration.type,
                     entry: configuration,
                     label: `$(debug) ${configuration.name}`,
                     config: launch,
                     target: scope ? vscode.ConfigurationTarget.WorkspaceFolder : vscode.ConfigurationTarget.Workspace,
-                }
-            });
-            choices.push(...scopedChoices);
-        }
+                };
+            }
+        );
 
         if (choices.length == 0) {
             throw new Error("There are no launch configurations to remove");
         }
 
-        choices.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
         const options: QuickPickOptions = {
             matchOnDescription: true,
             placeHolder: "Select a launch configuration to remove",
         };
+
         const entry = await vscode.window.showQuickPick(choices, options);
         if (!entry) {
             return;
         }
-        let configurations = entry.config.get("configurations") as Array<DebugConfiguration>;
-        configurations = configurations.filter((configuration) => {
-            return JSON.stringify(configuration) !== JSON.stringify(entry.entry);
-        });
-        await entry.config.update("configurations", configurations, entry.target);
+
+        await this._removeConfigItem("configurations", entry);
     }
 
     public async packagePickerChoices(): Promise<IFolderItem[]> {
@@ -282,26 +305,8 @@ export class Commands {
         }
     }
 
-    public async addPackageToTestMate() {
-        let packages = await this.getPackagesInCodeWorkspace();
-        if (packages.length == 0) {
-            throw new Error("No packages to add");
-        }
-
-        packages = packages.filter((pkg) => pkg.package.builddir);
-        const options: QuickPickOptions = {
-            matchOnDescription: true,
-            placeHolder: "Select a package to add to TestMate C++",
-        };
-
-        const selectedPackage = await vscode.window.showQuickPick(packages, options);
-        if (!selectedPackage) {
-            return;
-        }
-
-        const ws = selectedPackage.workspace;
-        const pkg = selectedPackage.package;
-        const advancedExecutable = {
+    private _testMateEntry(pkg: autoproj.IPackage, ws: autoproj.Workspace): any {
+        return {
             "name": pkg.name,
             "pattern": path.join(pkg.builddir, "**", "*{test,Test,TEST}*"),
             "cwd": "${absDirpath}",
@@ -331,6 +336,28 @@ export class Commands {
                 "miDebuggerPath": path.join(ws.root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb")
             }
         }
+    }
+
+    public async addPackageToTestMate() {
+        let packages = await this.getPackagesInCodeWorkspace();
+        if (packages.length == 0) {
+            throw new Error("No packages to add");
+        }
+
+        packages = packages.filter((pkg) => pkg.package.builddir);
+        const options: QuickPickOptions = {
+            matchOnDescription: true,
+            placeHolder: "Select a package to add to TestMate C++",
+        };
+
+        const selectedPackage = await vscode.window.showQuickPick(packages, options);
+        if (!selectedPackage) {
+            return;
+        }
+
+        const ws = selectedPackage.workspace;
+        const pkg = selectedPackage.package;
+        const advancedExecutable = this._testMateEntry(pkg, ws);
 
         const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test");
         let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
@@ -625,6 +652,30 @@ export class Commands {
         return defaultUri;
     }
 
+    private _debugConfiguration(testExecutable: ITestExecuable, args: string): DebugConfiguration {
+        const debuggerPath = path.join(testExecutable.workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb");
+        return {
+            "name": testExecutable.name,
+            "type": "cppdbg",
+            "request": "launch",
+            "cwd": path.dirname(testExecutable.path),
+            "program": testExecutable.path,
+            "args": [...shlex.split(args)],
+            "stopAtEntry": false,
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": debuggerPath,
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    }
+
     public async generateDebugConfiguration() {
         const workspaceList = [...this._workspaces.workspaces.values()];
         if (workspaceList.length == 0) {
@@ -645,29 +696,10 @@ export class Commands {
             return;
         }
 
-        const debuggerPath = path.join(testExecutable.workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "gdb");
         const srcdir = Uri.file(testExecutable.package?.srcdir || testExecutable.workspace.root);
         const parentWs = vscode.workspace.getWorkspaceFolder(srcdir);
-        const config = {
-            "name": testExecutable.name,
-            "type": "cppdbg",
-            "request": "launch",
-            "cwd": path.dirname(testExecutable.path),
-            "program": testExecutable.path,
-            "args": [...shlex.split(args)],
-            "stopAtEntry": false,
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "miDebuggerPath": debuggerPath,
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ]
-        }
+        const config = this._debugConfiguration(testExecutable, args);
+
         return { config: config, ws: parentWs };
     }
 
