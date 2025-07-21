@@ -91,21 +91,16 @@ describe("configManager", () => {
             await subject.setupPythonExtension();
 
             m.workspaceConfiguration.verify((x) => x.update("python.defaultInterpreterPath", It.isAny()), Times.never());
-            m.workspaceConfiguration.verify((x) => x.update("optOutFrom", It.isAny(), It.isAny()), Times.never());
         })
         it("sets the default python interpreter", async () => {
             builder.fs.mkdir(".autoproj", "bin");
             builder.fs.mkfile("", ".autoproj", "bin", "python");
 
             m.getConfiguration.setup((x) => x()).returns(() => m.workspaceConfiguration.object);
-            m.getConfiguration.setup((x) => x("python.experiments")).returns(() => m.workspaceConfiguration.object);
-            m.workspaceConfiguration.setup((x) => x.get<string[]>("optOutFrom")).returns(() => ["foobar"]);
             await subject.setupPythonExtension();
 
             const pythonShimPath = path.join(builder.root, shims.ShimsWriter.RELATIVE_SHIMS_PATH, "python");
             m.workspaceConfiguration.verify((x) => x.update("python.defaultInterpreterPath", pythonShimPath), Times.once());
-            m.workspaceConfiguration.verify((x) => x.update("optOutFrom",
-                ["foobar", "pythonTestAdapter"], vscode.ConfigurationTarget.Global), Times.once());
         })
     });
     describe("setupRubyExtension()", () => {

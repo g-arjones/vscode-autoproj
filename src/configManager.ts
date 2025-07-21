@@ -43,12 +43,6 @@ export class ConfigManager {
 
         const pythonShimPath = path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "python");
         vscode.workspace.getConfiguration().update("python.defaultInterpreterPath", pythonShimPath);
-
-        const experiments = vscode.workspace.getConfiguration("python.experiments");
-        const optOutFrom = experiments.get<string[]>("optOutFrom") || [];
-
-        experiments.update("optOutFrom", [...new Set([...optOutFrom, "pythonTestAdapter"])],
-            vscode.ConfigurationTarget.Global);
     }
 
     public setupTestMate() {
