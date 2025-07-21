@@ -779,7 +779,6 @@ describe("Commands", () => {
             await assert.rejects(subject.removeDebugConfiguration(), /There are no launch configurations to remove/);
         });
         it("does nothing if user cancels", async () => {
-
             await vscode.workspace.getConfiguration("launch").update("configurations", debugConfigs);
             await subject.removeDebugConfiguration();
             const expected = It.is((x: vscode.QuickPickItem[]) => {
@@ -816,7 +815,6 @@ describe("Commands", () => {
             rmdirSync(path.join(pkg.srcdir, ".vscode"));
 
             assert.deepStrictEqual(actual, expected);
-
         });
     });
     describe("addPackageToTestMate()", () => {
