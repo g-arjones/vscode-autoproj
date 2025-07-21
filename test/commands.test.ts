@@ -692,7 +692,7 @@ describe("Commands", () => {
     });
     describe("removeTestMateEntry()", () => {
         let advancedExecutables;
-        let selected: vscode.QuickPickItem | undefined;
+        let pick: number | undefined;
         let details: { workspaceFolderValue };
         beforeEach(() => {
             details = { workspaceFolderValue: undefined };
@@ -705,7 +705,9 @@ describe("Commands", () => {
 
             let items: vscode.QuickPickItem[] = It.isAny();
             let options: vscode.QuickPickOptions = It.isAny();
-            mocks.showQuickPick.setup((x) => x(items, options)).returns(() => Promise.resolve(selected));
+            mocks.showQuickPick.setup((x) => x(items, options)).returns((i, o) => {
+                return Promise.resolve(pick != undefined ? i[pick] : undefined);
+            });
             using(mocks.getConfiguration, mocks.showQuickPick);
         });
         it("throws if there are not executables to remove", async () => {
@@ -729,13 +731,7 @@ describe("Commands", () => {
                 { name: "foo" },
                 { name: "bar" },
             ];
-            selected = {
-                label: "$(debug-console) foo",
-                entry: advancedExecutables[0],
-                config: mocks.workspaceConfiguration.object,
-                target: vscode.ConfigurationTarget.Workspace
-            } as vscode.QuickPickItem;
-
+            pick = 1;
             await subject.removeTestMateEntry();
             mocks.workspaceConfiguration.verify((x) => {
                     x.update("advancedExecutables", [advancedExecutables[1]], vscode.ConfigurationTarget.Workspace)
@@ -744,13 +740,7 @@ describe("Commands", () => {
         });
         it("removes setting if empty", async () => {
             advancedExecutables = [{ name: "foo" }];
-            selected = {
-                label: "$(debug-console) foo",
-                entry: advancedExecutables[0],
-                config: mocks.workspaceConfiguration.object,
-                target: vscode.ConfigurationTarget.Workspace
-            } as vscode.QuickPickItem;
-
+            pick = 0;
             await subject.removeTestMateEntry();
             mocks.workspaceConfiguration.verify((x) => {
                     x.update("advancedExecutables", undefined, vscode.ConfigurationTarget.Workspace)
@@ -759,12 +749,27 @@ describe("Commands", () => {
         });
     });
     describe("removeDebugConfiguration()", () => {
-        let debugConfigs;
-        let selected: vscode.QuickPickItem | undefined;
+        let pick: number | undefined;
+        const debugConfigs = [
+            {
+                "name": "foo",
+                "type": "cppdbg",
+                "request": "launch",
+                "program": "/path/to/foo"
+            },
+            {
+                "name": "bar",
+                "type": "cppdbg",
+                "request": "launch",
+                "program": "/path/to/bar"
+            }
+        ];
         beforeEach(() => {
             let items: vscode.QuickPickItem[] = It.isAny();
             let options: vscode.QuickPickOptions = It.isAny();
-            mocks.showQuickPick.setup((x) => x(items, options)).returns(() => Promise.resolve(selected));
+            mocks.showQuickPick.setup((x) => x(items, options)).returns((i, o) => {
+                return Promise.resolve(pick != undefined ? i[pick] : undefined);
+            });
             using(mocks.showQuickPick);
         });
         afterEach(async () => {
@@ -774,20 +779,7 @@ describe("Commands", () => {
             await assert.rejects(subject.removeDebugConfiguration(), /There are no launch configurations to remove/);
         });
         it("does nothing if user cancels", async () => {
-            debugConfigs = [
-                {
-                    "name": "foo",
-                    "type": "cppdbg",
-                    "request": "launch",
-                    "program": "/path/to/foo"
-                },
-                {
-                    "name": "bar",
-                    "type": "cppdbg",
-                    "request": "launch",
-                    "program": "/path/to/bar"
-                }
-            ];
+
             await vscode.workspace.getConfiguration("launch").update("configurations", debugConfigs);
             await subject.removeDebugConfiguration();
             const expected = It.is((x: vscode.QuickPickItem[]) => {
@@ -798,52 +790,16 @@ describe("Commands", () => {
             assert.deepStrictEqual(debugConfigs, vscode.workspace.getConfiguration("launch").get("configurations"));
         });
         it("removes the selected entry", async () => {
-            debugConfigs = [
-                {
-                    "name": "foo",
-                    "type": "cppdbg",
-                    "request": "launch",
-                    "program": "/path/to/foo"
-                },
-                {
-                    "name": "bar",
-                    "type": "cppdbg",
-                    "request": "launch",
-                    "program": "/path/to/bar"
-                }
-            ];
             await vscode.workspace.getConfiguration("launch", null)
                 .update("configurations", debugConfigs, vscode.ConfigurationTarget.Workspace);
 
-            selected = {
-                label: "$(debug-console) foo",
-                entry: debugConfigs[0],
-                config: vscode.workspace.getConfiguration("launch", null),
-                target: vscode.ConfigurationTarget.Workspace
-            } as vscode.QuickPickItem;
-
-
+            pick = 1;
             await subject.removeDebugConfiguration();
             const expected = [debugConfigs[1]];
 
             assert.deepStrictEqual(expected, vscode.workspace.getConfiguration("launch").get("configurations"));
         });
         it("removes locally scoped launch configuration", async () => {
-            debugConfigs = [
-                {
-                    "name": "foo",
-                    "type": "cppdbg",
-                    "request": "launch",
-                    "program": "/path/to/foo"
-                },
-                {
-                    "name": "bar",
-                    "type": "cppdbg",
-                    "request": "launch",
-                    "program": "/path/to/bar"
-                }
-            ];
-
             workspaces.add(builder1.workspace);
             const pkg = builder1.addPackage("foo");
             workspaces.addFolder(pkg.srcdir);
@@ -851,14 +807,7 @@ describe("Commands", () => {
             await vscode.workspace.getConfiguration("launch", vscode.Uri.file(pkg.srcdir))
                 .update("configurations", debugConfigs, vscode.ConfigurationTarget.WorkspaceFolder);
 
-            selected = {
-                label: "$(debug-console) foo",
-                entry: debugConfigs[0],
-                config: vscode.workspace.getConfiguration("launch", vscode.Uri.file(pkg.srcdir)),
-                target: vscode.ConfigurationTarget.WorkspaceFolder,
-                scope: vscode.Uri.file(pkg.srcdir)
-            } as vscode.QuickPickItem;
-
+            pick = 1;
             await subject.removeDebugConfiguration();
             const expected = [debugConfigs[1]];
             const actual = vscode.workspace.getConfiguration("launch", vscode.Uri.file(pkg.srcdir)).get("configurations");
