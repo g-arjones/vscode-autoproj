@@ -116,7 +116,13 @@ export class Commands {
         callback: IConfigItemCallback<T>
     ): IEntryWithConfigItem<T>[] {
         let choices: IEntryWithConfigItem<T>[] = [];
-        for (const scope of [...vscode.workspace.workspaceFolders || [], null]) {
+        let scopes: Array<vscode.WorkspaceFolder | null> = [...(vscode.workspace.workspaceFolders || [])];
+
+        if (vscode.workspace.workspaceFile) {
+            scopes.push(null);  // Add null for Workspace scope
+        }
+
+        for (const scope of scopes) {
             const configuration = vscode.workspace.getConfiguration(config, scope);
             const details = vscode.workspace.getConfiguration(config, scope).inspect(section);
 
