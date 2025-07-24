@@ -413,12 +413,12 @@
                 "autoproj.tasks.workspace.build": {
                     "type": "boolean",
                     "description": "Provide \"Build all packages\" tasks",
-                    "default": false
+                    "default": true
                 },
                 "autoproj.tasks.workspace.updateConfig": {
                     "type": "boolean",
                     "description": "Provide \"Update Configuration\" tasks",
-                    "default": false
+                    "default": true
                 },
                 "autoproj.tasks.workspace.installOsdeps": {
                     "type": "boolean",
@@ -428,12 +428,12 @@
                 "autoproj.tasks.workspace.update": {
                     "type": "boolean",
                     "description": "Provide \"Update all packages\" tasks",
-                    "default": false
+                    "default": true
                 },
                 "autoproj.tasks.workspace.checkout": {
                     "type": "boolean",
-                    "description": "Provide \"Checkout all packages\" tasks",
-                    "default": false
+                    "description": "Provide \"Checkout missing packages\" tasks",
+                    "default": true
                 }
             }
         }

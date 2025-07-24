@@ -226,7 +226,7 @@ describe("Task provider", () => {
     function assertCheckoutTask(task: vscode.Task, wsRoot: string, pkgPath?: string, pkgName?: string) {
         const process = autoprojExePath(pkgPath ? pkgPath : wsRoot);
         const args = ["update", "-k", "--color", "--checkout-only"];
-        let name = `${pathBasename(wsRoot)}: Checkout all packages`;
+        let name = `${pathBasename(wsRoot)}: Checkout missing packages`;
         let scope = vscode.workspace.workspaceFolders![0];
         let defs: tasks.ITaskDefinition = { type: "", workspace: wsRoot };
 
