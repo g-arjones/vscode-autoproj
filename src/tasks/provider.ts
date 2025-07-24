@@ -132,7 +132,7 @@ export class AutoprojProvider implements vscode.TaskProvider {
             }
 
             if (checkout) {
-                this._addTask(ws.root, this._createCheckoutTask(`${ws.name}: Checkout all packages`,
+                this._addTask(ws.root, this._createCheckoutTask(`${ws.name}: Checkout missing packages`,
                     ws, "workspace"), this._checkoutTasks);
             }
 
