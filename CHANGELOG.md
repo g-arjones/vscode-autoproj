@@ -3,6 +3,9 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.3.3
+- Update tasks that are enabled by default (#[54](https://github.com/g-arjones/vscode-autoproj/pull/54))
+
 ## 0.3.2
 - Fix packages being shown twice in some commands ([#53](https://github.com/g-arjones/vscode-autoproj/pull/53))
 
