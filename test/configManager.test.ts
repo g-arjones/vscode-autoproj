@@ -90,9 +90,9 @@ describe("configManager", () => {
         it("does nothing if autoproj python shim does not exist", async () => {
             await subject.setupPythonExtension();
 
-            m.workspaceConfiguration.verify((x) => x.update("python.defaultInterpreterPath", It.isAny()), Times.never());
+            m.workspaceConfiguration.verify((x) => x.update(It.isAny(), It.isAny()), Times.never());
         })
-        it("sets the default python interpreter", async () => {
+        it("sets python extension configurations", async () => {
             builder.fs.mkdir(".autoproj", "bin");
             builder.fs.mkfile("", ".autoproj", "bin", "python");
 
@@ -101,7 +101,8 @@ describe("configManager", () => {
 
             const pythonShimPath = path.join(builder.root, shims.ShimsWriter.RELATIVE_SHIMS_PATH, "python");
             m.workspaceConfiguration.verify((x) => x.update("python.defaultInterpreterPath", pythonShimPath), Times.once());
-        })
+            m.workspaceConfiguration.verify((x) => x.update("python.useEnvironmentsExtension", false), Times.once());
+        });
     });
     describe("setupRubyExtension()", () => {
         let mockBundleWatcher: IMock<BundleWatcher>;
