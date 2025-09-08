@@ -43,6 +43,7 @@ export class ConfigManager {
 
         const pythonShimPath = path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH, "python");
         vscode.workspace.getConfiguration().update("python.defaultInterpreterPath", pythonShimPath);
+        vscode.workspace.getConfiguration().update("python.useEnvironmentsExtension", false);
     }
 
     public setupTestMate() {
