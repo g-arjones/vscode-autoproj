@@ -3,6 +3,9 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.3.4
+- Disable python environments extension on autoproj workspaces (#[55](https://github.com/g-arjones/vscode-autoproj/pull/55))
+
 ## 0.3.3
 - Update tasks that are enabled by default (#[54](https://github.com/g-arjones/vscode-autoproj/pull/54))
 
