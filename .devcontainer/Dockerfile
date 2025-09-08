@@ -1,5 +1,5 @@
 FROM ubuntu:24.04
-ENV NODE_VERSION=20.19.5
+ENV NODE_VERSION=22.19.0
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
                                    apt-get install -y --no-install-recommends ca-certificates \
