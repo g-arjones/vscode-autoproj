@@ -1,6 +1,4 @@
 FROM ubuntu:24.04
-ENV NODE_VERSION=22.19.0
-
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
                                    apt-get install -y --no-install-recommends ca-certificates \
                                                                               dbus \
@@ -11,9 +9,12 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
                                                                               xvfb \
                                                                               xz-utils
 
-RUN wget -qO- https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz | \
-    tar Jxvf - -C /usr --strip-components 1
+ENV NODE_VERSION=22.19.0
+RUN mkdir /opt/nodejs && \
+    wget -qO- https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz | \
+    tar Jxvf - -C /opt/nodejs --strip-components=1
 
+ENV PATH="/opt/nodejs/bin:$PATH"
 RUN wget -q -O /tmp/code.deb 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64' && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends /tmp/code.deb && \
     apt-get clean && rm -rf /tmp/* /var/tmp/*
