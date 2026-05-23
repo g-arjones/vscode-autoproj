@@ -143,8 +143,8 @@ describe("configManager", () => {
 
                 const shimsPath = path.join(builder.root, ".autoproj", "vscode-autoproj", "bin");
                 m.workspaceConfiguration.verify((x) => x.update("rubyVersionManager", { identifier: "custom" }), Times.once());
-                m.workspaceConfiguration.verify((x) => x.update("customRubyCommand", `PATH=${shimsPath}:$PATH`), Times.once());
-                m.workspaceConfiguration.verify((x) => x.update("bundleGemfile", extensionGemfile), Times.once());
+                m.workspaceConfiguration.verify((x) => x.update("customRubyCommand", `PATH=${shimsPath}:$PATH`, true), Times.once());
+                m.workspaceConfiguration.verify((x) => x.update("bundleGemfile", extensionGemfile, true), Times.once());
             });
         });
     });
