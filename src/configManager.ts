@@ -68,8 +68,13 @@ export class ConfigManager {
         const shimsPath = path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH);
 
         await vscode.workspace.getConfiguration("rubyLsp").update("rubyVersionManager", { identifier: "custom" });
-        await vscode.workspace.getConfiguration("rubyLsp").update("customRubyCommand", `PATH=${shimsPath}:$PATH`);
-        await vscode.workspace.getConfiguration("rubyLsp").update("bundleGemfile", bundle.extensionGemfile);
+        // TODO:
+        // rubyLsp does not allow workspace scoped configuration of the customRubyCommand and bundleGemfile
+        // anymore. Temporarily set it globally, considering that the extension sets it on startup, this is not a big
+        // issue for users using Ruby in autoproj workspaces, but it might cause issues for users using Ruby in
+        // non-autoproj workspaces. Look into a better solution in the future.
+        await vscode.workspace.getConfiguration("rubyLsp").update("customRubyCommand", `PATH=${shimsPath}:$PATH`, true);
+        await vscode.workspace.getConfiguration("rubyLsp").update("bundleGemfile", bundle.extensionGemfile, true);
     }
 
     public async writeShims() {
