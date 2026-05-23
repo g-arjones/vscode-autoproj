@@ -3,6 +3,9 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.3.5
+- Set Ruby configurations globally (#[64](https://github.com/g-arjones/vscode-autoproj/pull/64))
+
 ## 0.3.4
 - Disable python environments extension on autoproj workspaces (#[55](https://github.com/g-arjones/vscode-autoproj/pull/55))
 
