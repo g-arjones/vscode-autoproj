@@ -676,6 +676,78 @@ describe("Commands", () => {
             });
         });
     });
+    describe("enableCmakeTestCoverage()", () => {
+        it("shows an error message if workspace is empty", async () => {
+            await assert.rejects(subject.enableCmakeTestCoverage(),
+                /Cannot enable CMake test coverage on an empty workspace/);
+        });
+        describe("in a real workspace", () => {
+            let mockSubject: IMock<commands.Commands>;
+            let root: string;
+            let supression: boolean;
+            beforeEach(() => {
+                root = builder1.fs.root;
+
+                workspaces.addFolder(root);
+                mocks.getConfiguration.setup((x) => x("autoproj")).returns(() => mocks.workspaceConfiguration.object);
+                mocks.workspaceConfiguration.setup((x) => x.get<boolean>("supressCmakeCoverageOverrideNotice"))
+                    .returns(() => supression);
+
+                supression = false;
+                subject = new commands.Commands(workspaces, mocks.logOutputChannel.object);
+                using(mocks.getConfiguration, mocks.showInformationMessage);
+            });
+            function assertNotice(show: boolean) {
+                const times = show ? Times.once() : Times.never();
+                mocks.showInformationMessage.verify((x) => x(It.isAny(), It.isAny(), It.isAny(), It.isAny()), times);
+            }
+            function assertSetSupression(update: boolean) {
+                const times = update ? Times.once() : Times.never();
+                mocks.workspaceConfiguration.verify((x) => x.update("supressCmakeCoverageOverrideNotice", true), times);
+            }
+            it("does nothing if user cancels", async () => {
+                mockSubject = Mock.ofInstance(subject);
+                mockSubject.callBase = true;
+                mockSubject.setup((x) => x.showWorkspacePicker()).returns(() => Promise.resolve(undefined));
+
+                await mockSubject.object.enableCmakeTestCoverage();
+                assertNotice(false);
+            });
+            it("throws if script cannot be created", async () => {
+                builder1.fs.mkfile("empty", "autoproj", "overrides.d"); // create file to make mkdir_p fail
+                await assert.rejects(subject.enableCmakeTestCoverage(), /Could not create overrides script/);
+                assertNotice(false);
+            });
+            describe("the overrides script is created", () => {
+                let filePath: string;
+                beforeEach(() => {
+                    builder1.fs.registerDir("autoproj", "overrides.d");
+                    builder1.fs.registerFile("autoproj", "overrides.d", "vscode-autoproj-cmake-coverage.rb");
+                    filePath = path.join(root, "autoproj", "overrides.d", "vscode-autoproj-cmake-coverage.rb");
+                });
+                it("creates the overrides script", async () => {
+                    await subject.enableCmakeTestCoverage();
+                    assert(await fs.exists(filePath));
+                    assertNotice(true);
+                    assertSetSupression(false);
+                });
+                it("does not show notice if supressed", async () => {
+                    supression = true;
+                    await subject.enableCmakeTestCoverage();
+                    assertNotice(false);
+                    assertSetSupression(false);
+                });
+                it("supresses future notices", async () => {
+                    const doNotShowAgainClicked = Promise.resolve({ isCloseAffordance: false });
+                    mocks.showInformationMessage.setup((x) => x(
+                        It.isAny(), It.isAny(), It.isAny(), It.isAny())).returns(() => doNotShowAgainClicked);
+
+                    await subject.enableCmakeTestCoverage();
+                    assertSetSupression(true);
+                });
+            });
+        });
+    });
     describe("openWorkspace()", () => {
         let options: vscode.OpenDialogOptions;
         let selectedUri: vscode.Uri | undefined;
@@ -1108,6 +1180,7 @@ describe("Commands", () => {
                 setupMocks("saveLastDebuggingSession", "autoproj.saveLastDebuggingSession"),
                 setupMocks("restartDebugging", "autoproj.restartDebugging"),
                 setupMocks("enableCmakeDebuggingSymbols", "autoproj.enableCmakeDebuggingSymbols"),
+                setupMocks("enableCmakeTestCoverage", "autoproj.enableCmakeTestCoverage"),
                 setupMocks("addPackageToTestMate", "autoproj.addPackageToTestMate"),
                 setupMocks("removeTestMateEntry", "autoproj.removeTestMateEntry"),
                 setupMocks("removeDebugConfiguration", "autoproj.removeDebugConfiguration"),
