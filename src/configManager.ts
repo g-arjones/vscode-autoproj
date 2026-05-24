@@ -6,6 +6,7 @@ import { isSubdirOf } from "./util";
 import { BundleManager } from "./bundleWatcher";
 import { ShimsWriter } from "./shimsWriter";
 import { fs } from "./cmt/pr";
+import { AUTOPROJ_GCOV_ADAPTER_LABEL } from "./coverage";
 
 export class ConfigManager {
     private _shimsWriter: ShimsWriter;
@@ -49,6 +50,9 @@ export class ConfigManager {
     public setupTestMate() {
         const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test");
         testMateConfig.update("executables", "");
+
+        const testMateCoverageConfig = vscode.workspace.getConfiguration("testMate.cpp.coverage");
+        testMateCoverageConfig.update("profile.default", AUTOPROJ_GCOV_ADAPTER_LABEL);
     }
 
     public async setupRubyExtension() {
