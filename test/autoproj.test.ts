@@ -562,6 +562,40 @@ describe("Autoproj helpers tests", () => {
                     new RegExp(`Could not load '${ws.name}' installation manifest`));
             });
         });
+        describe("getPackageByBuildPath", () => {
+            let pkg: autoproj.IPackage;
+            beforeEach(() => {
+                pkg = builder1.addPackage("foobar");
+                workspaces.add(builder1.workspace);
+                workspaces.add(builder2.workspace);
+            });
+            it("returns the workspace and package whose builddir contains the path", async () => {
+                const r = await workspaces.getPackageByBuildPath(path.join(pkg.builddir, "bin", "foo"));
+
+                assert(r);
+                assert.deepEqual(pkg, r.package);
+                assert.deepEqual(builder1.workspace, r.workspace);
+            });
+            it("returns undefined if no package matches the path", async () => {
+                const r = await workspaces.getPackageByBuildPath(path.join(builder1.root, "unrelated", "bin"));
+                assert.equal(r, undefined);
+            });
+            it("ignores packages without a builddir", async () => {
+                const noBuild = builder1.addPackage("nobuild");
+                noBuild.builddir = "";
+                builder1.writeManifest();
+                const r = await workspaces.getPackageByBuildPath(noBuild.srcdir);
+                assert.equal(r, undefined);
+            });
+            it("throws if manifest cannot be read", async () => {
+                builder1.fs.mkfile("- bla: [", ".autoproj", "installation-manifest");
+
+                const ws = builder1.workspace;
+                await assert.rejects(
+                    workspaces.getPackageByBuildPath(path.join(pkg.builddir, "bin", "foo")),
+                    new RegExp(`Could not load '${ws.name}' installation manifest`));
+            });
+        });
         describe("getPackagesInCodeWorkspace", () => {
             let foo: autoproj.IPackage;
             let bar: autoproj.IPackage;
