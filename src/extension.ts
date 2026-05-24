@@ -5,6 +5,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import * as autoproj from "./autoproj";
 import * as commands from "./commands";
+import * as coverage from "./coverage";
 import * as tasks from "./tasks";
 import * as watcher from "./fileWatcher";
 import * as cpptools from "./cpptools";
@@ -124,6 +125,7 @@ export async function setupExtension(subscriptions: vscode.Disposable[]) {
     autoprojTaskProvider.reloadTasks();
     autoprojCommands.register(subscriptions);
     cppConfigurationProvider.register();
+    coverage.register(outputChannel, subscriptions, workspaces);
 
     subscriptions.push(bundleManager);
     subscriptions.push(eventHandler);
