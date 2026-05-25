@@ -1,5 +1,5 @@
 "use strict";
-import * as assert from "assert";
+import assert = require("assert");
 import * as path from "path";
 import { IMock, IGlobalMock, It, Mock, Times, GlobalMock, GlobalScope } from "typemoq";
 import * as vscode from "vscode";
@@ -69,7 +69,7 @@ describe("EventHandler", () => {
         let mockWatchFunc: IMock<(ws: autoproj.Workspace) => void>;
         let workspace: autoproj.Workspace;
         beforeEach(() => {
-            mockWatchFunc = Mock.ofInstance(() => void 0);
+            mockWatchFunc = Mock.ofInstance((_ws: autoproj.Workspace): void => { });
             subject.watchManifest = mockWatchFunc.object;
         });
         describe("with a valid instalatiion manifest", () => {
@@ -151,7 +151,7 @@ describe("EventHandler", () => {
                 uri: vscode.Uri.file(buildconfPath),
             };
 
-            mockUnwatchFunc = Mock.ofInstance(() => void 0);
+            mockUnwatchFunc = Mock.ofInstance((_ws: autoproj.Workspace): void => { });
             subject.unwatchManifest = mockUnwatchFunc.object;
         });
         it("de-registers the folder", async () => {
@@ -189,7 +189,7 @@ describe("EventHandler", () => {
             workspace = builder.workspace;
             workspaces.add(workspace)
             workspaces.addFolder(builder.root);
-            mockOnManifestChangedFunc = Mock.ofInstance(() => Promise.resolve());
+            mockOnManifestChangedFunc = Mock.ofInstance((_ws: autoproj.Workspace) => Promise.resolve());
             subject.onManifestChanged = mockOnManifestChangedFunc.object;
             installManifestPath = builder.fs.fullPath(".autoproj", "installation-manifest");
         });

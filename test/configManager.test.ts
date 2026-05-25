@@ -153,7 +153,7 @@ describe("configManager", () => {
     describe("writeShims()", () => {
         it("writes all shims", async () => {
             await subject.writeShims();
-            const ws = workspaces.workspaces.values().next().value;
+            const ws = workspaces.workspaces.values().next().value!;
             mockShimsWriter.verify((x) => x.writeGdb(ws), Times.once());
             mockShimsWriter.verify((x) => x.writeOpts(ws), Times.once());
             mockShimsWriter.verify((x) => x.writePython(ws), Times.once());
@@ -177,7 +177,7 @@ describe("configManager", () => {
         });
         it("does nothing if advancedExecutables is empty", async () => {
             const pkg = builder.addPackage("foo");
-            const advancedExecutables = []
+            const advancedExecutables: any[] = []
 
             workspaces.addFolder(pkg.srcdir);
             await host.addFolders(pkg.srcdir);
@@ -213,7 +213,7 @@ describe("configManager", () => {
 
             workspaces.addFolder(pkg1.srcdir);
             workspaces.addFolder(pkg3.srcdir);
-            await workspaces.workspaces.values().next().value.reload();
+            await workspaces.workspaces.values().next().value!.reload();
             await host.addFolders(pkg1.srcdir, pkg3.srcdir);
 
             m.getConfiguration.setup((x) => x("testMate.cpp.test")).returns(() => m.workspaceConfiguration.object);

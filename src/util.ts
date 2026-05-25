@@ -49,9 +49,9 @@ export function getLogger(channel: vscode.LogOutputChannel, name: string): vscod
         get(target, prop, receiver) {
             const methods = ["trace", "debug", "info", "warn", "error", "replace", "append", "appendLine"];
             if (methods.includes(String(prop))) {
-                return (msg, ...args) => target[prop].call(target, `[${name}] ${msg}`, ...args)
+                return (msg: string, ...args: any[]) => (target as any)[prop].call(target, `[${name}] ${msg}`, ...args)
             }
-            return target[prop];
+            return (target as any)[prop];
         }
     });
 }

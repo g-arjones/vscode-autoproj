@@ -1,4 +1,4 @@
-import * as assert from "assert";
+import assert = require("assert");
 import * as child_process from "child_process";
 import * as fileWatcher from "../src/fileWatcher";
 import { setTimeout as sleep } from "timers/promises";

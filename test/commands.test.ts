@@ -1,5 +1,5 @@
 "use strict";
-import * as assert from "assert";
+import assert = require("assert");
 import * as path from "path";
 import { basename, dirname } from "path";
 import { GlobalMock, IGlobalMock, IMock, It, Mock, Times } from "typemoq";
@@ -104,7 +104,7 @@ describe("Commands", () => {
         });
     });
     describe("showWorkspacePicker()", () => {
-        let choices: { label, description, workspace }[];
+        let choices: { label: string, description: string, workspace: autoproj.Workspace }[];
         function makeChoice(ws: autoproj.Workspace) {
             return {
                 description: basename(dirname(ws.root)),
@@ -225,7 +225,7 @@ describe("Commands", () => {
         let mockSubject: IMock<commands.Commands>;
         let packageOne: autoproj.IPackage;
         let packageTwo: autoproj.IPackage;
-        let choices: { label, description, folder }[] = [];
+        let choices: { label: string, description: string, folder: { name: string, uri: vscode.Uri } }[] = [];
         const options: vscode.QuickPickOptions = {
             matchOnDescription: true,
             placeHolder: "Select a package to add to this workspace",
@@ -802,9 +802,9 @@ describe("Commands", () => {
         });
     });
     describe("removeTestMateEntry()", () => {
-        let advancedExecutables;
+        let advancedExecutables: any[] | undefined;
         let pick: number | undefined;
-        let details: { workspaceFolderValue };
+        let details: { workspaceFolderValue: any };
         beforeEach(() => {
             details = { workspaceFolderValue: undefined };
             mocks.getConfiguration.setup((x) => x("testMate.cpp.test", It.isAny()))
@@ -845,7 +845,7 @@ describe("Commands", () => {
             pick = 1;
             await subject.removeTestMateEntry();
             mocks.workspaceConfiguration.verify((x) => {
-                    x.update("advancedExecutables", [advancedExecutables[1]], vscode.ConfigurationTarget.Workspace)
+                    x.update("advancedExecutables", [advancedExecutables![1]], vscode.ConfigurationTarget.Workspace)
                 },
                 Times.once());
         });
@@ -929,7 +929,7 @@ describe("Commands", () => {
         });
     });
     describe("addPackageToTestMate()", () => {
-        let advancedExecutables;
+        let advancedExecutables: any[] | undefined;
         let pick: number | undefined;
         beforeEach(() => {
             mocks.getConfiguration.setup((x) => x("testMate.cpp.test"))

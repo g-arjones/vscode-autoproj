@@ -14,9 +14,9 @@ import { GlobalMock, IGlobalMock, IMock, Mock } from "typemoq";
 export class WorkspaceBuilder {
     public readonly packages: Array<Autoproj.IPackage>;
     public readonly packageSets: Array<Autoproj.IPackageSet>;
-    public workspace: Autoproj.Workspace;
-    public root: string;
-    public fs: TempFS;
+    public workspace!: Autoproj.Workspace;
+    public root!: string;
+    public fs!: TempFS;
 
     constructor(
         public builddir: { dir: string[], relative: boolean } = { dir: ["build"], relative: false },
@@ -120,7 +120,7 @@ export class WorkspaceBuilder {
 }
 
 export class TempFS {
-    public root: string;
+    public root!: string;
     public createdFS: string[][];
 
     constructor() {
@@ -139,7 +139,7 @@ export class TempFS {
     public fullPath(...path: string[]): string {
         return Path.join(this.root, ...path);
     }
-    public mkdir(...path): string {
+    public mkdir(...path: string[]): string {
         let joinedPath = this.root;
         path.forEach((element) => {
             joinedPath = Path.join(joinedPath, element);
@@ -150,25 +150,25 @@ export class TempFS {
         });
         return joinedPath;
     }
-    public rmdir(...path) {
+    public rmdir(...path: string[]) {
         const joinedPath = this.fullPath(...path);
         FS.rmdirSync(joinedPath);
     }
-    public mkfile(data: string, ...path): string {
+    public mkfile(data: string, ...path: string[]): string {
         const joinedPath = this.fullPath(...path);
         FS.writeFileSync(joinedPath, data);
         this.createdFS.push([joinedPath, "file"]);
         return joinedPath;
     }
-    public registerDir(...path) {
+    public registerDir(...path: string[]) {
         const joinedPath = this.fullPath(...path);
         this.createdFS.push([joinedPath, "dir"]);
     }
-    public registerFile(...path) {
+    public registerFile(...path: string[]) {
         const joinedPath = this.fullPath(...path);
         this.createdFS.push([joinedPath, "file"]);
     }
-    public createInstallationManifest(data: any, ...workspacePath): string {
+    public createInstallationManifest(data: any, ...workspacePath: string[]): string {
         let joinedPath = this.fullPath(...workspacePath);
         joinedPath = Autoproj.installationManifestPath(joinedPath);
         this.mkdir(...workspacePath, ".autoproj");
@@ -185,7 +185,7 @@ export class TempFS {
                     FS.rmdirSync(entry[0]);
                 }
             } catch (error) {
-                if (!(error.code === "ENOENT")) {
+                if (!((error as NodeJS.ErrnoException).code === "ENOENT")) {
                     throw error;
                 }
             }

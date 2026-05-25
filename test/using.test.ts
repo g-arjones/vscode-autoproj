@@ -1,4 +1,4 @@
-import * as assert from "assert";
+import assert = require("assert");
 import { GlobalMock, Times } from "typemoq";
 import { using } from "./using";
 import { usingResultRegistry } from "./hooks";
