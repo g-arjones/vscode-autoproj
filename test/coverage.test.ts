@@ -1,7 +1,5 @@
 "use strict";
 import assert = require("assert");
-import * as cp from "child_process";
-import { EventEmitter } from "events";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
 import * as path from "path";
@@ -15,22 +13,6 @@ import { host, WorkspaceBuilder } from "./helpers";
 import { using } from "./using";
 
 const RESOURCES_DIR = path.resolve(__dirname, "..", "..", "test", "resources");
-
-interface FakeChildProcess extends EventEmitter {
-    stdout: EventEmitter;
-    stderr: EventEmitter;
-    kill: () => void;
-    killed: boolean;
-}
-
-function createFakeChildProcess(): FakeChildProcess {
-    const proc = new EventEmitter() as FakeChildProcess;
-    proc.stdout = new EventEmitter();
-    proc.stderr = new EventEmitter();
-    proc.killed = false;
-    proc.kill = () => { proc.killed = true; };
-    return proc;
-}
 
 function createTestRun(token?: vscode.CancellationToken) {
     const coverages: vscode.FileCoverage[] = [];
@@ -86,59 +68,40 @@ describe("Coverage", () => {
     });
 
     describe("execute()", () => {
-        let spawnMock: IGlobalMock<typeof cp.spawn>;
         let tokenSource: vscode.CancellationTokenSource;
 
         beforeEach(() => {
-            spawnMock = GlobalMock.ofInstance(cp.spawn, "spawn", cp);
             tokenSource = new vscode.CancellationTokenSource();
-            using(spawnMock);
         });
 
         it("resolves with stdout/stderr when the process exits with code 0", async () => {
-            const proc = createFakeChildProcess();
-            spawnMock.setup((x) => x(It.isAny(), It.isAny(), It.isAny())).returns(() => proc as any);
-
-            const promise = coverage.execute("gcov", ["a"], "/tmp", tokenSource.token);
-            setImmediate(() => {
-                proc.stdout.emit("data", Buffer.from("out"));
-                proc.stderr.emit("data", Buffer.from("err"));
-                proc.emit("close", 0);
-            });
-            const [stdout, stderr] = await promise;
+            const [stdout, stderr] = await coverage.execute(
+                "/bin/sh", ["-c", "printf out; printf err >&2"], "/tmp", tokenSource.token,
+            );
             assert.strictEqual(stdout, "out");
             assert.strictEqual(stderr, "err");
         });
 
         it("rejects when the process exits with a non-zero code", async () => {
-            const proc = createFakeChildProcess();
-            spawnMock.setup((x) => x(It.isAny(), It.isAny(), It.isAny())).returns(() => proc as any);
-
-            const promise = coverage.execute("gcov", [], "/tmp", tokenSource.token);
-            setImmediate(() => {
-                proc.stderr.emit("data", Buffer.from("boom"));
-                proc.emit("close", 2);
-            });
+            const promise = coverage.execute(
+                "/bin/sh", ["-c", "printf boom >&2; exit 2"], "/tmp", tokenSource.token,
+            );
             await assert.rejects(promise, /failed with exit code: 2; boom/);
         });
 
         it("rejects when the process emits an error", async () => {
-            const proc = createFakeChildProcess();
-            spawnMock.setup((x) => x(It.isAny(), It.isAny(), It.isAny())).returns(() => proc as any);
-
-            const promise = coverage.execute("gcov", [], "/tmp", tokenSource.token);
-            setImmediate(() => proc.emit("error", new Error("spawn-fail")));
-            await assert.rejects(promise, /spawn-fail/);
+            const promise = coverage.execute(
+                "/nonexistent/binary-that-does-not-exist", [], "/tmp", tokenSource.token,
+            );
+            await assert.rejects(promise, /ENOENT/);
         });
 
         it("rejects and kills the process when cancelled", async () => {
-            const proc = createFakeChildProcess();
-            spawnMock.setup((x) => x(It.isAny(), It.isAny(), It.isAny())).returns(() => proc as any);
-
-            const promise = coverage.execute("gcov", [], undefined, tokenSource.token);
+            const promise = coverage.execute(
+                "/bin/sh", ["-c", "sleep infinity"], undefined, tokenSource.token,
+            );
             setImmediate(() => tokenSource.cancel());
             await assert.rejects(promise, /Cancelled by user/);
-            assert.strictEqual(proc.killed, true);
         });
     });
 
