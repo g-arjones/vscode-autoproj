@@ -80,10 +80,12 @@ describe("configManager", () => {
         });
     });
     describe("setupTestMate()", () => {
-        it("sets standard executables to empty string", async () => {
+        it("sets standard executables to empty string and default coverage profile", async () => {
             m.getConfiguration.setup((x) => x("testMate.cpp.test")).returns(() => m.workspaceConfiguration.object);
+            m.getConfiguration.setup((x) => x("testMate.cpp.coverage")).returns(() => m.workspaceConfiguration.object);
             subject.setupTestMate();
             m.workspaceConfiguration.verify((x) => x.update("executables", ""), Times.once());
+            m.workspaceConfiguration.verify((x) => x.update("profile.default", "Autoproj (gcov)"), Times.once());
         })
     });
     describe("setupPythonExtension()", () => {

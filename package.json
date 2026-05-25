@@ -83,6 +83,11 @@
                 "command": "autoproj.enableCmakeDebuggingSymbols"
             },
             {
+                "title": "Enable test coverage (CMake)",
+                "category": "Autoproj",
+                "command": "autoproj.enableCmakeTestCoverage"
+            },
+            {
                 "title": "Open workspace",
                 "category": "Autoproj",
                 "command": "autoproj.openWorkspace"
@@ -378,6 +383,11 @@
                 "autoproj.supressCmakeBuildTypeOverrideNotice": {
                     "type": "boolean",
                     "description": "Supress notice shown when CMake build type is overriden",
+                    "default": false
+                },
+                "autoproj.supressCmakeCoverageOverrideNotice": {
+                    "type": "boolean",
+                    "description": "Supress notice shown when CMake test coverage is enabled",
                     "default": false
                 },
                 "autoproj.tasks.package.build": {

@@ -203,6 +203,20 @@ export class Workspaces {
         }
     }
 
+    /** Returns the workspace and package whose builddir contains the given path
+    */
+    public async getPackageByBuildPath(buildPath: string): Promise<{ workspace: Workspace, package: IPackage } | undefined> {
+        for (const ws of this.workspaces.values()) {
+            const info: WorkspaceInfo = await this._loadInstallationManifest(ws);
+            for (const pkg of info.packages.values()) {
+                if (pkg.builddir && isSubdirOf(buildPath, pkg.builddir)) {
+                    return { workspace: ws, package: pkg };
+                }
+            }
+        }
+        return undefined;
+    }
+
     /** Returns all packages that are directly or indirectly part of the current vscode workspace
     */
     public async getPackagesInCodeWorkspace(): Promise<{ workspace: Workspace, package: IPackage }[]> {
