@@ -17,7 +17,7 @@ export class Workspace {
     public name: string;
     // The workspace root directory
     public readonly root: string;
-    private _infoPromise: Promise<WorkspaceInfo>;
+    private _infoPromise?: Promise<WorkspaceInfo>;
     private _infoUpdatedEvent: vscode.EventEmitter<WorkspaceInfo>;
 
     constructor(root: string, loadInfo: boolean = true) {

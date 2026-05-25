@@ -1,4 +1,4 @@
-import * as assert from "assert";
+import assert = require("assert");
 import * as path from "path";
 import * as cpptools from "vscode-cpptools";
 import * as vscode from "vscode";

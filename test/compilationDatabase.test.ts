@@ -1,4 +1,4 @@
-import * as assert from "assert";
+import assert = require("assert");
 import * as path from "path";
 import { CompilationDatabase } from "../src/compilationDatabase";
 import { Mocks, WorkspaceBuilder } from "./helpers";

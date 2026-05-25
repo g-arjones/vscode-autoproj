@@ -1,5 +1,5 @@
 "use strict";
-import * as assert from "assert";
+import assert = require("assert");
 import * as path from "path";
 import * as TypeMoq from "typemoq";
 import * as vscode from "vscode";
@@ -433,7 +433,7 @@ describe("Autoproj helpers tests", () => {
             it("fires the package info event if the manifest has data for it", async () => {
                 const pkg = builder1.addPackage("foobar");
                 let { workspace } = workspaces.addFolder(pkg.srcdir);
-                let received;
+                let received: any;
                 workspaces.onFolderInfo((info) => received = info);
                 workspace = workspace as autoproj.Workspace;
                 await workspace.reload();

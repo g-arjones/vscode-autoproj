@@ -2,7 +2,7 @@ import { LogOutputChannel } from "vscode";
 import { Mocks } from "./helpers";
 import { asyncSpawn, getLogger, isSubdirOf } from "../src/util"
 import { IMock, Mock, Times } from "typemoq";
-import * as assert from "assert";
+import assert = require("assert");
 
 describe("getLogger()", () => {
     let mocks: Mocks;

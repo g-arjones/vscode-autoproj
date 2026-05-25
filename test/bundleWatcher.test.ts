@@ -1,4 +1,4 @@
-import * as assert from "assert";
+import assert = require("assert");
 import { Mocks, WorkspaceBuilder } from "./helpers";
 import * as path from "path";
 import * as progress from "../src/progress";

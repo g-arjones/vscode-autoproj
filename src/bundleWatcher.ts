@@ -54,7 +54,7 @@ export interface IBundleState {
 
 class PromiseQueue {
     public queue: Promise<any> = Promise.resolve();
-    public add(operation): Promise<number | null> {
+    public add(operation: () => Promise<number | null>): Promise<number | null> {
         return new Promise((resolve, reject) => {
             this.queue = this.queue.then(operation).then(resolve).catch(reject);
         });

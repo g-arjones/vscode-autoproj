@@ -1,12 +1,12 @@
 "use strict";
-import * as assert from "assert";
+import assert = require("assert");
 import * as cp from "child_process";
 import { EventEmitter } from "events";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
-import { GlobalMock, IGlobalMock, IMock, It, Mock, Times } from "typemoq";
+import { GlobalMock, IGlobalMock, It, Mock } from "typemoq";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
 import * as coverage from "../src/coverage";

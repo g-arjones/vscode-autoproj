@@ -4,7 +4,7 @@ const promisify = util.promisify;
 
 import * as path from 'path';
 import { walk as walk_ } from '@nodelib/fs.walk';
-import * as pLimit from 'p-limit';
+const pLimit = require('p-limit') as (concurrency: number) => any;
 
 // Limits the concurrent async access to the file system to avoid errors such as "EMFILE: too many open files".
 const fsAccessLimiter = pLimit(50);

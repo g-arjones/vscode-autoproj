@@ -1,4 +1,4 @@
-import * as assert from "assert";
+import assert = require("assert");
 import * as vscode from "vscode";
 import * as progress from "../src/progress";
 import { GlobalMock, IGlobalMock, IMock, It, Mock, Times } from "typemoq";

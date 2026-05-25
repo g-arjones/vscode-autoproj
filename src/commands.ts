@@ -368,7 +368,7 @@ export class Commands {
         const testMateConfig = vscode.workspace.getConfiguration("testMate.cpp.test");
         let advancedExecutables = testMateConfig.get<any[]>("advancedExecutables") || [];
 
-        const jsonEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+        const jsonEqual = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
         if (advancedExecutables.some((config) => jsonEqual(config, advancedExecutable))) {
             return;
         }
@@ -586,7 +586,7 @@ export class Commands {
         const wsConfig = vscode.workspace.getConfiguration("launch");
         let currentDebugConfigs = wsConfig.configurations as Array<any>;
 
-        const jsonEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+        const jsonEqual = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
         if (currentDebugConfigs.some((existing) => jsonEqual(config, existing))) {
             return;
         }

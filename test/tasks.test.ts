@@ -1,5 +1,5 @@
 "use strict";
-import * as assert from "assert";
+import assert = require("assert");
 import { basename as pathBasename, relative as pathRelative, join as pathJoin } from "path";
 import * as vscode from "vscode";
 import * as autoproj from "../src/autoproj";
@@ -64,6 +64,7 @@ describe("definitionsEqual()", () => {
 });
 
 describe("Task provider", () => {
+    const cancellationToken: vscode.CancellationToken = {} as any;
     let builder1: WorkspaceBuilder;
     let builder2: WorkspaceBuilder;
     let workspaces: autoproj.Workspaces;
@@ -128,7 +129,7 @@ describe("Task provider", () => {
             assert.deepEqual(task.presentationOptions, { reveal: vscode.TaskRevealKind.Silent });
         }
     }
-    function autoprojExePath(basePath) {
+    function autoprojExePath(basePath: string) {
         const wsRoot = autoproj.findWorkspaceRoot(basePath) as string;
         return autoproj.autoprojExePath(wsRoot);
     }
@@ -285,30 +286,30 @@ describe("Task provider", () => {
         const installManifest: autoproj.IPackage[] =
             yaml.load(await fs.readFile(pathJoin(wsRoot, ".autoproj", "installation-manifest"))) as autoproj.IPackage[];
 
-        const args = [wsRoot, pkgPath, packageName(pkgPath, wsRoot, installManifest)];
+        const args: [string, string, string] = [wsRoot, pkgPath, packageName(pkgPath, wsRoot, installManifest)];
         const buildTask = await subject.buildTask(pkgPath);
         assert.notEqual(buildTask, undefined);
-        assertBuildTask.apply(this, [buildTask, ...args]);
+        assertBuildTask(buildTask, ...args);
 
         const nodepsBuildTask = await subject.nodepsBuildTask(pkgPath);
         assert.notEqual(nodepsBuildTask, undefined);
-        assertNodepsBuildTask.apply(this, [nodepsBuildTask, ...args]);
+        assertNodepsBuildTask(nodepsBuildTask, ...args);
 
         const forceBuildTask = await subject.forceBuildTask(pkgPath);
         assert.notEqual(forceBuildTask, undefined);
-        assertForceBuildTask.apply(this, [forceBuildTask, ...args]);
+        assertForceBuildTask(forceBuildTask, ...args);
 
         const rebuildTask = await subject.rebuildTask(pkgPath);
         assert.notEqual(rebuildTask, undefined);
-        assertRebuildTask.apply(this, [rebuildTask, ...args]);
+        assertRebuildTask(rebuildTask, ...args);
 
         const updateTask = await subject.updateTask(pkgPath);
         assert.notEqual(updateTask, undefined);
-        assertUpdateTask.apply(this, [updateTask, ...args]);
+        assertUpdateTask(updateTask, ...args);
 
         const checkoutTask = await subject.checkoutTask(pkgPath);
         assert.notEqual(checkoutTask, undefined);
-        assertCheckoutTask.apply(this, [checkoutTask, ...args]);
+        assertCheckoutTask(checkoutTask, ...args);
     }
 
     async function assertAllWorkspaceTasks(wsRoot: string) {
@@ -362,16 +363,16 @@ describe("Task provider", () => {
             subject = new tasks.AutoprojProvider(workspaces);
         });
         it("is initalized with all tasks", async () => {
-            const providedTasks = await subject.provideTasks(null);
+            const providedTasks = await subject.provideTasks(cancellationToken);
             assert.equal(providedTasks.length, 28);
         });
         it("is initalized with all workspace tasks", async () => {
-            await subject.provideTasks(null);
+            await subject.provideTasks(cancellationToken);
             await assertAllWorkspaceTasks(wsOneRoot);
             await assertAllWorkspaceTasks(wsTwoRoot);
         });
         it("is initalized with all package tasks", async () => {
-            await subject.provideTasks(null);
+            await subject.provideTasks(cancellationToken);
             await assertAllPackageTasks(a, wsOneRoot);
             await assertAllPackageTasks(b, wsOneRoot);
             await assertAllPackageTasks(c, wsTwoRoot);
@@ -393,10 +394,10 @@ describe("Task provider", () => {
                 update: false,
                 updateConfig: false,
             };
-            await subject.provideTasks(null);
+            await subject.provideTasks(cancellationToken);
             subject.reloadTasks();
 
-            const providedTasks = await subject.provideTasks(null);
+            const providedTasks = await subject.provideTasks(cancellationToken);
             assert.equal(providedTasks.length, 0);
         });
         it("handles exception if installation manifest is invalid", async () => {
@@ -408,7 +409,7 @@ describe("Task provider", () => {
             }
 
             subject.reloadTasks();
-            const providedTasks = await subject.provideTasks(null);
+            const providedTasks = await subject.provideTasks(cancellationToken);
             await assertAllWorkspaceTasks(wsOneRoot);
             await assertAllWorkspaceTasks(wsTwoRoot);
             assert.equal(providedTasks.length, 10);
@@ -417,7 +418,7 @@ describe("Task provider", () => {
             mocks.showErrorMessage.verify((x) => x(It.is(msg)), Times.atLeast(1)); // TODO: why somestimes twice?
         });
         it("gets the package names from installation manifest", async () => {
-            await subject.provideTasks(null);
+            await subject.provideTasks(cancellationToken);
             await assertAllPackageTasks(a, wsOneRoot);
             await assertAllPackageTasks(b, wsOneRoot);
             await assertAllPackageTasks(c, wsTwoRoot);
@@ -425,7 +426,7 @@ describe("Task provider", () => {
         describe("AutoprojWorkspaceTaskProvider", () => {
             it("returns workspace tasks only", async () => {
                 const workspaceProvider = new tasks.AutoprojWorkspaceTaskProvider(subject);
-                const providedTasks = await workspaceProvider.provideTasks(null as any);
+                const providedTasks = await workspaceProvider.provideTasks(cancellationToken);
                 const filteredTasks = providedTasks.filter((task) => task.definition.type === "autoproj-workspace");
                 assert.equal(providedTasks.length, filteredTasks.length);
             });
@@ -437,7 +438,7 @@ describe("Task provider", () => {
         describe("AutoprojPackageTaskProvider", () => {
             it("returns package tasks only", async () => {
                 const packageProvider = new tasks.AutoprojPackageTaskProvider(subject);
-                const providedTasks = await packageProvider.provideTasks(null as any);
+                const providedTasks = await packageProvider.provideTasks(cancellationToken);
                 const filteredTasks = providedTasks.filter((task) => task.definition.type === "autoproj-package");
                 assert.equal(providedTasks.length, filteredTasks.length);
             });
@@ -453,7 +454,7 @@ describe("Task provider", () => {
             subject = new tasks.AutoprojProvider(workspaces);
         });
         it("provides an empty array of tasks", async () => {
-            const providedTasks = await subject.provideTasks(null);
+            const providedTasks = await subject.provideTasks(cancellationToken);
             assert.equal(providedTasks.length, 0);
         });
         it("creates tasks when folders/workspaces are added", async () => {
@@ -464,7 +465,7 @@ describe("Task provider", () => {
 
             subject.reloadTasks();
 
-            const providedTasks = await subject.provideTasks(null);
+            const providedTasks = await subject.provideTasks(cancellationToken);
             assert.equal(providedTasks.length, 11);
             await assertAllWorkspaceTasks(builder1.root);
             await assertAllPackageTasks(a, builder1.root);
@@ -475,7 +476,7 @@ describe("Task provider", () => {
             subject = new tasks.AutoprojProvider(workspaces);
         });
         it("resolveTask() always returns null", async () => {
-            assert.equal(await subject.resolveTask(undefined, undefined), null);
+            assert.equal(await subject.resolveTask(undefined as any, undefined as any), null);
         });
         it("task getters throws if there are no tasks", async () => {
             await assert.rejects(subject.buildTask("/not/found"), /no entry/);

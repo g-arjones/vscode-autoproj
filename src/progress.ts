@@ -6,14 +6,13 @@ export function createProgressView(title?: string) {
 }
 
 export class ProgressView {
-    private _resolver: (value?: any) => void;
-    private _view: Progress<{ message?: string, increment?: number }>;
-    private _currentProgress: number;
-    private _currentText: string;
-    private _promise: Promise<void>;
+    private _resolver?: (value?: any) => void;
+    private _view?: Progress<{ message?: string, increment?: number }>;
+    private _currentProgress: number = 0;
+    private _currentText?: string;
+    private _promise?: Promise<void>;
 
     constructor(public readonly title?: string) {
-        this._currentProgress = 0;
     }
 
     public show(): void {
@@ -38,11 +37,11 @@ export class ProgressView {
 
         if (this._currentProgress < 0) { this._currentProgress = 0; }
 
-        this._view.report({ message, increment });
+        this._view!.report({ message, increment });
     }
 
     public close() {
-        this._resolver();
+        this._resolver!();
     }
 
     public async wait() {
