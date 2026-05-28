@@ -1,0 +1,67 @@
+{
+	"folders": [
+		{
+			"name": "autoproj (sample)",
+			"path": "sample/autoproj"
+		},
+		{
+			"name": "sample (package set)",
+			"path": "sample/autoproj/sample"
+		},
+		{
+			"name": "sample_cpp",
+			"path": "sample/src/sample_cpp"
+		},
+		{
+			"name": "sample_py",
+			"path": "sample/src/sample_py"
+		}
+	],
+	"settings": {
+		"rubyLsp.rubyVersionManager": {
+			"identifier": "custom"
+		},
+		"testMate.cpp.test.executables": "",
+		"testMate.cpp.coverage.profile.default": "Autoproj (gcov)",
+		"python.defaultInterpreterPath": "/workspaces/vscode-autoproj/.autoproj-workspace/sample/.autoproj/vscode-autoproj/bin/python",
+		"python.useEnvironmentsExtension": false,
+		"testMate.cpp.test.advancedExecutables": [
+			{
+				"name": "sample_cpp",
+				"pattern": "/workspaces/vscode-autoproj/.autoproj-workspace/sample/build/sample_cpp/**/*{test,Test,TEST}*",
+				"cwd": "${absDirpath}",
+				"testGrouping": {
+					"groupByLabel": {
+						"label": "sample_cpp",
+						"description": "sample",
+						"groupByTags": {
+							"description": "${baseFilename}",
+							"tags": [],
+							"tagFormat": "${tag}"
+						}
+					}
+				},
+				"gtest": {
+					"debug.enableOutputColouring": true
+				},
+				"executionWrapper": {
+					"path": "/workspaces/vscode-autoproj/.autoproj-workspace/sample/.autoproj/bin/autoproj",
+					"args": [
+						"exec",
+						"--use-cache",
+						"${cmd}",
+						"${argsFlat}"
+					]
+				},
+				"debug.configTemplate": {
+					"type": "cppdbg",
+					"MIMode": "gdb",
+					"program": "${exec}",
+					"args": "${argsArray}",
+					"cwd": "${cwd}",
+					"miDebuggerPath": "/workspaces/vscode-autoproj/.autoproj-workspace/sample/.autoproj/vscode-autoproj/bin/gdb"
+				}
+			}
+		]
+	}
+}

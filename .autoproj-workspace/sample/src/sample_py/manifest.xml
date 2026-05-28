@@ -1,0 +1,6 @@
+<package>
+    <description brief="sample python package">
+    </description>
+    <maintainer>Gabriel Arjones/arjones@arjones.com</maintainer>
+    <depend package="python3-pytest" />
+</package>

@@ -14,7 +14,11 @@
     "customizations": {
         "vscode": {
             "extensions": [
-                "ms-vscode.extension-test-runner"
+                "ms-vscode.extension-test-runner",
+                "matepek.vscode-catch2-test-adapter",
+                "ms-python.python",
+                "ms-vscode.cpptools",
+                "shopify.ruby-lsp"
             ]
         }
     }

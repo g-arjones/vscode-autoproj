@@ -3,3 +3,11 @@ node_modules
 .vscode-test/
 .vsix
 coverage/
+.autoproj-workspace/sample/autoproj_install
+.autoproj-workspace/sample/env.sh
+.autoproj-workspace/sample/autoproj/overrides.d/
+.autoproj-workspace/sample/build/
+.autoproj-workspace/sample/install/
+.autoproj-workspace/sample/.autoproj/
+.autoproj-workspace/sample/**/.vscode/
+.autoproj-workspace/sample/**/__pycache__/
