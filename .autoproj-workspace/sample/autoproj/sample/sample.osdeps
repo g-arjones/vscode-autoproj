@@ -1,0 +1,5 @@
+google-test:
+    ubuntu: libgtest-dev
+
+python3-pytest:
+    ubuntu: python3-pytest

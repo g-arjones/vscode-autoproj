@@ -1,0 +1,4 @@
+source "https://rubygems.org"
+gem "autoproj"
+gem "autobuild"
+gem "facets", "< 3.2"

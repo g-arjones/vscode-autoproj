@@ -1,9 +1,18 @@
 FROM ubuntu:24.04
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
                                    apt-get install -y --no-install-recommends ca-certificates \
+                                                                              cmake \
                                                                               dbus \
                                                                               git \
                                                                               gnupg \
+                                                                              libyaml-dev \
+                                                                              python3 \
+                                                                              python3-pytest \
+                                                                              python3-pytest-cov \
+                                                                              python3-setuptools \
+                                                                              ruby-dev \
+                                                                              build-essential \
+                                                                              sudo \
                                                                               ssh \
                                                                               wget \
                                                                               xvfb \
@@ -12,7 +21,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 ENV NODE_VERSION=22.19.0
 RUN mkdir /opt/nodejs && \
     wget -qO- https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz | \
-    tar Jxvf - -C /opt/nodejs --strip-components=1
+    tar Jxvf - -C /opt/nodejs --strip-components=1 && \
+    echo '%sudo ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/nopasswd
 
 ENV PATH="/opt/nodejs/bin:$PATH"
 RUN wget -q -O /tmp/code.deb 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64' && \
