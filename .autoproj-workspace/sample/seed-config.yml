@@ -1,0 +1,5 @@
+apt_dpkg_update: false
+osdeps_mode: all
+USE_PYTHON: true
+python_executable: "/usr/bin/python3"
+python_version: '3.8'
