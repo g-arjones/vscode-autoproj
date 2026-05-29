@@ -3,4 +3,5 @@ package_sets:
 
 layout:
   - sample_cpp
+  - sample_rb
   - sample_py

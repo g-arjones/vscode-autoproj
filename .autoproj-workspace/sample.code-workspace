@@ -15,6 +15,10 @@
 		{
 			"name": "sample_py",
 			"path": "sample/src/sample_py"
+		},
+		{
+			"name": "sample_rb",
+			"path": "sample/src/sample_rb"
 		}
 	],
 	"settings": {
