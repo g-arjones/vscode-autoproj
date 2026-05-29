@@ -3,3 +3,6 @@ google-test:
 
 python3-pytest:
     ubuntu: python3-pytest
+
+minitest: gem
+simplecov: gem

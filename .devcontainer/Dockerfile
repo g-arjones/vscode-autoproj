@@ -18,7 +18,11 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
                                                                               xvfb \
                                                                               xz-utils
 
+ENV LANGUAGE=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
 ENV NODE_VERSION=22.19.0
+
 RUN mkdir /opt/nodejs && \
     wget -qO- https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz | \
     tar Jxvf - -C /opt/nodejs --strip-components=1 && \

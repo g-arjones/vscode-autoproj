@@ -1,0 +1,2 @@
+gem "stringio", "3.0.4"
+gem "erb", "4.0.2"
