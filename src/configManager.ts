@@ -69,7 +69,8 @@ export class ConfigManager {
 
     private async _setRubyLspConfiguration(workspace: autoproj.Workspace) {
         const bundle = this._bundleManager.getWatcher(workspace);
-        const shimsPath = path.join(workspace.root, ShimsWriter.RELATIVE_SHIMS_PATH);
+        const shimsPath = path.join(workspace.root, ShimsWriter.RELATIVE_OPTS_PATH);
+        const activateCmd = `source "${path.join(shimsPath, 'activate_ruby.sh')}"`
 
         await vscode.workspace.getConfiguration("rubyLsp").update("rubyVersionManager", { identifier: "custom" });
         // TODO:
@@ -77,7 +78,7 @@ export class ConfigManager {
         // anymore. Temporarily set it globally, considering that the extension sets it on startup, this is not a big
         // issue for users using Ruby in autoproj workspaces, but it might cause issues for users using Ruby in
         // non-autoproj workspaces. Look into a better solution in the future.
-        await vscode.workspace.getConfiguration("rubyLsp").update("customRubyCommand", `PATH=${shimsPath}:$PATH`, true);
+        await vscode.workspace.getConfiguration("rubyLsp").update("customRubyCommand", activateCmd, true);
         await vscode.workspace.getConfiguration("rubyLsp").update("bundleGemfile", bundle.extensionGemfile, true);
     }
 
@@ -89,6 +90,8 @@ export class ConfigManager {
             await this._shimsWriter.writePython(workspace);
             await this._shimsWriter.writeGdb(workspace);
             await this._shimsWriter.writeRuby(workspace);
+            await this._shimsWriter.writeActivateRuby(workspace);
+            await this._shimsWriter.writeBundle(workspace);
         } catch (err) {
             await vscode.window.showErrorMessage(`Could not create file: ${err.message}`);
         }

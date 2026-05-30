@@ -143,9 +143,10 @@ describe("configManager", () => {
                 m.getConfiguration.setup((x) => x("rubyLsp")).returns(() => m.workspaceConfiguration.object);
                 await subject.setupRubyExtension();
 
-                const shimsPath = path.join(builder.root, ".autoproj", "vscode-autoproj", "bin");
+                const shimsPath = path.join(builder.root, ".autoproj", "vscode-autoproj");
+                const activateCmd = `source "${path.join(shimsPath, 'activate_ruby.sh')}"`
                 m.workspaceConfiguration.verify((x) => x.update("rubyVersionManager", { identifier: "custom" }), Times.once());
-                m.workspaceConfiguration.verify((x) => x.update("customRubyCommand", `PATH=${shimsPath}:$PATH`, true), Times.once());
+                m.workspaceConfiguration.verify((x) => x.update("customRubyCommand", activateCmd, true), Times.once());
                 m.workspaceConfiguration.verify((x) => x.update("bundleGemfile", extensionGemfile, true), Times.once());
             });
         });
@@ -158,6 +159,8 @@ describe("configManager", () => {
             mockShimsWriter.verify((x) => x.writeOpts(ws), Times.once());
             mockShimsWriter.verify((x) => x.writePython(ws), Times.once());
             mockShimsWriter.verify((x) => x.writeRuby(ws), Times.once());
+            mockShimsWriter.verify((x) => x.writeActivateRuby(ws), Times.once());
+            mockShimsWriter.verify((x) => x.writeBundle(ws), Times.once());
         });
         it("shows an error message if writing fails", async () => {
             mockShimsWriter.setup((x) => x.writeOpts(It.isAny())).throws(new Error("foo"));
