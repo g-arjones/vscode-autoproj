@@ -3,6 +3,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
                                    apt-get install -y --no-install-recommends ca-certificates \
                                                                               cmake \
                                                                               dbus \
+                                                                              gdb \
                                                                               git \
                                                                               gnupg \
                                                                               libyaml-dev \

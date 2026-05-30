@@ -2,5 +2,5 @@
     <description brief="sample cpp package">
     </description>
     <maintainer>Gabriel Arjones/arjones@arjones.com</maintainer>
-    <depend package="sample_lib" />
+    <depend package="google-test" />
 </package>

@@ -3,5 +3,4 @@
     </description>
     <maintainer>Gabriel Arjones/arjones@arjones.com</maintainer>
     <depend package="python3-pytest" />
-    <depend package="sample_module" />
 </package>

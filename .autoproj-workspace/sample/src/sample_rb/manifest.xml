@@ -3,5 +3,5 @@
     </description>
     <maintainer>Gabriel Arjones/arjones@arjones.com</maintainer>
     <depend package="minitest" />
-    <depend package="simplecov" />
+    <depend package="sample_gem" />
 </package>

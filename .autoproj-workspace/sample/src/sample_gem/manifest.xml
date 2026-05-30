@@ -1,6 +1,6 @@
 <package>
-    <description brief="sample cpp package">
+    <description brief="sample ruby gem package">
     </description>
     <maintainer>Gabriel Arjones/arjones@arjones.com</maintainer>
-    <depend package="sample_lib" />
+    <depend package="minitest" />
 </package>
