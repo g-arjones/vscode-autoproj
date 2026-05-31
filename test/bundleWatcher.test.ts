@@ -76,6 +76,7 @@ describe("BundleWatcher", () => {
         extensionGemfile = path.join(workspace.root, ".autoproj", "vscode-autoproj", "Gemfile");
         stateFile = path.join(workspace.root, ".autoproj", "vscode-autoproj", "state.json");
         const cmd = `. ${envshFile} && ` +
+            'GIT_CONFIG_COUNT=0 ' +
             `BUNDLE_GEMFILE='${extensionGemfile}' ` +
             `BUNDLE_LOCKFILE='${extensionGemfile}.lock' exec bundle install`;
 
