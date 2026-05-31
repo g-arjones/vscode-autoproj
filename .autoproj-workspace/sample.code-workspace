@@ -13,6 +13,18 @@
 			"path": "sample/src/sample_cpp"
 		},
 		{
+			"name": "sample_gem",
+			"path": "sample/src/sample_gem"
+		},
+		{
+			"name": "sample_lib",
+			"path": "sample/src/sample_lib"
+		},
+		{
+			"name": "sample_module",
+			"path": "sample/src/sample_module"
+		},
+		{
 			"name": "sample_py",
 			"path": "sample/src/sample_py"
 		},
@@ -31,12 +43,12 @@
 		"python.useEnvironmentsExtension": false,
 		"testMate.cpp.test.advancedExecutables": [
 			{
-				"name": "sample_cpp",
-				"pattern": "/workspaces/vscode-autoproj/.autoproj-workspace/sample/build/sample_cpp/**/*{test,Test,TEST}*",
+				"name": "sample_lib",
+				"pattern": "/workspaces/vscode-autoproj/.autoproj-workspace/sample/build/sample_lib/**/*{test,Test,TEST}*",
 				"cwd": "${absDirpath}",
 				"testGrouping": {
 					"groupByLabel": {
-						"label": "sample_cpp",
+						"label": "sample_lib",
 						"description": "sample",
 						"groupByTags": {
 							"description": "${baseFilename}",

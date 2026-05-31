@@ -71,4 +71,26 @@ describe("ShimsWriter instanciated", () => {
             accessSync(path.join(root, relativeOptsPath), constants.F_OK);
         });
     });
+    describe("writeActivateRuby", () => {
+        let relativeShimPath: string;
+        beforeEach(() => {
+            relativeShimPath = path.join(ShimsWriter.RELATIVE_OPTS_PATH, "activate_ruby.sh");
+            tempfs.registerFile(relativeShimPath);
+        });
+        it("writes activate_ruby.sh in the given workspace", async () => {
+            await subject.writeActivateRuby(workspace);
+            accessSync(path.join(root, relativeShimPath), constants.F_OK);
+        });
+    });
+    describe("writeBundle", () => {
+        let relativeShimPath: string;
+        beforeEach(() => {
+            relativeShimPath = path.join(ShimsWriter.RELATIVE_SHIMS_PATH, "bundle");
+            tempfs.registerFile(relativeShimPath);
+        });
+        it("writes bundle shim in the given workspace", async () => {
+            await subject.writeBundle(workspace);
+            accessSync(path.join(root, relativeShimPath), constants.X_OK);
+        });
+    });
 });

@@ -3,5 +3,8 @@ package_sets:
 
 layout:
   - sample_cpp
-  - sample_rb
+  - sample_gem
+  - sample_lib
+  - sample_module
   - sample_py
+  - sample_rb

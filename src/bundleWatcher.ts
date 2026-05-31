@@ -258,7 +258,9 @@ export class BundleWatcher implements vscode.Disposable {
         await this.unwatch();
         await this._writeExtensionGemfile();
         const cmd = `. ${path.join(this._ws.root, "env.sh")} && ` +
-            `BUNDLE_GEMFILE='${this.extensionGemfile}' exec bundle install`
+            'GIT_CONFIG_COUNT=0 ' + // Avoid spurious config defined by vscode
+            `BUNDLE_GEMFILE='${this.extensionGemfile}' ` +
+            `BUNDLE_LOCKFILE='${this.extensionLockPath}' exec bundle install`
 
         const returnCode = asyncSpawn(this._logger, "/bin/sh", ["-c", cmd]).returnCode;
         try {

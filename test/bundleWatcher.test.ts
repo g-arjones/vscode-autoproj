@@ -75,7 +75,10 @@ describe("BundleWatcher", () => {
         let envshFile = path.join(workspace.root, "env.sh");
         extensionGemfile = path.join(workspace.root, ".autoproj", "vscode-autoproj", "Gemfile");
         stateFile = path.join(workspace.root, ".autoproj", "vscode-autoproj", "state.json");
-        const cmd = `. ${envshFile} && BUNDLE_GEMFILE='${extensionGemfile}' exec bundle install`;
+        const cmd = `. ${envshFile} && ` +
+            'GIT_CONFIG_COUNT=0 ' +
+            `BUNDLE_GEMFILE='${extensionGemfile}' ` +
+            `BUNDLE_LOCKFILE='${extensionGemfile}.lock' exec bundle install`;
 
         mocks.createProgressView.setup((x) => x(It.isAny())).returns((x) => mockView.object);
         mocks.asyncSpawn.setup((x) => x(mocks.logOutputChannel.object, "/bin/sh", ["-c", cmd]))
@@ -86,7 +89,7 @@ describe("BundleWatcher", () => {
 
         builder.fs.registerDir(".autoproj", "vscode-autoproj");
         builder.fs.registerFile(".autoproj", "vscode-autoproj", "Gemfile");
-        builder.fs.registerFile(".autoproj", "vscode-autoproj", "Gemfile.lcok");
+        builder.fs.registerFile(".autoproj", "vscode-autoproj", "Gemfile.lock");
         builder.fs.registerFile(".autoproj", "vscode-autoproj", "state.json");
         builder.fs.mkdir("install", "gems");
         builder.fs.mkfile("one", "install", "gems", "Gemfile.lock");
