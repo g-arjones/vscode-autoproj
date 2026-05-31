@@ -3,6 +3,9 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.4.1
+- Fix Ruby integration ([#70](https://github.com/g-arjones/vscode-autoproj/pull/70))
+
 ## 0.4.0
 - Add command to enable coverage on all CMake packages ([#65](https://github.com/g-arjones/vscode-autoproj/pull/65))
 - Set 'Autoproj (gcov)' as the default TestMate C++ coverage profile ([#65](https://github.com/g-arjones/vscode-autoproj/pull/65))
