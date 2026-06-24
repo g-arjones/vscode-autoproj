@@ -66,6 +66,48 @@
         "autoproj"
     ],
     "contributes": {
+        "chatSkills": [
+            {
+                "path": "./chat/skills/autoproj/SKILL.md",
+                "when": "autoproj.workspace"
+            }
+        ],
+        "chatPromptFiles": [
+            {
+                "path": "./chat/prompts/autoproj-build-test.prompt.md",
+                "when": "autoproj.workspace"
+            },
+            {
+                "path": "./chat/prompts/autoproj-new-package.prompt.md",
+                "when": "autoproj.workspace"
+            },
+            {
+                "path": "./chat/prompts/autoproj-run-checks.prompt.md",
+                "when": "autoproj.workspace"
+            },
+            {
+                "path": "./chat/prompts/autoproj-triage-build.prompt.md",
+                "when": "autoproj.workspace"
+            }
+        ],
+        "chatInstructions": [
+            {
+                "path": "./chat/instructions/autoproj-workspace.instructions.md",
+                "when": "autoproj.workspace"
+            },
+            {
+                "path": "./chat/instructions/autoproj-cpp.instructions.md",
+                "when": "autoproj.workspace"
+            },
+            {
+                "path": "./chat/instructions/autoproj-python.instructions.md",
+                "when": "autoproj.workspace"
+            },
+            {
+                "path": "./chat/instructions/autoproj-cmake.instructions.md",
+                "when": "autoproj.workspace"
+            }
+        ],
         "commands": [
             {
                 "title": "Add package to workspace",

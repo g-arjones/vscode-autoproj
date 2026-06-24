@@ -151,6 +151,7 @@ export async function setupExtension(subscriptions: vscode.Disposable[]) {
 // your extension is activated the very first time the command is executed
 export async function activate(extensionContext: vscode.ExtensionContext) {
     await setupExtension(extensionContext.subscriptions);
+    await vscode.commands.executeCommand('setContext', 'autoproj.workspace', true);
 }
 
 // this method is called when your extension is deactivated
