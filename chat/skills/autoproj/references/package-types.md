@@ -49,9 +49,21 @@ the build stamp triggers a rebuild; artificially old mtimes can suppress one.
   the workspace environment.
 - Changing `-D` defines reconfigures `CMakeCache.txt` on the next build.
 
+## Python test setup
+
+Before running Python tests, build/refresh the package with `amake <pkg>` (or
+just `amake` from its `srcdir`) after source edits, **or** activate the workspace
+env and prepend that `srcdir` to the existing `PYTHONPATH` for a direct source
+test. The environment alone may expose no copy of the package, or a stale
+installed copy. Both routes run from `srcdir`, not the workspace root. See
+[Python test prerequisites](../SKILL.md#python-test-prerequisites) for the
+source-first recipe; it does not build missing deps or generated artifacts.
+
 ## Seeing real build output
 
-Autoproj hides per-command output by default. To stream it:
+Autoproj hides per-command output by default. Run package commands from the
+package's resolved `srcdir` inside the workspace environment, even when autobuild
+uses a separate build dir internally. To stream output:
 
 ```bash
 amake --tool <pkg>              # real make/compiler output
@@ -67,11 +79,12 @@ See the troubleshooting and commands references.
 
 ### C++ test output gotcha
 `autoproj test` for a CMake package usually calls `make test`, which can swallow
-individual test output. Fall back to ctest verbose mode from the package
-**build dir**, always inside the env:
+individual test output. Keep the shell in `srcdir` and select the resolved
+**build dir** with `-C`, always inside the env (`root` is the absolute workspace
+root; `srcdir` and `builddir` come from its installation-manifest):
 
 ```bash
-.autoproj/bin/autoproj exec -- make test ARGS=-V
+"$root/.autoproj/bin/autoproj" exec -- make -C "$builddir" test ARGS=-V
 # ARGS=-V is forwarded to ctest -> verbose per-test output
 ```
 

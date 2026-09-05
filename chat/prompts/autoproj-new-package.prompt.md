@@ -26,7 +26,8 @@ Steps:
 3. **Declare the package** in the package set (its build definition + `source.yml`
    entry) following the existing entries' style.
 4. **Add it to the build** by inserting it into the `layout` of `autoproj/manifest`.
-5. **Verify** with `amake --tool <pkg>` inside the env, and report the result.
+5. **Verify** from the new package's source directory, not the workspace root,
+   with `amake --tool <pkg>` inside the workspace env, and report the result.
 
 Before editing any file under `autoproj/` or a package set, summarize the intended
 changes. Do not modify generated directories. Use `--no-interactive`.
