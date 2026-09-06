@@ -3,6 +3,9 @@ All notable changes to the "Autoproj" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.5.1
+- Enhance autoproj documentation for clarity and accuracy ([#76](https://github.com/g-arjones/vscode-autoproj/pull/76))
+
 ## 0.5.0
 - Contribute AI Agent customizations ([#71](https://github.com/g-arjones/vscode-autoproj/pull/71))
 
