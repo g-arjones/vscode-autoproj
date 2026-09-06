@@ -103,8 +103,9 @@ A YAML file autoproj regenerates on import/build. It contains, per package:
 It also has `package_set` entries (with `name`, `vcs`, `raw_local_dir`,
 `user_local_dir`). **Prefer this file over `alocate`** for resolving any package
 path. To read a single field quickly you can parse the YAML, or use
-`.autoproj/bin/autoproj exec -- ruby` with the `Autoproj::InstallationManifest`
-API if Ruby is convenient.
+`"$root/.autoproj/bin/autoproj" exec -- ruby` with the
+`Autoproj::InstallationManifest` API if Ruby is convenient (`root` is the absolute
+workspace root, so this also works from a package's `srcdir`).
 
 ### Other generated paths (do not edit)
 - `.autoproj/remotes/` — package-set clones.

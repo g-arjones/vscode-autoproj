@@ -34,7 +34,8 @@ CMake for you — you edit `CMakeLists.txt`/`.cmake`, then build with `amake`.
 
 ## After editing
 
-Reconfigure + build with `amake --tool <pkg>` to see real CMake configure and
+From the package's resolved `srcdir` (not the workspace root), reconfigure + build
+inside the workspace env with `amake --tool <pkg>` to see real CMake configure and
 compile output. If a stale cache causes trouble, use `amake --rebuild <pkg>`.
 Inspect `<logdir>/<pkg>-build.log` (path from the installation-manifest) for
 configure-time details.

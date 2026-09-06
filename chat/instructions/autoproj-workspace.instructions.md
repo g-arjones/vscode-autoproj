@@ -9,6 +9,10 @@ manager built on **autobuild**). These rules apply to every task. For commands,
 package-type build recipes, troubleshooting, and config-file details, use the
 `autoproj` skill.
 
+In command examples, `root` is the absolute workspace root; `srcdir` and
+`builddir` are the target package's resolved paths from the installation-manifest.
+Workspace-relative paths such as `.autoproj/` are anchored at `root`.
+
 ## Workspace layout (do not assume — verify)
 
 - `autoproj/` — workspace config (`manifest`, `init.rb`, `overrides.rb`, `overrides.d/`). **Editable.**
@@ -20,13 +24,15 @@ package-type build recipes, troubleshooting, and config-file details, use the
 
 1. **Edit source only.** Never modify anything under the build dir, install/prefix dir, `.autoproj/`, `env.sh`, `env.bash`, or `.autoproj/remotes/` — they are generated and will be overwritten.
 2. **Resolve real paths from `.autoproj/installation-manifest`** (YAML: per-package `srcdir`, `builddir`, `prefix`, `logdir`, `dependencies`). Do **not** rely on `alocate` (known to be buggy) and do **not** hardcode `src/`, `build/`, `install/`.
-3. **Always run tools inside the workspace environment.** Either `source env.sh` first, or wrap each command with `.autoproj/bin/autoproj exec -- <cmd>`. Outside the env, libraries and tools are not on the path.
-4. **Build and test through autoproj**, not raw `cmake`/`make`/`colcon`/`pytest`: use `amake` (build), `autoproj test`, `aup` (update). To **see the real underlying build/test output**, pass `--tool` (e.g. `amake --tool <pkg>`, `autoproj test --tool <pkg>`); it streams `make`/`ctest` output to STDOUT instead of hiding it.
-5. **For C++ test output that `make test` swallows**, fall back to `make test ARGS=-V` from the package build dir — always via the env (`.autoproj/bin/autoproj exec -- make test ARGS=-V`).
-6. **`autoproj test` is silent when a package's tests are disabled/unavailable** (exit 0, no output) — that is *not* a pass. Check with `autoproj test list <pkg>` (`Enabled`/`Available`); if disabled, `autoproj test enable <pkg>` (persists), then rebuild and run.
-7. **Never block on prompts.** Pass `--no-interactive` (or set `AUTOPROJ_NONINTERACTIVE=1`) for automation.
-8. **Build a single package with its deps:** `amake <pkg>`; add `-n`/`--no-deps` to build only that package (deps must already be built).
-9. **Missing dependency under `separate_prefixes`.** If a build/run fails because a *built* dependency isn't visible (failed `find_package`, missing headers/libs, failed Python import), autoproj likely didn't inject its prefix because it's **not declared in the package's `manifest.xml`/`package.xml`**. The manifest lives in the package source tree, or — often for third-party packages — in the owning package set under `manifests/<name>.xml`. Check it and, if the dependency is missing, **ASK the user** before adding it — never add it silently.
+3. **Run every package-scoped command from that package's `srcdir`, not the workspace root.** Set the working directory explicitly or use `cd "$srcdir" && <cmd>` for builds, tests, linters, and type-checkers. A package argument or absolute test path does not constrain working-directory scans or config discovery. Check multiple packages separately from their own source dirs; reserve the root for workspace discovery and explicitly workspace-wide operations.
+4. **Always run tools inside the workspace environment.** Either `source "$root/env.sh"` first, or wrap each command with `"$root/.autoproj/bin/autoproj" exec -- <cmd>`. Absolute workspace paths keep this working from `srcdir`. An `exec` call does not activate later commands in the parent shell.
+5. **Build and test through autoproj** by default: use `amake` (build), `autoproj test`, `aup` (update), rather than raw build tools. To **see the real underlying build/test output**, pass `--tool` (e.g. `amake --tool <pkg>`, `autoproj test --tool <pkg>`); it streams `make`/`ctest` output to STDOUT instead of hiding it. The focused test recipes below still require the workspace env and `srcdir` working directory.
+6. **Before Python tests, build/refresh the package or expose its source.** Run `amake <pkg>` (or `amake` from `srcdir`) after source edits; alternatively, after sourcing `"$root/env.sh"`, run a direct test with `PYTHONPATH="$srcdir${PYTHONPATH:+:$PYTHONPATH}" pytest <test-path>`. Preserve the workspace's existing `PYTHONPATH`; the env alone does not ensure the package under test is importable or current.
+7. **For C++ test output that `make test` swallows**, keep the shell in `srcdir` and select the build dir with `-C`: `"$root/.autoproj/bin/autoproj" exec -- make -C "$builddir" test ARGS=-V` (verbose ctest).
+8. **`autoproj test` is silent when a package's tests are disabled/unavailable** (exit 0, no output) — that is *not* a pass. Check with `autoproj test list <pkg>` (`Enabled`/`Available`); if disabled, `autoproj test enable <pkg>` (persists), then rebuild and run.
+9. **Never block on prompts.** Pass `--no-interactive` (or set `AUTOPROJ_NONINTERACTIVE=1`) for automation.
+10. **Build a single package with its deps:** `amake <pkg>`; add `-n`/`--no-deps` to build only that package (deps must already be built).
+11. **Missing dependency under `separate_prefixes`.** If a build/run fails because a *built* dependency isn't visible (failed `find_package`, missing headers/libs, failed Python import), autoproj likely didn't inject its prefix because it's **not declared in the package's `manifest.xml`/`package.xml`**. For Python, first distinguish the package under test (rule 6) from a dependency. The manifest lives in the package source tree, or — often for third-party packages — in the owning package set under `manifests/<name>.xml`. Check it and, if the dependency is missing, **ASK the user** before adding it — never add it silently.
 
 ## When things break
 

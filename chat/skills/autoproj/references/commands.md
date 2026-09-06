@@ -1,7 +1,15 @@
 # Autoproj & Autobuild Command Reference
 
-All commands assume the workspace environment is active: either `source env.sh`
-first, or wrap the command with `.autoproj/bin/autoproj exec -- <cmd>`.
+For package-scoped commands, set the working directory to the package's resolved
+`srcdir`, **not the workspace root** (including tests, linters, and type-checkers).
+Here `root` is the absolute workspace root; `srcdir` and `builddir` come from its
+`.autoproj/installation-manifest`. Use `cd "$srcdir" && <cmd>` or explicitly set
+the tool's working directory. Reserve the root for workspace-wide operations.
+
+All commands also require the workspace environment: either
+`source "$root/env.sh"` first, or wrap each command with
+`"$root/.autoproj/bin/autoproj" exec -- <cmd>`. Absolute paths work from `srcdir`;
+an `exec` invocation does not activate the parent shell for later commands.
 
 ## Convenience executables (shortcuts)
 
@@ -84,6 +92,12 @@ runnable test suite.
 
 ## Recipes
 
+**Before Python tests:** build/refresh with `amake <pkg>` (or `amake` from
+`srcdir`), or activate the workspace env and prepend `srcdir` to its existing
+`PYTHONPATH` for a direct source test. The env alone does not ensure the current
+package is importable or up to date. See the
+[Python test prerequisites](../SKILL.md#python-test-prerequisites) for the recipe.
+
 ```bash
 # See exactly why a build fails, with live compiler output:
 amake --tool <pkg>
@@ -93,11 +107,11 @@ amake -n <pkg>
 
 # Run one package's tests with full ctest output:
 autoproj test --tool <pkg>
-# or, for C++ when make test hides output, from the package build dir:
-.autoproj/bin/autoproj exec -- make test ARGS=-V
+# or, for C++ when make test hides output, keep the shell in srcdir:
+"$root/.autoproj/bin/autoproj" exec -- make -C "$builddir" test ARGS=-V
 
 # Run an arbitrary tool inside the env without sourcing:
-.autoproj/bin/autoproj exec -- <cmd> [args...]
+"$root/.autoproj/bin/autoproj" exec -- <cmd> [args...]
 
 # Health check after weird failures:
 autoproj envsh

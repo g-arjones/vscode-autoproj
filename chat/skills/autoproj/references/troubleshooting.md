@@ -1,10 +1,18 @@
 # Troubleshooting Builds & Tests
 
-Work inside the workspace environment (`source env.sh`, or `.autoproj/bin/autoproj
-exec -- <cmd>`). Resolve all paths from `.autoproj/installation-manifest`
+Resolve all paths from the workspace's `.autoproj/installation-manifest`
 (`srcdir`, `builddir`, `prefix`, `logdir`), not from guesses or `alocate`.
+Run package commands with **`srcdir` as the working directory**, not the workspace
+root. Work inside the workspace environment (`source "$root/env.sh"`, or
+`"$root/.autoproj/bin/autoproj" exec -- <cmd>`), where `root` is the absolute
+workspace root. Those absolute paths remain valid after changing to `srcdir`.
 
 ## Step 1 — Get the real error
+
+Before reproducing a Python test, build/refresh with `amake <pkg>` (or `amake`
+from `srcdir`), or use the
+[source-first PYTHONPATH recipe](../SKILL.md#python-test-prerequisites) for a direct
+test without installing. Environment activation alone is not sufficient.
 
 Re-run the failing operation in **tool mode** so the underlying tool's output is
 not hidden:
@@ -14,11 +22,11 @@ amake --tool <pkg>              # build errors, live
 autoproj test --tool <pkg>      # test errors, live
 ```
 
-For C++ tests where `make test` hides per-test detail, from the package
-**build dir**:
+For C++ tests where `make test` hides per-test detail, keep the shell in `srcdir`
+and select the package's **build dir** with `-C`:
 
 ```bash
-.autoproj/bin/autoproj exec -- make test ARGS=-V
+"$root/.autoproj/bin/autoproj" exec -- make -C "$builddir" test ARGS=-V
 ```
 
 ## Step 2 — Read the logs
@@ -62,12 +70,13 @@ run the health check:
 autoproj envsh
 ```
 
-This reloads the workspace and regenerates `env.sh`.
+This reloads the workspace and regenerates `env.sh`. On success, re-source
+`"$root/env.sh"` before retrying from the package's `srcdir`.
 
 ```mermaid
 flowchart TD
     A[Commands failing] --> B[autoproj envsh]
-    B -->|succeeds| C[re-source env.sh, retry]
+   B -->|succeeds| C[re-source workspace env, retry from srcdir]
     B -->|fails| D[Workspace is broken]
     D --> E[Diagnose & PROPOSE a fix]
     E --> F[Request explicit user authorization]
@@ -81,6 +90,12 @@ user authorization before running any corrective or destructive action**. Never
 delete `.autoproj/` state, re-bootstrap, or modify workspace config unprompted.
 
 ## Missing dependency under `separate_prefixes` (find_package / import failures)
+
+If a Python import fails for the **package under test itself**, first check the
+test setup: from its `srcdir`, build/refresh with `amake <pkg>` or, after sourcing
+the workspace env, prepend `srcdir` to the existing `PYTHONPATH` for direct tests.
+Do not mistake an absent/stale install of the package itself for an undeclared
+dependency.
 
 A dependency's prefix is injected into a package's build/run environment only if
 that dependency is **declared in the package's `manifest.xml` / `package.xml`**
@@ -109,6 +124,8 @@ undeclared dependency's prefix is **never added**, and the build/run breaks:
 ## Common causes checklist
 
 - Command run **outside** the env → tools/libraries missing. Fix: source env or use `autoproj exec`.
+- Package check run from the **workspace root** → unrelated packages/configuration scanned. Set cwd to the resolved `srcdir`; passing a package/test path is not enough.
+- Python tests cannot import the **package under test**, or use stale code → from `srcdir`, run `amake <pkg>`/`amake` first, or use a source-first `PYTHONPATH` after activating the workspace env.
 - A **dependency** isn't built → `amake <pkg>` (without `-n`) to build deps first.
 - `autoproj test` gives **no output (exit 0)** → tests are **disabled/unavailable**, not passing. `autoproj test list <pkg>`; if disabled, `autoproj test enable <pkg>` → `amake --tool <pkg>` → run. If `Available` stays false, there is no test suite.
 - A dependency **isn't declared** in the package's `manifest.xml`/`package.xml` and `separate_prefixes` is on → its prefix is not injected; check the manifest and **ASK** before adding (see above).
@@ -137,13 +154,13 @@ broken during troubleshooting. Try these in order and stop at the first that wor
 
 1. **Inside the env (preferred — resolves the actually-loaded version):**
    ```bash
-   .autoproj/bin/autoproj exec ruby -e 'puts Gem.loaded_specs["autoproj"].full_gem_path'
-   .autoproj/bin/autoproj exec ruby -e 'puts Gem.loaded_specs["autobuild"].full_gem_path'
+   "$root/.autoproj/bin/autoproj" exec ruby -e 'puts Gem.loaded_specs["autoproj"].full_gem_path'
+   "$root/.autoproj/bin/autoproj" exec ruby -e 'puts Gem.loaded_specs["autobuild"].full_gem_path'
    ```
 2. **If `autoproj exec` fails but bundler still works:**
    ```bash
-   .autoproj/bin/bundle show autoproj
-   .autoproj/bin/bundle show autobuild
+   "$root/.autoproj/bin/bundle" show autoproj
+   "$root/.autoproj/bin/bundle" show autobuild
    ```
 3. **If bundler also fails — read `.autoproj/Gemfile.lock`** (static, no execution).
    Find the gem's version and the section it's under, which tells you the source
